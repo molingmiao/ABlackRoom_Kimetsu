@@ -1,0 +1,92 @@
+div#buildBtns {
+	position: absolute;
+	top: 50px;
+	left: 0px;
+}
+
+div#buildBtns:before, div#craftBtns:before, div#buyBtns:before {
+	content: attr(data-legend);
+	position: relative;
+	top: -5px;
+}
+
+div#craftBtns {
+	position: absolute;
+	top: 50px;
+	left: 150px;
+}
+
+div#buyBtns {
+	position: absolute;
+	top: 50px;
+	left: 300px;
+}
+
+div#storesContainer {
+	position: absolute;
+	top: 0px;
+	right: 0px;
+}
+
+div#stores:before, div#weapons:before {
+	position: absolute;
+	background: white;
+	content: attr(data-legend);
+	left: 8px;
+	top: -13px;
+}
+
+/* 库存分组折叠/展开 — 在含 .storeGroup 类的容器上用 JS 注入的 header 替代 :before */
+div#stores.storeGroup:before, div#weapons.storeGroup:before {
+	content: "";
+	display: none;
+}
+
+div.storeGroup > div.storeGroupHeader {
+	position: absolute;
+	background: white;
+	left: 8px;
+	top: -13px;
+	padding: 0 4px;
+	cursor: pointer;
+	user-select: none;
+	-webkit-user-select: none;
+	z-index: 1;
+}
+
+div.storeGroup > div.storeGroupHeader .storeGroupCaret {
+	display: inline-block;
+	width: 12px;
+	font-size: 10px;
+}
+
+div.storeGroup.collapsed {
+	padding-bottom: 0;
+}
+
+div.storeGroup.collapsed > div:not(.storeGroupHeader) {
+	display: none;
+}
+
+div#stores {
+	position: relative;
+	z-index:10;
+	border: 1px solid black;
+	cursor: default;
+	padding: 5px 10px;
+	width: 200px;
+}
+
+div.storeRow {
+	position: relative;
+}
+
+div#weapons {
+	margin-top: 15px;
+	position: relative;
+	right: 0px;
+	border: 1px solid black;
+	cursor: default;
+	padding: 5px 10px;
+	width: 200px;
+}

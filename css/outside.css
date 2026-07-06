@@ -1,0 +1,88 @@
+div#village {
+	position: absolute;
+	top: 0px;
+	right: 0px;
+	border: 1px solid black;
+	cursor: default;
+	padding: 5px 10px;
+	width: 200px;
+}
+
+div#population {
+	position: absolute;
+	top: -13px;
+	right: 10px;
+	background-color: white;
+}
+
+.noHuts #population {
+	display: none;
+}
+
+div#village:before {
+	position: absolute;
+	background: white;
+	content: attr(data-legend);
+	left: 8px;
+	top: -13px;
+}
+
+div#workers {
+	position:absolute;
+	top: -4px;
+	left: 160px;
+	width: 150px;
+}
+
+.workerRow > .row_val {
+	position: relative;
+	padding-right: 20px;
+	-webkit-touch-callout: none;
+	-webkit-user-select: none;
+	-khtml-user-select: none;
+	-moz-user-select: none;
+	-ms-user-select: none;
+	user-select: none;
+}
+
+.workerRow {
+	position: relative;
+	margin: 10px 0px;
+	cursor: default;
+}
+
+.workerRow .tooltip {
+	width: 150px;
+}
+
+div.storeRow div.tooltip {
+	width: 160px;
+}
+
+/* 村落信息行：文字左、数字右，flex 保证同一行且数字列对齐 */
+div#village div.storeRow {
+	display: flex;
+	justify-content: space-between;
+	align-items: baseline;
+	line-height: 1.5;
+}
+div#village div.storeRow > .row_key,
+div#village div.storeRow > .row_val {
+	float: none;
+}
+div#village div.storeRow > .row_val {
+	min-width: 28px;
+	text-align: right;
+	font-variant-numeric: tabular-nums;
+}
+div#village div.storeRow > .clear {
+	display: none;
+}
+
+/* 村民 workerRow 里的数字用等宽数字，并留出 up/dn 按钮空间 */
+div#workers div.workerRow > .row_val > span {
+	display: inline-block;
+	min-width: 28px;
+	text-align: right;
+	font-variant-numeric: tabular-nums;
+}

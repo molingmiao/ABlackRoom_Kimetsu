@@ -1,0 +1,18 @@
+module.exports = {
+	"the screaming lasts the better part of the night.": "尖叫几乎持续了大半夜。",
+	"you keep the fire stoked just to drown it out. by morning, the wood is half what it was.": "你只能不停添柴来盖过他的哭嚎——天亮时，柴堆已被烧去一半。",
+	"a sleepless night by the fire — wood is burned through.": "彻夜难眠——木材被白白烧去不少。",
+	"rub your eyes": "揉揉酸涩的眼睛",
+	"he leaves a folded charm at the threshold before vanishing.": "他在门槛上留下一枚折好的护身符，随即消失。",
+	"a breathing form is taught — and a charm left at the gate.": "一式呼吸法已得传授——门口还留下一枚护身符。",
+	"by morning, he is gone — along with some of the cured meat and a charm or two.": "次日清晨，他不见踪影——熏肉与护身符也少了一些。",
+	"the slayer wanders off at dawn — supplies missing.": "队员于清晨离去——补给有所遗失。",
+	"the boar-headed slayer snorts in disgust.": "猪头队员鄙夷地哼了一声。",
+	"he kicks over a stack of supplies on his way out, sending pelts and skins everywhere.": "他出门时一脚踢翻了一堆补给——毛皮与生皮散落一地。",
+	"the wild slayer trashes some supplies on his way out.": "野性队员临走前糟蹋了一些补给。",
+	"right the shelves": "扶正货架",
+	"a bundle of trophies is left behind — fangs, leather, charms.": "他扔下一捆战利品——獠牙、生皮、护身符散在地上。",
+	"the wild slayer is bested — trophies and a perk are gained.": "野性队员败北——得到战利品和一项技艺。",
+	"some supplies are scattered in the chaos — and you favour the bruised side for days.": "混乱中物资散落一地——你也因伤侧着身子歇了好几日。",
+	"beaten by the wild slayer — supplies scattered, rations spent on recovery.": "被野性队员压制——物资散失，伤药口粮也消耗了几日。",
+};

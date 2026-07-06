@@ -1,0 +1,29 @@
+{
+  "name": "apurpleroom",
+  "type": "module",
+  "version": "1.5.0",
+  "private": true,
+  "repository": "https://github.com/molingmiao/APurpleRoom.git",
+  "author": "Michael Townsend <michael@doublespeakgames.com>",
+  "license": "MPL-2.0",
+  "scripts": {
+    "start": "node dev-server.js",
+    "start:nodep": "node tools/static-server.cjs",
+    "lint": "eslint script dev-server.js",
+    "lint:fix": "eslint script dev-server.js --fix",
+    "format": "prettier --write \"script/**/*.js\" \"dev-server.js\" \"*.html\" \"css/**/*.css\"",
+    "format:check": "prettier --check \"script/**/*.js\" \"dev-server.js\" \"*.html\" \"css/**/*.css\"",
+    "check": "node --check dev-server.js",
+    "test:migrate": "node tools/test_migrate.cjs",
+    "update_pot": "pybabel extract -F lang/babel.cfg -c \"TRANSLATORS\" script -o lang/adarkroom.pot"
+  },
+  "dependencies": {
+    "express": "^4.17.1"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.0.0",
+    "eslint": "^9.0.0",
+    "globals": "^15.0.0",
+    "prettier": "^3.8.0"
+  }
+}

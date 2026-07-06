@@ -1,0 +1,17 @@
+# 第三方库
+lib/
+
+# 翻译数据（JSON 单行长串，prettier 会破坏）
+lang/
+
+# 静态资源
+audio/
+img/
+doc/
+
+# Node 产物
+node_modules/
+
+# 旧文档
+*.po
+*.pot

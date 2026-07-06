@@ -1,0 +1,270 @@
+body {
+	background-color: #272823;
+	color: #EEE;
+}
+
+div.headerButton {
+	border-left: 1px solid #EEE;
+}
+
+div#notifyGradient {
+	background-color: #272823;
+	background: -webkit-linear-gradient( rgba(39, 40, 35, 0) 0%, rgba(39, 40, 35, 1) 100% );
+	background: linear-gradient( rgba(39, 40, 35, 0) 0%, rgba(39, 40, 35, 1) 100% );
+	filter: alpha( Opacity=0, FinishOpacity=100, Style=1, StartX=0, StartY=0, FinishX=0, FinishY=500 );
+}
+
+div#saveNotify {
+	background: #272823;
+}
+
+.eventPanel:before {
+	background-color: #272823;
+}
+
+.eventTitle:after {
+	background-color: #272823;
+}
+
+div.tooltip {
+	background-color: #171813;
+	border: 1px solid black;
+	box-shadow: -1px 3px 2px #111;
+}
+
+div#population {
+	background-color: #272823;
+}
+
+div#village:before {
+	background: #272823;
+}
+
+div#village {
+	border: 1px solid #EEE;
+}
+
+div#stores:before {
+	background: #272823;
+}
+
+div.storeGroup > div.storeGroupHeader {
+	background: #272823;
+	color: #EEE;
+}
+
+/* 夜间模式下通知分隔线 */
+div#notifications div.notification {
+	border-bottom: 1px dashed rgba(255, 255, 255, 0.18);
+}
+
+/* 夜间模式下重要通知的边框色略调亮，背景透明度略提高 */
+div#notifications div.notification.notify-achievement {
+	background: rgba(212, 160, 23, 0.14);
+}
+div#notifications div.notification.notify-boon {
+	background: rgba(174, 108, 210, 0.14);
+	border-left-color: #ae6cd2;
+}
+div#notifications div.notification.notify-reward {
+	background: rgba(74, 178, 74, 0.14);
+	border-left-color: #4ab24a;
+}
+div#notifications div.notification.notify-summary {
+	background: rgba(94, 174, 210, 0.14);
+	border-left-color: #5eaed2;
+}
+div#notifications div.notification.notify-loss {
+	background: rgba(220, 89, 76, 0.14);
+	border-left-color: #dc594c;
+}
+div#notifications div.notification.notify-npc {
+	background: rgba(120, 176, 240, 0.10);
+	border-left-color: #78b0f0;
+}
+
+/* 夜间模式下战斗按钮边框颜色保持不变（高亮足够），仅调法新解锁边框 */
+div.button.newly-unlocked {
+	border-color: #ffcf33 !important;
+	box-shadow: 0 0 8px rgba(255, 207, 51, 0.7);
+}
+
+div#stores {
+	border: 1px solid #EEE;
+}
+
+/* 成就面板 - 夜间模式 */
+#achievementsPanel {
+	background: #272823;
+	color: #EEE;
+	border: 1px solid #EEE;
+}
+#achievementsPanel .achGroupTitle {
+	border-bottom: 1px solid #555;
+}
+#achievementsPanel .achRow {
+	color: #777;
+}
+#achievementsPanel .achRow.unlocked {
+	color: #EEE;
+}
+#achievementsPanel .achRow.unlocked .achMark {
+	color: #6f6;
+}
+#achievementsPanel .achDesc {
+	color: #888;
+}
+#achievementsPanel .achRow.unlocked .achDesc {
+	color: #BBB;
+}
+
+/* 无限城节点面板 - 夜间模式（body.noMask 状态下） */
+body.noMask #floorHeader { border-bottom-color: #888; }
+body.noMask .floorSubTitle { color: #999; }
+body.noMask .floorActionBar { border-bottom-color: #555; }
+body.noMask .floorActionBtn { color: #DDD; border-color: #999; }
+body.noMask .floorActionBtn.disabled { color: #555; border-color: #444; }
+body.noMask .nodeBtn { color: #DDD; border-color: #BBB; }
+body.noMask .nodeBtn small { color: #888; }
+
+div#blueprints:before {
+	background: #272823;
+}
+
+div#blueprints {
+	border: 1px solid #EEE;
+}
+
+div#weapons:before {
+	background: #272823;
+}
+
+div#weapons {
+	border: 1px solid #EEE;
+}
+
+div#bagspace {
+	background-color: #272823;
+}
+
+div#outfitting:before {
+	background: #272823;
+}
+
+div#perks {
+	border: 1px solid #EEE;
+}
+
+div#perks:before {
+	background-color: #272823;
+}
+
+div#outfitting {
+	border: 1px solid #EEE;
+}
+
+#bagspace-world {
+	border: 1px solid #EEE;
+}
+
+div.supplyItem {
+	border: 1px solid #EEE;
+}
+
+#backpackTitle {
+	background-color: #272823;
+}
+
+#backpackSpace {
+	background-color: #272823;
+}
+
+#healthCounter {
+	background-color: #272823;
+}
+
+#map {
+	border: 1px solid #EEE;
+}
+
+#map .landmark {
+	color: #EEE;
+}
+
+#dropMenu {
+	background: none repeat scroll 0 0 #272823;
+	box-shadow: -1px 3px 2px #111;
+}
+
+div.button {
+	border: 1px solid #EEE;
+}
+
+div.button.disabled, div.button.disabled:hover {
+	border-color: #444;
+	color: #444;
+}
+
+
+.upBtn:after, .upManyBtn:after {
+	border-color: transparent transparent #272823;
+}
+
+.upBtn:before, .upManyBtn:before {
+	border-color: transparent transparent #EEE;
+}
+
+.upBtn.disabled:before, .upManyBtn.disabled:before {
+	border-color: transparent transparent #555;
+}
+
+.dnBtn:after, .dnManyBtn:after {
+	border-color: #272823 transparent transparent;
+}
+
+.dnBtn:before, .dnManyBtn:before {
+	border-color: #EEE transparent transparent;
+}
+
+.dnBtn.disabled:before, .dnManyBtn.disabled:before {
+	border-color: #555 transparent transparent;
+}
+
+body.noMask .eventTitle {
+	background-color: #1a1a1a;
+	color: #ddd;
+}
+
+body.noMask .eventTitle:after {
+	background-color: #1a1a1a;
+}
+
+body.noMask .eventPanel {
+	background-color: #1a1a1a;
+}
+
+body.noMask #description {
+	color: #ddd;
+}
+
+body.noMask #buttons > .button {
+	border: 1px solid #ddd;
+	color: #ddd;
+}
+
+#stars > div, #starsBack > div {
+	color: black;
+}
+
+.endGame, .outro {
+	color:#272823;
+}
+
+#wait-btn {
+	border-color: black;
+	color: black;
+}
+
+#theEnd {
+	color: #272823;
+}

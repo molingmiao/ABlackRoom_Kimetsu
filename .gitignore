@@ -1,0 +1,21 @@
+/.settings
+*.TODO
+*.mo
+*.swp
+.idea
+lang/.DS_Store
+.DS_Store
+node_modules
+img/Thumbs.db
+# install-no-npm.cjs 缓存（tarball 下载缓存，可随时删）
+.npm-cache
+# 用户自行下载的源码包（已通过 npm registry 装好可删）
+eslint-*.zip
+prettier-*.zip
+# 翻译扫描脚本的临时输出（dump_batchN.cjs 写入，apply 后即可丢）
+tools/translations-cache/*.json
+
+# 打包产物：exe / zip / patch 走 GitHub Releases 分发，不进仓库
+dist/
+# build-exe.cjs 打包时的临时目录
+.build-tmp/
