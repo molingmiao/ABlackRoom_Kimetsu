@@ -72,3 +72,13 @@ div.supplyItem {
 	padding: 0 5px;
 	cursor: default;
 }
+
+/* 进入地图（远征）时隐藏左侧的天赋/物品/装备栏，只保留地图；
+   远征补给由世界面板自身的 #bagspace-world 显示 */
+body.world-active #perks,
+body.world-active #storesContainer,
+body.world-active #outfitting,
+body.world-active #equipDoll,
+body.world-active #suppliesRow {
+	display: none !important;
+}

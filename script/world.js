@@ -961,6 +961,8 @@ var World = {
         $('#outerSlider').css('left', '0px');
         $('#locationSlider').css('left', '0px');
         $('#storesContainer').css({'top': '0px', 'right': '0px'});
+        // 死亡返回营地：恢复左侧的天赋/物品/装备栏
+        $('body').removeClass('world-active');
         Engine.activeModule = Room;
         $('div.headerButton').removeClass('selected');
         Room.tab.addClass('selected');
@@ -1012,6 +1014,8 @@ var World = {
 
     World.returnOutfit();
 
+    // 离开地图回到营地：恢复左侧的天赋/物品/装备栏
+    $('body').removeClass('world-active');
     $('#outerSlider').animate({left: '0px'}, 300);
     Engine.activeModule = Path;
     Path.onArrival();

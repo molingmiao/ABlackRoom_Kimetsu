@@ -506,6 +506,13 @@ var Path = {
 
 		// 弹药子行：每把武器下方列出 cost 中的消耗品当前的 outfit 携带量
 		$('.outfitRow.ammoRow', outfit).remove();
+		// 移除库存已归零的物品行：sortedKeys 已过滤掉 stores<=0 的物品，
+		// 主循环不会再访问它们，旧行会残留在 DOM 中（回收最后一件后需刷新才消失）——这里显式清理
+		$('.outfitRow', outfit).each(function() {
+			var rk = $(this).attr('key');
+			if (!rk) return;
+			if (!($SM.get('stores["'+rk+'"]', true) > 0)) $(this).remove();
+		});
 		for (var wi = 0; wi < sortedKeys.length; wi++) {
 			var wk = sortedKeys[wi];
 			var wDef = World.Weapons[wk];
@@ -741,6 +748,8 @@ var Path = {
 		// 记录出征次数
 		$SM.add('game.embarks', 1);
 		World.onArrival();
+		// 进入地图（远征）：隐藏左侧的天赋/物品/装备栏，只留地图
+		$('body').addClass('world-active');
 		$('#outerSlider').animate({left: '-700px'}, 300);
 		Engine.activeModule = World;
 		AudioEngine.playSound(AudioLibrary.EMBARK);
