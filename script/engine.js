@@ -815,11 +815,11 @@
       var stores = $('#storesContainer');
       var panelIndex = $('.location').index(module.panel);
       var diff = Math.abs(panelIndex - currentIndex);
-      slider.animate({left: -(panelIndex * 700) + 'px'}, 300 * diff);
+      slider.animate({left: -(panelIndex * 910) + 'px'}, 300 * diff);
 
       if($SM.get('stores.wood') !== undefined) {
         // FIXME Why does this work if there's an animation queue...?
-        stores.animate({right: -(panelIndex * 700) + 'px'}, 300 * diff);
+        stores.animate({right: -(panelIndex * 910) + 'px'}, 300 * diff);
       }
 
       if(Engine.activeModule == Room || Engine.activeModule == Path || Engine.activeModule == Fabricator) {
@@ -875,12 +875,12 @@
 
     updateSlider: function() {
       var slider = $('#locationSlider');
-      slider.width((slider.children().length * 700) + 'px');
+      slider.width((slider.children().length * 910) + 'px');
     },
 
     updateOuterSlider: function() {
       var slider = $('#outerSlider');
-      slider.width((slider.children().length * 700) + 'px');
+      slider.width((slider.children().length * 910) + 'px');
     },
 
     getIncomeMsg: function(num, delay) {

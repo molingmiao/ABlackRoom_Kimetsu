@@ -20,7 +20,7 @@ div.outfitRow {
 }
 
 div.outfitRow > .row_val {
-	padding-right: 30px;
+	padding-right: 62px;
 	-webkit-touch-callout: none;
 	-webkit-user-select: none;
 	-khtml-user-select: none;
@@ -68,9 +68,20 @@ div.perkRow .row_key {
 	padding-top: 10px;
 	position: relative;
 	top: -10px;
-	max-height: 660px;
-	width: 475px;
+	max-height: 858px;
+	width: 620px;
 	overflow-y: auto;
+}
+
+/* 供应 + 装备 并排容器 */
+#suppliesRow {
+	display: flex;
+	gap: 84px;
+	align-items: flex-start;
+}
+#outfitting, #equipDoll {
+	flex: 0 0 auto;
+	margin-bottom: 0;
 }
 
 /* 一键装满 + 出发 按钮并排 */
@@ -83,3 +94,164 @@ div.perkRow .row_key {
 #pathButtonsRow div.button {
 	margin-bottom: 0;
 }
+
+/* 武器稀有度分级（按 damage 值）：颜色沿用通知系统配色 */
+div.outfitRow.weapon > .row_key { font-weight: 600; }
+div.outfitRow.weapon.weapon-tier-1 > .row_key { color: #999999; font-weight: normal; }
+div.outfitRow.weapon.weapon-tier-2 > .row_key { color: #4ab24a; }
+div.outfitRow.weapon.weapon-tier-3 > .row_key { color: #5eaed2; }
+div.outfitRow.weapon.weapon-tier-4 > .row_key { color: #ae6cd2; }
+div.outfitRow.weapon.weapon-tier-5 > .row_key { color: #d4a017; }
+
+/* 新学 perk 视觉提示：脉动 + 星标（点击后消失） */
+div.perkRow.new-perk {
+	animation: perkPulse 1.5s ease-in-out infinite;
+	cursor: pointer;
+}
+div.perkRow.new-perk .row_key::after {
+	content: ' ★';
+	color: #d4a017;
+	font-weight: bold;
+	margin-left: 4px;
+}
+@keyframes perkPulse {
+	0%, 100% { background-color: transparent; }
+	50% { background-color: rgba(212, 160, 23, 0.18); }
+}
+
+/* 装备栏（equipDoll）：主/副/道具 3 类×2 槽 */
+#equipDoll {
+	position: relative;
+	border: 1px solid black;
+	width: 200px;
+	margin-bottom: 20px;
+	padding: 5px 10px;
+}
+div#equipDoll:before {
+	content: attr(data-legend);
+	position: absolute;
+	top: -13px;
+	background-color: white;
+}
+.equipDollBody { padding-top: 4px; }
+.equipDollSep {
+	border-top: 1px solid #ccc;
+	margin: 6px 0;
+}
+.outfitSep {
+	border-top: 1px dashed #bbb;
+	margin: 8px 0 4px;
+}
+
+/* 供应内武器行下的弹药子行（与物品栏风格一致） */
+div.outfitRow.ammoRow > .row_key,
+div.outfitRow.ammoRow > .row_val {
+	color: #888;
+	font-size: 0.9em;
+}
+div.outfitRow.ammoRow > .row_key {
+	padding-left: 8px;
+}
+
+/* 回收按钮：显式文字按钮，位于步进箭头右侧、两框之间，不遮挡箭头也不碰装备框 */
+div.outfitRow .scrapBtn {
+	position: absolute;
+	right: -56px;
+	top: 0;
+	cursor: pointer;
+	font-size: 12px;
+	color: #999;
+	border: 1px solid #999;
+	padding: 0 6px;
+	line-height: 18px;
+	height: 18px;
+	background: white;
+	user-select: none;
+}
+div.outfitRow .scrapBtn:hover {
+	color: #dc594c;
+	border-color: #dc594c;
+}
+.equipRow {
+	display: flex;
+	align-items: center;
+	margin: 6px 0;
+	position: relative;
+}
+.equipRowLabel {
+	width: 44px;
+	font-size: 0.85em;
+	color: #666;
+	flex-shrink: 0;
+}
+.equipSlot {
+	flex: 1;
+	height: 22px;
+	line-height: 22px;
+	text-align: center;
+	border: 1px dashed #999;
+	margin: 0 3px;
+	cursor: pointer;
+	font-size: 0.9em;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	padding: 0 3px;
+	box-sizing: border-box;
+}
+.equipSlot.empty { color: #bbb; }
+.equipSlot.filled {
+	border-style: solid;
+	background: rgba(212, 160, 23, 0.05);
+	font-weight: 600;
+}
+.equipSlot.weapon-tier-1 { color: #999; font-weight: normal; }
+.equipSlot.weapon-tier-2 { color: #4ab24a; }
+.equipSlot.weapon-tier-3 { color: #5eaed2; }
+.equipSlot.weapon-tier-4 { color: #ae6cd2; }
+.equipSlot.weapon-tier-5 { color: #d4a017; }
+
+.equipPicker {
+	position: absolute;
+	top: 100%;
+	left: 44px;
+	right: 0;
+	background: white;
+	border: 1px solid #333;
+	padding: 3px 0;
+	z-index: 100;
+	box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+	margin-top: 2px;
+}
+.equipPickerBackdrop {
+	position: fixed;
+	top: 0;
+	left: 0;
+	width: 100%;
+	height: 100%;
+	z-index: 99;
+	background: transparent;
+}
+.pickerOption {
+	padding: 3px 10px;
+	cursor: pointer;
+	font-size: 0.9em;
+}
+.pickerOption:hover {
+	background: rgba(212, 160, 23, 0.12);
+}
+.pickerOption.unequip {
+	color: #999;
+	font-style: italic;
+	border-bottom: 1px solid #ddd;
+}
+.pickerOption.disabled {
+	color: #ccc;
+	cursor: default;
+}
+.pickerOption.weapon-tier-1 { color: #999; }
+.pickerOption.weapon-tier-2 { color: #4ab24a; font-weight: 600; }
+.pickerOption.weapon-tier-3 { color: #5eaed2; font-weight: 600; }
+.pickerOption.weapon-tier-4 { color: #ae6cd2; font-weight: 600; }
+.pickerOption.weapon-tier-5 { color: #d4a017; font-weight: 600; }
+.pickerOption.disabled:hover { background: transparent; }

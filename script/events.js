@@ -142,6 +142,8 @@ var Events = {
 		for(var k in World.Weapons) {
 			var weapon = World.Weapons[k];
 			if(typeof Path.outfit[k] == 'number' && Path.outfit[k] > 0) {
+				var _cat = Path.getWeaponCategory ? Path.getWeaponCategory(k) : null;
+				if (_cat && !Path.isEquipped(k)) continue;
 				if(typeof weapon.damage != 'number' || weapon.damage === 0) {
 					// Weapons that deal no damage don't count
 					numWeapons--;
@@ -545,6 +547,24 @@ var Events = {
 		if(Events.activeEvent()) {
 			var weaponName = btn.attr('id').substring(7).replace(/-/g, ' ');
 			var weapon = World.Weapons[weaponName];
+			if (Path.getWeaponCategory) {
+				var _cat = Path.getWeaponCategory(weaponName);
+				if (_cat) {
+					var _eq = Path.getEquipped(_cat);
+					var _maxCd = 0;
+					_eq.forEach(function(k) {
+						var w = World.Weapons[k];
+						if (w && typeof w.cooldown === 'number' && w.cooldown > _maxCd) _maxCd = w.cooldown;
+					});
+					if (_maxCd > 0) {
+						_eq.forEach(function(k) {
+							if (k === weaponName) return;
+							var other = $('#attack_' + k.replace(/ /g, '-'));
+							if (other.length) Button.cooldown(other, _maxCd);
+						});
+					}
+				}
+			}
 			if(weapon.type == 'unarmed') {
 				if(!$SM.get('character.punches')) $SM.set('character.punches', 0);
 				$SM.add('character.punches', 1);

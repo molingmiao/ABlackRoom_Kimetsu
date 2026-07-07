@@ -90,3 +90,14 @@ div#weapons {
 	padding: 5px 10px;
 	width: 200px;
 }
+
+/* 武器行下的弹药子行：缩进 + 淡灰 */
+div.storeRow.ammoRow > .row_key {
+	padding-left: 8px;
+	color: #888;
+	font-size: 0.9em;
+}
+div.storeRow.ammoRow > .row_val {
+	color: #888;
+	font-size: 0.9em;
+}

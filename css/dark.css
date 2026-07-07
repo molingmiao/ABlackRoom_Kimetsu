@@ -268,3 +268,58 @@ body.noMask #buttons > .button {
 #theEnd {
 	color: #272823;
 }
+
+/* 装备栏（equipDoll）与武器选择器 夜间模式 */
+div#equipDoll {
+	border: 1px solid #EEE;
+}
+div#equipDoll:before {
+	background-color: #272823;
+}
+.equipRowLabel {
+	color: #AAA;
+}
+.equipSlot {
+	border-color: #777;
+	color: #EEE;
+}
+.equipSlot.empty {
+	color: #666;
+}
+.equipSlot.filled {
+	background: rgba(212, 160, 23, 0.12);
+}
+.equipDollSep {
+	border-top-color: #555;
+}
+.outfitSep {
+	border-top-color: #555;
+}
+div.outfitRow .scrapBtn {
+	background: #272823;
+	color: #AAA;
+	border-color: #666;
+}
+div.outfitRow .scrapBtn:hover {
+	color: #dc594c;
+	border-color: #dc594c;
+}
+.equipSlot.weapon-tier-1 { color: #BBB; }
+.equipPicker {
+	background: #272823;
+	border: 1px solid #EEE;
+	box-shadow: 0 2px 6px rgba(0,0,0,0.6);
+}
+.pickerOption {
+	color: #EEE;
+}
+.pickerOption:hover {
+	background: rgba(212, 160, 23, 0.22);
+}
+.pickerOption.unequip {
+	color: #999;
+	border-bottom: 1px solid #555;
+}
+.pickerOption.disabled {
+	color: #666;
+}

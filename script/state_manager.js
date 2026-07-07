@@ -437,6 +437,7 @@ var StateManager = {
 	//PERKS
 	addPerk: function(name) {
 		$SM.set('character.perks["'+name+'"]', true);
+		$SM.set('character.perksNew["'+name+'"]', true, true);
 		Notifications.notify(null, Engine.Perks[name].notify);
 	},
 

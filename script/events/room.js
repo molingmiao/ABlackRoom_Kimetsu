@@ -19,12 +19,14 @@ buttons: {
 'buyScales': {
 text: _('buy demon scales'),
 cost: { 'fur': 100 },
-reward: { 'scales': 1 }
+reward: { 'scales': 1 },
+notification: _('the merchant exchanges fur for demon scales.')
 },
 'buyTeeth': {
 text: _('buy demon claws'),
 cost: { 'fur': 200 },
-reward: { 'teeth': 1 }
+reward: { 'teeth': 1 },
+notification: _('the merchant hands over a bundle of demon claws.')
 },
 'buyBait': {
 text: _('buy human scent bait'),

@@ -64,8 +64,8 @@ var Room = {
 
 		// 携行 / 水袋 / 交通工具
 		'rucksack': _('布背包——背包容量 +10'),
-		'wagon': _('小车——背包容量 +30'),
-		'convoy': _('辎重车队——背包容量 +60'),
+		'wagon': _('行李架——背包容量 +30'),
+		'convoy': _('辎重箱——背包容量 +60'),
 		'cargo crow': _('传计鸦队——背包容量 +100'),
 		'waterskin': _('水袋——上限上调'),
 		'cask': _('木桶——水上限进一步上调'),
@@ -888,7 +888,7 @@ var Room = {
 		if (stores.length === 0) {
 			stores = $('<div>').attr({
 				'id': 'stores',
-				'data-legend': _('stores')
+				'data-legend': _('materials')
 			}).addClass('storeGroup').css('opacity', 0);
 			needsAppend = true;
 		}
@@ -913,7 +913,7 @@ var Room = {
 		if (weapons.length === 0) {
 			weapons = $('<div>').attr({
 				'id': 'weapons',
-				'data-legend': _('weapons')
+				'data-legend': _('items')
 			}).addClass('storeGroup').css('opacity', 0);
 			wNeedsAppend = true;
 		}
@@ -941,13 +941,9 @@ var Room = {
 					// Don't display buildings either
 					continue;
 				case 'weapon':
-					location = weapons;
-					break;
 				case 'special':
-					location = special;
-					break;
 				case 'tool':
-					location = tools;
+					location = weapons;
 					break;
 				default:
 					location = resources;
@@ -999,6 +995,9 @@ var Room = {
 				newRow = true;
 			} else {
 				$('div#' + row.attr('id') + ' > div.row_val', location).text(Math.floor(num));
+			}
+			if (type === 'weapon') {
+				Room._updateWeaponAmmoRow(k, location);
 			}
 		}
 
@@ -1077,6 +1076,31 @@ var Room = {
 			$('.storeGroupCaret', header).text(collapsed ? '▶' : '▼');
 			$SM.set('config.storeCollapsed["' + id + '"]', collapsed, true);
 		});
+	},
+
+	_updateWeaponAmmoRow: function(weaponKey, container) {
+		if (typeof World === 'undefined' || !World.Weapons) return;
+		var wDef = World.Weapons[weaponKey];
+		if (!wDef || !wDef.cost) return;
+		var weaponRow = $('#row_' + weaponKey.replace(/ /g, '-'), container);
+		if (weaponRow.length === 0) return;
+		var lastNode = weaponRow;
+		for (var ammoKey in wDef.cost) {
+			if (ammoKey === weaponKey) continue;
+			var ammoId = 'ammorow_' + weaponKey.replace(/ /g, '-') + '_' + ammoKey.replace(/ /g, '-');
+			var ammoRow = $('#' + ammoId, container);
+			var ammoNum = $SM.get('stores["' + ammoKey + '"]', true) || 0;
+			if (ammoRow.length === 0) {
+				ammoRow = $('<div>').attr('id', ammoId).addClass('storeRow ammoRow');
+				$('<div>').addClass('row_key').text('— ' + _(ammoKey)).appendTo(ammoRow);
+				$('<div>').addClass('row_val').text(Math.floor(ammoNum)).appendTo(ammoRow);
+				$('<div>').addClass('clear').appendTo(ammoRow);
+				ammoRow.insertAfter(lastNode);
+			} else {
+				$('.row_val', ammoRow).text(Math.floor(ammoNum));
+			}
+			lastNode = ammoRow;
+		}
 	},
 
 	updateIncomeView: function () {
