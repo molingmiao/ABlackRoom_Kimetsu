@@ -750,7 +750,7 @@ var Path = {
 		World.onArrival();
 		// 进入地图（远征）：隐藏左侧的天赋/物品/装备栏，只留地图
 		$('body').addClass('world-active');
-		$('#outerSlider').animate({left: '-700px'}, 300);
+		$('#outerSlider').animate({left: '-910px'}, 300);
 		Engine.activeModule = World;
 		AudioEngine.playSound(AudioLibrary.EMBARK);
 	},

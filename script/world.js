@@ -593,6 +593,21 @@ var World = {
     } else if(typeof World.LANDMARKS[curTile] != 'undefined') {
       if(curTile != World.TILE.OUTPOST || !World.outpostUsed()) {
         Events.startEvent(Events.Setpieces[World.LANDMARKS[curTile].scene]);
+        // 元进程：记录已探索的地标类型，用于「无限城探索者赐福」（所有地标都探过 → 入城 +5% max HP）
+        try {
+          var visited = $SM.get('game.landmarksVisited') || {};
+          if (!visited[curTile]) {
+            visited[curTile] = true;
+            $SM.set('game.landmarksVisited', visited, true);
+            var need = Object.keys(World.LANDMARKS).filter(function(k) { return k != World.TILE.OUTPOST; });
+            var got = 0;
+            need.forEach(function(k) { if (visited[k]) got++; });
+            if (got >= need.length && !$SM.get('game.castleMeta.perfectExploration', true)) {
+              $SM.set('game.castleMeta.perfectExploration', true, true);
+              try { Notifications.notify(null, _('you have walked every corner of this world. the castle will remember.')); } catch (e) {}
+            }
+          }
+        } catch (e) { /* ignore */ }
       }
     } else {
       if(World.useSupplies()) {
@@ -959,10 +974,14 @@ var World = {
       AudioEngine.playSound(AudioLibrary.DEATH);
       $('#outerSlider').animate({opacity: '0'}, 600, 'linear', function() {
         $('#outerSlider').css('left', '0px');
+        $('#outerSlider').css('top', '0px'); // 无限城中死亡：一并复位下坠位移
         $('#locationSlider').css('left', '0px');
         $('#storesContainer').css({'top': '0px', 'right': '0px'});
-        // 死亡返回营地：恢复左侧的天赋/物品/装备栏
+        // 死亡返回营地：恢复左侧的天赋/物品/装备栏，并清理无限城暗色模式
         $('body').removeClass('world-active');
+        $('body').removeClass('noMask').css('background-color', Engine.isLightsOff() ? '#272823' : '#FFFFFF');
+        // 无限城中死亡：一并清理天赋 + 药水态 + 空面板
+        try { if (window.Space) { Space.done = true; Space.clearTalents(); Space._potionEffect = null; Space.clearPillarTimers(); $('#spacePanel').empty().attr('style', ''); } } catch (e) { /* ignore */ }
         Engine.activeModule = Room;
         $('div.headerButton').removeClass('selected');
         Room.tab.addClass('selected');
@@ -1016,8 +1035,11 @@ var World = {
 
     // 离开地图回到营地：恢复左侧的天赋/物品/装备栏
     $('body').removeClass('world-active');
-    $('#outerSlider').animate({left: '0px'}, 300);
+    $('#outerSlider').stop(true).animate({left: '0px'}, 300);
     Engine.activeModule = Path;
+    // 兑换图纸/触发解锁事件后，兑换导航状态，避免回来后无法切换地点
+    Engine.tabNavigation = true;
+    Engine.keyLock = false;
     Path.onArrival();
     Engine.restoreNavigation = true;
   },
@@ -1040,7 +1062,7 @@ var World = {
     redeem('firefly orb blueprint', 'firefly orb');
 
     if (redeemed) {
-      Notifications.notify(null, 'blueprints feed into the fabricator data port. possibilities grow.');
+      Notifications.notify(null, _('blueprints feed into the fabricator data port. possibilities grow.'));
     }
   },
 
@@ -1101,23 +1123,36 @@ var World = {
   },
 
   getMaxHealth: function() {
+    var base;
     if($SM.get('stores["wind armour"]', true) > 0) {
-      return World.BASE_HEALTH + 75;
+      base = World.BASE_HEALTH + 75;
     } else if($SM.get('stores["s armour"]', true) > 0) {
-      return World.BASE_HEALTH + 35;
+      base = World.BASE_HEALTH + 35;
     } else if($SM.get('stores["i armour"]', true) > 0) {
-      return World.BASE_HEALTH + 15;
+      base = World.BASE_HEALTH + 15;
     } else if($SM.get('stores["l armour"]', true) > 0) {
-      return World.BASE_HEALTH + 5;
+      base = World.BASE_HEALTH + 5;
+    } else {
+      base = World.BASE_HEALTH;
     }
-    return World.BASE_HEALTH;
+    // 无限城天赋加成：仅在无限城中生效
+    try {
+      if (window.Space && Engine.activeModule === Space && Space.getMaxHpBonus) {
+        base += Space.getMaxHpBonus();
+      }
+    } catch (e) { /* ignore */ }
+    return base;
   },
 
   getHitChance: function() {
-    if($SM.hasPerk('mikiri')) {
-      return World.BASE_HIT_CHANCE + 0.1;
-    }
-    return World.BASE_HIT_CHANCE;
+    var base = World.BASE_HIT_CHANCE;
+    if($SM.hasPerk('mikiri')) base += 0.1;
+    try {
+      if (window.Space && Engine.activeModule === Space && Space.getAccuracyBonus) {
+        base += Space.getAccuracyBonus();
+      }
+    } catch (e) { /* ignore */ }
+    return base;
   },
 
   getMaxWater: function() {

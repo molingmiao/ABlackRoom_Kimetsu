@@ -72,7 +72,7 @@ var Room = {
 		'water tank': _('水槽——顶阶水容量'),
 
 		// 鬼灭术语与特殊道具
-		'fleet beacon': _('归阵符——终局使用的召集道具'),
+		'fleet beacon': _('归阵符——战斗中可召集柱前来驰援，瞬间回满血'),
 		'rope': _('绳索，某些险境探索中会用到'),
 
 		// 旧 key 兼容（_RENAME_STORES 迁移前的老存档可能短暂可见）
@@ -414,6 +414,21 @@ var Room = {
 				};
 			},
 			audio: AudioLibrary.CRAFT_STEEL_SWORD
+		},
+		'nichirin gun': {
+			name: _('nichirin gun'),
+			button: null,
+			type: 'weapon',
+			buildMsg: _("a sun-steel barrel, bored true \u2014 it drinks solar crystals and spits light."),
+			cost: function () {
+				return {
+					'wood': 500,
+					'leather': 60,
+					'steel': 20,
+					'sulphur': 20
+				};
+			},
+			audio: AudioLibrary.CRAFT_RIFLE
 		},
 		'wisteria gun': {
 			name: _('wisteria gun'),

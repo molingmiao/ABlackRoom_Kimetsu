@@ -106,22 +106,34 @@ return Ship.getCrowCount();
 },
 
 checkDescend: function() {
-if(!$SM.get('game.spaceShip.seenWarning')) {
+var firstTime = !$SM.get('game.spaceShip.seenWarning');
+var intro = firstTime ? [
+_("the castle plunges endlessly downward, corridors twisting in impossible geometry."),
+_("each guide crow will light one path through the darkness — then be consumed."),
+_("demons will block the descent. reach the Demon King's throne before the crows run out.")
+] : [
+_("confirm the supplies and weapons in your backpack before the plunge."),
+_("what you pack is all you take below \u2014 you can still adjust it now.")
+];
 Events.startEvent({
 title: _('Descend into the Infinity Castle?'),
 scenes: {
 'start': {
-text: [
-_("the castle plunges endlessly downward, corridors twisting in impossible geometry."),
-_("each guide crow will light one path through the darkness — then be consumed."),
-_("demons will block the descent. reach the Demon King's throne before the crows run out.")
-],
+text: intro,
 buttons: {
 'descend': {
 text: _('descend'),
 onChoose: function() {
 $SM.set('game.spaceShip.seenWarning', true);
 Ship.descend();
+},
+nextScene: 'end'
+},
+'outfit': {
+text: _('adjust backpack'),
+onChoose: function() {
+Button.clearCooldown($('#liftoffButton'));
+Engine.travelTo(Path);
 },
 nextScene: 'end'
 },
@@ -136,13 +148,16 @@ nextScene: 'end'
 }
 }
 });
-} else {
-Ship.descend();
-}
 },
 
 descend: function() {
-$('#outerSlider').animate({top: '700px'}, 300);
+// 与远征一致：把背包（Path.outfit）从家里库存中扣除带走
+if (!Engine.options.testerMode && Path.outfit) {
+for (var k in Path.outfit) {
+if (Path.outfit[k] > 0) $SM.add('stores["' + k + '"]', -Path.outfit[k]);
+}
+}
+$('#outerSlider').animate({top: '-910px'}, 300);
 Space.onArrival();
 Engine.activeModule = Space;
 AudioEngine.playSound(AudioLibrary.LIFT_OFF);

@@ -139,27 +139,42 @@ var Events = {
 
 		var attackBtns = $('<div>').appendTo(btns).attr('id','attackButtons');
 		var numWeapons = 0;
+		// 固定排序：双手(primary) → 副手(secondary) → 道具(tool)，每类按装备槽 A/B；
+		// 之后再列出未分类但携带的武器（兜底）。始终保持该顺序。
+		var orderedWeapons = [];
+		if (Path.WeaponCategory && Path.getEquippedSlots) {
+			['primary', 'secondary', 'tool'].forEach(function(cat) {
+				Path.getEquippedSlots(cat).forEach(function(wk) {
+					if (wk && typeof Path.outfit[wk] === 'number' && Path.outfit[wk] > 0 && orderedWeapons.indexOf(wk) < 0) {
+						orderedWeapons.push(wk);
+					}
+				});
+			});
+		}
 		for(var k in World.Weapons) {
-			var weapon = World.Weapons[k];
 			if(typeof Path.outfit[k] == 'number' && Path.outfit[k] > 0) {
 				var _cat = Path.getWeaponCategory ? Path.getWeaponCategory(k) : null;
-				if (_cat && !Path.isEquipped(k)) continue;
-				if(typeof weapon.damage != 'number' || weapon.damage === 0) {
-					// Weapons that deal no damage don't count
-					numWeapons--;
-				} else if(weapon.cost){
-					for(var c in weapon.cost) {
-						var num = weapon.cost[c];
-						if(typeof Path.outfit[c] != 'number' || Path.outfit[c] < num) {
-							// Can't use this weapon, so don't count it
-							numWeapons--;
-						}
-					}
-				}
-				numWeapons++;
-				Events.createAttackButton(k).appendTo(attackBtns);
+				if (_cat) continue; // 分类武器已在上面按装备槽处理（未装备的不显示）
+				if (orderedWeapons.indexOf(k) < 0) orderedWeapons.push(k);
 			}
 		}
+		orderedWeapons.forEach(function(wk) {
+			var weapon = World.Weapons[wk];
+			if(typeof weapon.damage != 'number' || weapon.damage === 0) {
+				// Weapons that deal no damage don't count
+				numWeapons--;
+			} else if(weapon.cost){
+				for(var c in weapon.cost) {
+					var num = weapon.cost[c];
+					if(typeof Path.outfit[c] != 'number' || Path.outfit[c] < num) {
+						// Can't use this weapon, so don't count it
+						numWeapons--;
+					}
+				}
+			}
+			numWeapons++;
+			Events.createAttackButton(wk).appendTo(attackBtns);
+		});
 		if(numWeapons === 0) {
 			// No weapons? You can punch stuff!
 			Events.createAttackButton('fists').prependTo(attackBtns);
@@ -179,6 +194,9 @@ var Events = {
 		}
 		if($SM.get('stores["wind armour"]', true) > 0) {
 			Events.createShieldButton().appendTo(healBtns);
+		}
+		if(($SM.get('stores["fleet beacon"]', true) || 0) > 0) {
+			Events.createBeaconButton().appendTo(healBtns);
 		}
 		$('<div>').addClass('clear').appendTo(healBtns);
 		Events.setHeal(healBtns);
@@ -226,8 +244,29 @@ var Events = {
 					var dmg = t.dmg || 0;
 					var hit = (typeof t.hit === 'number') ? t.hit : 1;
 					if (Math.random() <= hit && dmg > 0) {
+						// 破盾攻击：先卸掉玩家的护盾状态；有盾则不吃伤害，无盾则全额受创
+						if (t.shieldBreaker) {
+							var w = $('#wanderer');
+							if (w.data('status') === 'shield') {
+								w.data('status', '');
+								Events.updateFighterDiv(w);
+								Notifications.notify(null, _('the shield shatters against the blow.'));
+								return;
+							}
+						}
 						var attackFn = t.ranged ? Events.animateRanged : Events.animateMelee;
 						attackFn(enemy, dmg, Events.checkPlayerDeath);
+						// 出血 DoT：命中后附加持续伤害
+						if (t.bleedSec && t.bleedPerSec) {
+							var w2 = $('#wanderer');
+							Notifications.notify(null, _('you are bleeding \u2014 {0} damage per second for {1} seconds', t.bleedPerSec, t.bleedSec));
+							var ticks = t.bleedSec;
+							var bid = Engine.combatSetInterval(function() {
+								if (--ticks < 0 || Events.won || Events.fought) { clearInterval(bid); return; }
+								Events.dotDamage(w2, t.bleedPerSec);
+							}, 1000);
+							Events._telegraphIntervalTimers.push(bid);
+						}
 					} else if (t.missText) {
 						Notifications.notify(null, t.missText);
 					}
@@ -428,6 +467,36 @@ var Events = {
 		click: Events.useStim
 	}),
 
+	// 归阵符（fleet beacon）战斗用途：召集一位柱前来掩护——立即回满血（消耗 1 张）
+	createBeaconButton: function() {
+		var btn = new Button.Button({
+			id: 'beacon',
+			text: _('rally a hashira'),
+			cooldown: Events._SHIELD_COOLDOWN,
+			click: Events.useBeacon
+		});
+		btn.addClass('btnBeacon');
+		return btn;
+	},
+
+	useBeacon: function(btn) {
+		var have = $SM.get('stores["fleet beacon"]', true) || 0;
+		if (have <= 0) { if (btn) Button.setDisabled(btn, true); return; }
+		$SM.add('stores["fleet beacon"]', -1);
+		var maxHp = World.getMaxHealth();
+		World.setHp(maxHp);
+		Events.setHeal();
+		if (Events.activeEvent()) {
+			var w = $('#wanderer');
+			w.data('hp', maxHp);
+			Events.updateFighterDiv(w);
+			Events.drawFloatText(_('+rescue'), '#wanderer .hp');
+		}
+		if (($SM.get('stores["fleet beacon"]', true) || 0) <= 0 && btn) Button.setDisabled(btn, true);
+		Notifications.notify(null, _('you raise the fleet beacon \u2014 a Hashira flashes in, shields you, and your wounds close.'));
+		AudioEngine.playSound(AudioLibrary.USE_MEDS);
+	},
+
 	createAttackButton: function(weaponName) {
 		var weapon = World.Weapons[weaponName];
 		var cd = weapon.cooldown;
@@ -499,9 +568,24 @@ var Events = {
 				Button.setDisabled(btn, true);
 			}
 
+			// 无限城中：治疗加成（元进程累计回复解锁）
+			try {
+				if (window.Space && Engine.activeModule === Space && Space.getHealMult) {
+					var mult = Space.getHealMult();
+					if (mult !== 1) cured = Math.floor(cured * mult);
+				}
+			} catch (e) { /* ignore */ }
+
+			var oldHp = World.health;
 			var hp = World.health + cured;
 			hp = Math.min(World.getMaxHealth(),hp);
 			World.setHp(hp);
+			// 无限城中：累计实际回复量到元进程
+			try {
+				if (window.Space && Engine.activeModule === Space && Space.addMetaHealed) {
+					Space.addMetaHealed(Math.max(0, hp - oldHp));
+				}
+			} catch (e) { /* ignore */ }
 			Events.setHeal();
 
 			if(Events.activeEvent()) {
@@ -681,6 +765,24 @@ var Events = {
 			}
 			
 			var attackFn = weapon.type == 'ranged' ? Events.animateRanged : Events.animateMelee;
+			
+			// 无限城天赋：伤害倍率 + 吸血（仅在无限城战斗中，Engine.activeModule === Space）
+			try {
+				if (typeof dmg === 'number' && dmg > 0 && window.Space && Engine.activeModule === Space) {
+					var _mult = Space.getDamageMult ? Space.getDamageMult() : 1;
+					if (_mult !== 1) dmg = Math.max(1, Math.floor(dmg * _mult));
+					var _lifesteal = Space.getLifestealPct ? Space.getLifestealPct() : 0;
+					if (_lifesteal > 0) {
+						var _heal = Math.max(1, Math.floor(dmg * _lifesteal));
+						var _oldHp = World.health;
+						var _newHp = Math.min(World.getMaxHealth(), World.health + _heal);
+						World.setHp(_newHp);
+						var _w = $('#wanderer');
+						if (_w.length) { _w.data('hp', _newHp); Events.updateFighterDiv(_w); Events.drawFloatText('+' + _heal, $('.hp', _w)); }
+						if (Space.addMetaHealed) Space.addMetaHealed(_newHp - _oldHp);
+					}
+				}
+			} catch (e) { /* ignore */ }
 			
 			// play variation audio for weapon type
 			var r = Math.floor(Math.random() * 2) + 1;
@@ -1135,7 +1237,7 @@ var Events = {
 			var take = $(this).children('.lootTake').first();
 			var takeAll = $(this).children('.lootTakeAll').first();
 			var numLeft = take.data('numLeft');
-			var num = Math.min(Math.floor(Path.getFreeSpace() / Path.getWeight(name)), numLeft);
+			var num = Math.max(0, Math.min(Math.floor(Path.getFreeSpace() / Path.getWeight(name)), numLeft));
 			takeAll.data('numLeft', num);
 			free -= numLeft * Path.getWeight(name);
 			if(num > 0){

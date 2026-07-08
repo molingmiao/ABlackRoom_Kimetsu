@@ -315,6 +315,7 @@ div.button.btnStun    { border-left: 4px solid #57b; }
 div.button.btnHeal    { border-left: 4px solid #5b7; }
 div.button.btnShield  { border-left: 4px solid #888; }
 div.button.btnUnarmed { border-left: 4px solid #999; }
+div.button.btnBeacon  { border-left: 4px solid #d4a017; }
 	margin-bottom: 10px;
 }
 
@@ -584,6 +585,15 @@ body.noMask .eventPanel .button {
 	border-color: white;
 	color: white;
 }
+
+/* 无限城战斗：保留武器类型的彩色左边框（否则被上面的白色边框覆盖） */
+body.noMask .eventPanel .button.btnMelee   { border-left-color: #c33; }
+body.noMask .eventPanel .button.btnRanged  { border-left-color: #c93; }
+body.noMask .eventPanel .button.btnStun    { border-left-color: #57b; }
+body.noMask .eventPanel .button.btnUnarmed { border-left-color: #999; }
+body.noMask .eventPanel .button.btnHeal    { border-left-color: #5b7; }
+body.noMask .eventPanel .button.btnShield  { border-left-color: #888; }
+body.noMask .eventPanel .button.btnBeacon  { border-left-color: #d4a017; }
 
 .eventTitle {
 	display: inline-block;
