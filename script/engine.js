@@ -235,6 +235,7 @@
         .click(Engine.confirmHyperMode)
         .appendTo(menu);
 
+      /* @strip:tester-start */
       $('<span>')
         .addClass('tester menuBtn')
         .text(_('tester.'))
@@ -269,6 +270,7 @@
           .appendTo(combatRow);
       });
       $('<span>').addClass('currentSpeed combatCurrentSpeed').appendTo(combatRow);
+      /* @strip:tester-end */
 
       $('<span>')
         .addClass('menuBtn')
@@ -355,12 +357,14 @@
         Engine.triggerHyperMode();
       }
 
+      /* @strip:tester-start */
       if($SM.get('config.testerMode', true)){
         Engine.options.testerMode = true;
         Engine.options.timeScale = $SM.get('config.timeScale', true) || 1;
         Engine.options.combatTimeScale = $SM.get('config.combatTimeScale', true) || 1;
         Engine.updateTesterPanel();
       }
+      /* @strip:tester-end */
 
       Engine.toggleVolume(Boolean($SM.get('config.soundOn')));
       if(!AudioEngine.isAudioContextRunning()){

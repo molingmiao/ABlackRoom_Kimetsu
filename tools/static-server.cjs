@@ -20,8 +20,18 @@ const url = require('url');
 const { exec } = require('child_process');
 
 const PORT = Number(process.env.PORT) || 8081;
-// pkg 模式：root 用 exe 所在目录；普通 node 运行：用 cwd
-const ROOT = process.pkg
+// 判断是否为打包后的 exe（Node SEA 或旧版 pkg），此时用 exe 所在目录作根；
+// 普通 node 运行则用当前工作目录。
+function _isPackagedExe() {
+	if (process.pkg) return true; // 旧 pkg 兼容
+	try {
+		// Node SEA 官方检测：require('node:sea').isSea()
+		var sea = require('node:sea');
+		if (sea && typeof sea.isSea === 'function' && sea.isSea()) return true;
+	} catch (e) { /* Node <20 或未开启 SEA */ }
+	return false;
+}
+const ROOT = _isPackagedExe()
 	? path.dirname(process.execPath)
 	: process.cwd();
 
