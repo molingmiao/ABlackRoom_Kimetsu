@@ -1,9 +1,9 @@
 {
-  "name": "apurpleroom",
+  "name": "ablackroom_kimetsu",
   "type": "module",
   "version": "1.6.0",
   "private": true,
-  "repository": "https://github.com/molingmiao/APurpleRoom.git",
+  "repository": "https://github.com/molingmiao/ABlackRoom_Kimetsu.git",
   "author": "Michael Townsend <michael@doublespeakgames.com>",
   "license": "MPL-2.0",
   "scripts": {

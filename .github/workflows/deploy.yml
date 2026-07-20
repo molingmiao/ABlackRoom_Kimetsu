@@ -1,0 +1,59 @@
+name: Deploy static site to GitHub Pages
+
+on:
+  # 推到 main 时自动部署
+  push:
+    branches: [main]
+  # 允许在 Actions 页面手动触发
+  workflow_dispatch:
+
+# GitHub Pages 部署需要的权限
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# 同一时刻只跑一个部署，新提交自动取消进行中的旧部署
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Build (sync + strip tester UI)
+        run: node tools/sync-dist.cjs
+
+      # 清理不该发布的文件（exe / zip / blob 都不上）
+      - name: Prune dist
+        run: |
+          rm -f dist/wisteria-hall.exe
+          rm -f dist/*.zip
+          rm -f dist/sea-prep.blob
+          rm -f dist/version.txt
+          ls -la dist
+
+      - name: Setup Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+
+      - name: Deploy
+        id: deployment
+        uses: actions/deploy-pages@v4
