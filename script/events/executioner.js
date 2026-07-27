@@ -1058,7 +1058,7 @@ Events.Executioner = {
         buttons: {
           'explode': {
             text: _('blow it down'),
-            cost: { grenade: 1 },
+            cost: { 'wisteria bomb': 1 },
             nextScene: { 1: '2-1' }
           },
           'right': {
