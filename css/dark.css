@@ -127,6 +127,13 @@ body.noMask .floorActionBtn.disabled { color: #555; border-color: #444; }
 body.noMask .nodeBtn { color: #DDD; border-color: #BBB; }
 body.noMask .nodeBtn small { color: #888; }
 
+/* 热键角标 - 夜间模式 */
+body.noMask .hotkeyBadge {
+	color: #CCC;
+	background-color: rgba(39, 40, 35, 0.85);
+	border-color: #888;
+}
+
 div#blueprints:before {
 	background: #272823;
 }

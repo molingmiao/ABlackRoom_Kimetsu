@@ -911,8 +911,39 @@
       return jQuery.inArray(e.keycode, [37,38,39,40]) < 0;
     },
 
+    // ---- 热键系统（2026-07-27）----
+    // Q/W/E/R/T/Y 触发战斗中的攻击按钮（按 DOM 顺序：双手→副手→道具）
+    // 1..6 触发战斗中的医疗按钮，也用于无限城整顿栏（熏肉/药剂/藤花精油）
+    // 事件面板 (.eventPanel) 内的按钮优先，其次才是背后场景中的按钮
+    HOTKEY_KEYS: {
+      81: 'q', 87: 'w', 69: 'e', 82: 'r', 84: 't', 89: 'y',
+      49: '1', 50: '2', 51: '3', 52: '4', 53: '5', 54: '6'
+    },
+    _tryHotkey: function(e) {
+      var key = Engine.HOTKEY_KEYS && Engine.HOTKEY_KEYS[e.which || e.keyCode];
+      if (!key) return false;
+      // 若焦点在输入框，热键让给输入
+      var t = document.activeElement;
+      if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return false;
+
+      // 收集候选：事件面板内的按钮优先
+      var $inEvent = $('.eventPanel .button[data-hotkey="' + key + '"]:visible');
+      var $rest = $('.button[data-hotkey="' + key + '"]:visible').not('.eventPanel .button');
+      var candidates = $.merge($inEvent.get(), $rest.get());
+      for (var i = 0; i < candidates.length; i++) {
+        var $b = $(candidates[i]);
+        if ($b.hasClass('disabled')) continue;
+        if ($b.data('onCooldown')) continue;
+        $b.click();
+        return true;
+      }
+      return false;
+    },
+
     keyUp: function(e) {
       Engine.pressed = false;
+      // 优先派发热键（Q/W/E/R/T/Y 攻击 & 1..6 医疗/整顿）——命中则拦截默认逻辑
+      if (Engine._tryHotkey(e)) return false;
       if(Engine.activeModule.keyUp) {
         Engine.activeModule.keyUp(e);
       } else {

@@ -183,6 +183,7 @@
 	cursor: pointer;
 	user-select: none;
 	font-size: 13px;
+	position: relative;
 }
 .floorActionBtn:hover:not(.disabled) {
 	background: rgba(255, 255, 255, 0.1);
@@ -191,6 +192,15 @@
 	color: #555;
 	border-color: #444;
 	cursor: not-allowed;
+}
+
+/* 键位提示（无限城顶部）*/
+.floorHotkeyHint {
+	font-size: 11px;
+	color: #888;
+	font-style: italic;
+	margin-top: 3px;
+	letter-spacing: 0.5px;
 }
 
 .floorNodeWrap {

@@ -981,7 +981,7 @@ var World = {
         $('body').removeClass('world-active');
         $('body').removeClass('noMask').css('background-color', Engine.isLightsOff() ? '#272823' : '#FFFFFF');
         // 无限城中死亡：一并清理天赋 + 药水态 + 空面板
-        try { if (window.Space) { Space.done = true; Space.clearTalents(); Space._potionEffect = null; Space.clearPillarTimers(); $('#spacePanel').empty().attr('style', ''); } } catch (e) { /* ignore */ }
+        try { if (window.Space) { Space.done = true; Space.clearTalents(); Space._potionEffect = null; Space._potionCharges = 0; Space.clearPillarTimers(); $('#spacePanel').empty().attr('style', ''); } } catch (e) { /* ignore */ }
         Engine.activeModule = Room;
         $('div.headerButton').removeClass('selected');
         Room.tab.addClass('selected');
