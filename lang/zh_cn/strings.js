@@ -1030,6 +1030,8 @@
 	"thunder breath I": "雷之呼吸·初型",
 	"ranged shots land with extra force": "远程射击附加力道",
 	"every shot now arrives a moment ahead of expectation.": "每一发都比预想提前半瞬抵达。",
+	"total concentration": "全集中",
+	"near death in combat triggers one emergency recovery": "战斗中濒死时触发一次紧急回复",
 	"blood demon art swells — the air thickens.": "血鬼术汇聚——周遭空气陡然凝重。",
 	"its concentration breaks; the technique fizzles.": "它的凝神被打断——招式还未成形便消散。",
 	"the drum-rhythm tightens — a chamber is rearranging itself.": "鼓点骤紧——一间隔室正在重新排列。",

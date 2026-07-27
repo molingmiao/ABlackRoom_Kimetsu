@@ -82,6 +82,10 @@
         name: _('thunder breath I'),
         desc: _('ranged shots land with extra force'),
         notify: _('every shot now arrives a moment ahead of expectation.')
+      },
+      'total concentration': {
+        name: _('total concentration'),
+        desc: _('near death in combat triggers one emergency recovery')
       }
     },
 
