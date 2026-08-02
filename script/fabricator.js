@@ -1,14 +1,16 @@
 /**
- * Module that registers the fabricator functionality
+ * Module that registers the Nichirin Forge functionality.
+ * A blacksmith's forge where demon-slayer weapons are tempered
+ * using demon stone (青鬼石) and nichirin techniques.
  */
 const Fabricator = {
   _STORES_OFFSET: 0,
-  name: _('Fabricator'),
+  name: _('Forge'),
   Craftables: {
     'flame blade': {
       name: _('flame blade'),
       type: 'weapon',
-      buildMsg: _("the blade hums, charged particles sparking and fizzing."),
+      buildMsg: _("the blade hums — flame breathing kindles the edge."),
       cost: () => ({
         'demon stone': 1
       })
@@ -17,7 +19,7 @@ const Fabricator = {
       name: _('water cycle'),
       type: 'upgrade',
       maximum: 1,
-      buildMsg: _('water out, water in. waste not, want not.'),
+      buildMsg: _('water out, water in — breath flowing, never wasted.'),
       cost: () => ({
         'demon stone': 2
       })
@@ -26,7 +28,7 @@ const Fabricator = {
       name: _('cargo crow'),
       type: 'upgrade',
       maximum: 1,
-      buildMsg: _('the workhorse of the wanderer fleet.'),
+      buildMsg: _("the workhorse of the slayer corps' messenger crows."),
       cost: () => ({
         'demon stone': 2
       })
@@ -36,7 +38,7 @@ const Fabricator = {
       type: 'upgrade',
       maximum: 1,
       blueprintRequired: true,
-      buildMsg: _('wanderer soldiers succeed by subverting the enemy\'s rage.'),
+      buildMsg: _("slayers prevail by turning the demon's rage against itself."),
       cost: () => ({
         'demon stone': 2
       })
@@ -45,7 +47,7 @@ const Fabricator = {
       name: _('bind kunai'),
       type: 'weapon',
       blueprintRequired: true,
-      buildMsg: _("somtimes it is best not to fight."),
+      buildMsg: _("sometimes it is best not to fight."),
       cost: () => ({
         'demon stone': 1
       })
@@ -54,7 +56,7 @@ const Fabricator = {
       name: _('wisteria oil'),
       type: 'tool',
       blueprintRequired: true,
-      buildMsg: _('a handful of hypos. life in a vial.'),
+      buildMsg: _('a handful of vials — life held in the scent of wisteria.'),
       cost: () => ({
         'demon stone': 1
       }),
@@ -73,7 +75,7 @@ const Fabricator = {
       name: _('thunder gun'),
       type: 'weapon',
       blueprintRequired: true,
-      buildMsg: _("the peak of wanderer weapons technology, sleek and deadly."),
+      buildMsg: _('the pinnacle of forgotten slayer weapons — sleek and deadly.'),
       cost: () => ({
         'demon stone': 1
       })
@@ -82,7 +84,7 @@ const Fabricator = {
       name: _('firefly orb'),
       type: 'tool',
       blueprintRequired: true,
-      buildMsg: _('a smooth, perfect sphere. its light is inextinguishable.'),
+      buildMsg: _('a smooth, perfect sphere — its light is inextinguishable.'),
       cost: () => ({
         'demon stone': 1
       })
@@ -96,7 +98,7 @@ const Fabricator = {
     }
 
     // Create the Fabricator tab
-    Fabricator.tab = Header.addLocation(_("A Whirring Fabricator"), "fabricator", Fabricator, 'ship');
+    Fabricator.tab = Header.addLocation(_("The Nichirin Forge"), "fabricator", Fabricator, 'ship');
     
     // Create the Fabricator panel
     Fabricator.panel = $('<div>').attr('id', "fabricatorPanel")
@@ -123,7 +125,7 @@ const Fabricator = {
     Fabricator.updateBlueprints(true);
 
     if(!$SM.get('game.fabricator.seen')) {
-      Notifications.notify(Fabricator, _('the familiar hum of wanderer machinery coming to life. finally, real tools.'));
+      Notifications.notify(Fabricator, _('the forge fire roars back to life. nichirin steel rings at last — real weapons, finally.'));
       $SM.set('game.fabricator.seen', true);
     }
     AudioEngine.playBackgroundMusic(AudioLibrary.MUSIC_SHIP);
@@ -133,7 +135,7 @@ const Fabricator = {
 
   setTitle: () => {
     if(Engine.activeModule == Fabricator) {
-      document.title = _("A Whirring Fabricator");
+      document.title = _("The Nichirin Forge");
     }
   },
 
@@ -141,7 +143,7 @@ const Fabricator = {
     let section = $('#fabricateButtons');
     let needsAppend = false;
     if (section.length === 0) {
-      section = $('<div>').attr({ 'id': 'fabricateButtons', 'data-legend': _('fabricate:') }).css('opacity', 0);
+      section = $('<div>').attr({ 'id': 'fabricateButtons', 'data-legend': _('forge:') }).css('opacity', 0);
       needsAppend = true;
     }
 
