@@ -960,11 +960,10 @@ var World = {
       // Dead! Discard any world changes and go home
       Notifications.notify(World, _('the world fades'));
       World.state = null;
-      // 重武器（日轮刀类，weight ≥ 2）随玩家魂归故里——不会消失，仍留在 stores。
-      // 消耗品（食物/弹药/藤花精油等 weight < 2）则随死亡丢失。
+      // 无限城中获得的所有掉落都返回家中，不再因为死亡而消失。
       if (Path && Path.outfit) {
         for (var k in Path.outfit) {
-          if (Path.outfit[k] > 0 && Path.getWeight(k) >= 2) {
+          if (Path.outfit[k] > 0) {
             $SM.add('stores["' + k + '"]', Path.outfit[k]);
           }
         }

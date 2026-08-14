@@ -47,6 +47,7 @@ var Space = {
 		Space._lastChapter = null;
 		Space._potionEffect = null;
 		Space._potionCharges = 0;
+		Space._pendingAmbushTalentChoices = 0;
 
 		// 战前确保 HP 至少 30，给玩家行动余地
 		World.setHp(Math.max(30, World.health || 30));
@@ -539,36 +540,48 @@ var Space = {
 	},
 	getAccuracyBonus: function() { return Space.getTalentLevel('steadyHand') * 0.01; },
 
-	_offerTalent: function() {
-		// 从池中随机抽 3 项供选择（含已达上限的不选）
+	_offerTalent: function(options) {
+		options = options || {};
+		var batchLeft = (typeof options.batchLeft === 'number') ? Math.max(0, options.batchLeft) : 1;
+		var onComplete = typeof options.onComplete === 'function' ? options.onComplete : function() { Space.afterNode(); };
 		var pool = Space.TALENTS.filter(function(t) { return Space.getTalentLevel(t.id) < t.maxLevel; });
-		if (pool.length === 0) { Space.afterNode(); return; }
-		// 打乱后取前 3
+		if (pool.length === 0) { onComplete(); return; }
 		pool.sort(function() { return Math.random() - 0.5; });
 		var picks = pool.slice(0, Math.min(3, pool.length));
 
 		var buttons = {};
+		var continueBatch = function() {
+			if (batchLeft > 1) {
+				setTimeout(function() {
+					Space._offerTalent({ batchLeft: batchLeft - 1, onComplete: onComplete });
+				}, 200);
+			} else {
+				onComplete();
+			}
+		};
 		picks.forEach(function(t, i) {
 			var curLvl = Space.getTalentLevel(t.id);
-			var displayPer = (t.per < 1) ? Math.round(t.per * 100) : t.per;
 			var label = _(t.nameKey) + ' Lv.' + (curLvl + 1) + '/' + t.maxLevel;
 			buttons['talent_' + i] = {
 				text: label,
-				onChoose: (function(tid) { return function() { Space._takeTalent(tid); }; })(t.id),
+				onChoose: (function(tid) { return function() { Space._takeTalent(tid, continueBatch); }; })(t.id),
 				nextScene: 'end'
 			};
 		});
 		buttons['skip'] = {
 			text: _('skip'),
-			onChoose: function() { Space.afterNode(); },
+			onChoose: function() { continueBatch(); },
 			nextScene: 'end'
 		};
 
-		var text = [_('the demon fades. faint red motes drift toward you \u2014 pick one to absorb.')];
+		var text = [_('the demon fades. faint red motes drift toward you — pick one to absorb.')];
+		if (batchLeft > 1) {
+			text.push(_('the swarm leaves behind {0} more opportunities to take on a new edge.', batchLeft));
+		}
 		picks.forEach(function(t) {
 			var curLvl = Space.getTalentLevel(t.id);
 			var val = (t.per < 1) ? Math.round(t.per * 100) : t.per;
-			text.push('\u2022 ' + _(t.nameKey) + ' Lv.' + (curLvl + 1) + ': ' + _(t.descKey, val));
+			text.push('• ' + _(t.nameKey) + ' Lv.' + (curLvl + 1) + ': ' + _(t.descKey, val));
 		});
 		Events.startEvent({
 			title: _('slayer talent'),
@@ -581,32 +594,36 @@ var Space = {
 		});
 	},
 
-	_takeTalent: function(id) {
+	_takeTalent: function(id, onDone) {
 		var curLvl = Space.getTalentLevel(id);
 		Space.setTalentLevel(id, curLvl + 1);
 		var t = Space.TALENTS.find(function(x) { return x.id === id; });
 		Notifications.notify(null, _('you take up {0} (now Lv.{1})', _(t.nameKey), curLvl + 1));
-		Space.afterNode();
+		if (typeof onDone === 'function') {
+			onDone();
+		} else {
+			Space.afterNode();
+		}
 	},
 
 	// ---- 节点：战斗 ----
 
 	_pickEnemy: function(floor, isElite) {
-		// 数值重平衡（2026-07-27）：
-		//   目标——普通鬼单场 6~15 秒，前 3 层缓入门。
-		//   参考玩家满装：日轮铳/雷鸣铳约 8~12 DPS；顶级护甲 85 HP。
-		// 前 3 层作为熟悉阶段，用更低系数。
+		// 2026-08-14：把前 20 层显著压低，保证“最强装配也能轻松过前 20 层”，
+		// 但后期仍可逐层上升，避免 100 层在中后期完全失速。
 		var hp, dmg;
-		if (floor <= 3) {
-			hp  = Math.floor(50 + floor * 12);   // F1=62, F2=74, F3=86
-			dmg = Math.floor(4 + floor * 1.0);   // F1=5, F2=6, F3=7
+		if (floor <= 10) {
+			hp  = Math.floor(24 + floor * 5);   // F1=32, F5=64, F10=104
+			dmg = Math.floor(2 + floor * 0.3);  // F1=3, F5=6, F10=10
+		} else if (floor <= 20) {
+			hp  = Math.floor(74 + (floor-10) * 7);  // F15=182, F20=232
+			dmg = Math.floor(5 + (floor-10) * 0.5);  // F15=19, F20=24
 		} else {
-			hp  = Math.floor(70 + floor * 15);   // F4=130, F10=220, F20=370
-			dmg = Math.floor(5 + floor * 1.3);   // F4=10, F10=18, F20=31
+			hp  = Math.floor(144 + (floor-20) * 10);  // F30=435, F50=695
+			dmg = Math.floor(10 + (floor-20) * 0.7); // F30=40, F50=63
 		}
-		var hit = 0.85 + Math.min(0.10, floor * 0.003);
-		// 攻速：从 1.2s 慢慢缩到 0.7s（原 1.0→0.5，明显放缓）
-		var delay = Math.max(0.7, 1.2 - floor * 0.008);
+		var hit = 0.82 + Math.min(0.12, floor * 0.0035);
+		var delay = Math.max(0.72, 1.15 - floor * 0.0075);
 
 		var enemyNames = [
 			'forest demon', 'claw demon', 'blood mist demon',
@@ -769,13 +786,15 @@ var Space = {
 		return null;
 	},
 
-	// 分层掉落：楼层越深，材料越高级；BOSS 概率掉归阵符
+	// 分层掉落：楼层越深，材料越高级；同时保证每场战斗至少有固定的恢复/辅助道具掉落。
 	_battleLoot: function(floor, isElite) {
 		var t = Math.floor(floor / 10); // 0..9 tier
 		var loot = {
-			'meat':      { min: 2 + t, max: 5 + t*2, chance: 0.9 },
-			'cured meat':{ min: 1 + Math.floor(t/2), max: 2 + t, chance: 0.55 },
-			'teeth':     { min: 1 + t, max: 4 + t*2, chance: 0.7 }
+			'medicine':    { min: 1, max: 2, chance: 0.85 },
+			'wisteria oil':{ min: 1, max: 2, chance: 0.60 },
+			'cured meat': { min: 1, max: 2 + Math.floor(t / 2), chance: 0.75 },
+			'meat':       { min: 2 + t, max: 5 + t*2, chance: 0.9 },
+			'teeth':      { min: 1 + t, max: 4 + t*2, chance: 0.7 }
 		};
 		if (t >= 1) loot['iron']    = { min: 1, max: 3 + t, chance: 0.55 };
 		if (t >= 2) loot['steel']   = { min: 1, max: 2 + t, chance: 0.45 };
@@ -783,11 +802,12 @@ var Space = {
 		if (t >= 4) loot['leather'] = { min: 1, max: 3 + t, chance: 0.40 };
 		if (t >= 5) loot['solar crystal']  = { min: 1, max: 2 + Math.floor(t/2), chance: 0.35 };
 		if (t >= 6) loot['wisteria charm'] = { min: 1, max: 2, chance: 0.30 };
-		if (t >= 7) loot['medicine'] = { min: 1, max: 3, chance: 0.55 };
-		if (t >= 8) loot['wisteria oil'] = { min: 1, max: 2, chance: 0.30 };
+		if (t >= 7) loot['medicine'] = { min: 2, max: 3, chance: 0.85 };
+		if (t >= 8) loot['wisteria oil'] = { min: 1, max: 3, chance: 0.70 };
 		if (t >= 9) loot['demon stone'] = { min: 1, max: 1, chance: 0.25 };
 		if (isElite) {
-			loot['medicine'] = { min: 2, max: 4, chance: 0.85 };
+			loot['medicine'] = { min: 2, max: 4, chance: 0.95 };
+			loot['wisteria oil'] = { min: 1, max: 3, chance: 0.80 };
 			loot['demon stone'] = { min: 1, max: 1, chance: 0.35 };
 		}
 		return loot;
@@ -835,11 +855,95 @@ var Space = {
 							cooldown: Events._LEAVE_COOLDOWN,
 							onChoose: Space.afterBattle,
 							nextScene: 'end'
+						},
+						'recraft': {
+							text: _('recraft supplies'),
+							onChoose: Space.triggerBossRecraft,
+							nextScene: 'end'
 						}
 					}
 				}
 			}
 		});
+	},
+
+	// ---- 10 层 boss 后的补给重铸：用家里的材料换到背包中的药品/弹药/辅助道具 ----
+	_bossRecraftOptions: function() {
+		return [
+			// 药品：直接对齐现有库存 key
+			{ item: 'medicine', cost: { 'teeth': 12, 'scales': 8 } },
+			{ item: 'wisteria oil', cost: { 'teeth': 8, 'scales': 12, 'cloth': 2 } },
+			{ item: 'concentration pill', cost: { 'scales': 10, 'iron': 4, 'steel': 2 } },
+			{ item: 'firefly orb', cost: { 'teeth': 8, 'solar crystal': 3, 'steel': 4 } },
+			{ item: 'cured meat', cost: { 'meat': 8, 'teeth': 4 } },
+
+			// 弹药 / 投掷：全部使用游戏中已存在的 key
+			{ item: 'wisteria bullet', cost: { 'teeth': 6, 'iron': 3, 'sulphur': 2 } },
+			{ item: 'wisteria bomb', cost: { 'scales': 12, 'steel': 6, 'sulphur': 5 } },
+			{ item: 'kusarigama', cost: { 'steel': 8, 'iron': 5, 'cloth': 3 } },
+			{ item: 'bind kunai', cost: { 'teeth': 10, 'steel': 5, 'cloth': 2 } },
+			{ item: 'torch', cost: { 'wood': 4, 'sulphur': 2 } }
+		];
+	},
+
+	_recraftToBackpack: function(item, cost) {
+		for (var k in cost) {
+			var have = $SM.get('stores["' + k + '"]', true) || 0;
+			if (have < cost[k]) {
+				Notifications.notify(null, _('not enough {0}.', _(k)));
+				return false;
+			}
+		}
+		if (!Engine.options.testerMode) {
+			var storeMod = {};
+			for (var m in cost) {
+				storeMod[m] = ($SM.get('stores["' + m + '"]', true) || 0) - cost[m];
+			}
+			$SM.setM('stores', storeMod);
+		}
+		if (!Path.outfit) Path.outfit = {};
+		Path.outfit[item] = (Path.outfit[item] || 0) + 1;
+		$SM.set('outfit["' + item + '"]', Path.outfit[item]);
+		Notifications.notify(null, _('crafted {0}.', _(item)));
+		return true;
+	},
+
+	triggerBossRecraft: function() {
+		var options = Space._bossRecraftOptions();
+		var buttons = {};
+		options.forEach(function(o, idx) {
+			buttons['recraft_' + idx] = {
+				text: _('{0} ({1})', _(o.item), Space._formatCost(o.cost)),
+				onChoose: function() {
+					Space._recraftToBackpack(o.item, o.cost);
+					Space.afterNode();
+				},
+				nextScene: 'end'
+			};
+		});
+		buttons['leave'] = {
+			text: _('leave'),
+			onChoose: function() { Space.afterNode(); },
+			nextScene: 'end'
+		};
+		Events.startEvent({
+			title: _('the merchant rebuilds supplies'),
+			scenes: {
+				'start': {
+					text: [
+						_('the floor boss falls. on a nearby crate, a merchant grins and offers to rebuild your kit.'),
+						_('use the materials from your estate to make fresh consumables and tools for this descent.')
+					],
+					buttons: buttons
+				}
+			}
+		});
+	},
+
+	_formatCost: function(cost) {
+		var parts = [];
+		for (var k in cost) parts.push(_(k) + ' ' + cost[k]);
+		return parts.join(', ');
 	},
 
 	// ---- 节点：商店 ----
@@ -1050,6 +1154,7 @@ var Space = {
 	triggerAmbush: function() {
 		var count = 3 + Math.floor(Math.random() * 3);
 		Space._ambushRemaining = count;
+		Space._pendingAmbushTalentChoices = count;
 		Space._ambushSnapshot = JSON.parse(JSON.stringify(Path.outfit || {}));
 		Notifications.notify(null, _('demons circle you from every side \u2014 {0} of them.', count));
 		Space._ambushNext();
@@ -1120,7 +1225,15 @@ var Space = {
 					buttons: {
 						'continue': {
 							text: _('continue down'),
-							onChoose: Space.afterBattle,
+							onChoose: function() {
+								if (Space._pendingAmbushTalentChoices > 0) {
+									var count = Space._pendingAmbushTalentChoices;
+									Space._pendingAmbushTalentChoices = 0;
+									Space._offerTalent({ batchLeft: count, onComplete: function() { Space.afterNode(); } });
+									return;
+								}
+								Space.afterBattle();
+							},
 							nextScene: 'end'
 						}
 					}

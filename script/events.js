@@ -1381,6 +1381,9 @@ var Events = {
 				curNum = typeof curNum == 'number' ? curNum : 0;
 				curNum++;
 				Path.outfit[name] = curNum;
+				if (Engine.activeModule === Space) {
+					$SM.add('stores["' + name + '"]', 1);
+				}
 				World.updateSupplies();
 
 				if(!skipButtonSet){
