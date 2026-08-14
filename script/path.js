@@ -603,7 +603,11 @@ var Path = {
 					$('<div>').addClass('scrapBtn').attr('title', parts.join(' ')).text(_('scrap'))
 						.on('click', function(e) {
 							e.stopPropagation();
-							Path.scrapItem(wKey);
+							if (e.shiftKey) {
+								Path._showScrapQuantityDialog(wKey);
+								return;
+							}
+							Path.scrapItem(wKey, 1);
 						}).appendTo(row);
 				})(key);
 			}
@@ -621,24 +625,66 @@ var Path = {
 		try { return src.cost(); } catch (e) { return null; }
 	},
 
-	scrapItem: function(key) {
+	_showScrapQuantityDialog: function(key) {
+		var have = $SM.get('stores["'+key+'"]', true) || 0;
+		var carried = (Path.outfit && typeof Path.outfit[key] === 'number') ? Path.outfit[key] : 0;
+		var maxPossible = Math.max(0, have - carried);
+		if (maxPossible <= 0) return;
+		if ($('#scrapQuantityOverlay').length) {
+			$('#scrapQuantityOverlay').remove();
+		}
+		var overlay = $('<div>').attr('id', 'scrapQuantityOverlay');
+		var panel = $('<div>').attr('id', 'scrapQuantityPanel').appendTo(overlay);
+		$('<div>').addClass('buyQuantityTitle').text(_('scrap {0}', _(key))).appendTo(panel);
+		$('<div>').addClass('buyQuantityText').text(_('max recyclable: {0}', maxPossible)).appendTo(panel);
+		var input = $('<input>').addClass('buyQuantityInput').attr({
+			type: 'number',
+			min: 1,
+			max: maxPossible,
+			value: maxPossible
+		}).appendTo(panel);
+		var actions = $('<div>').addClass('buyQuantityActions').appendTo(panel);
+		var commit = function () {
+			var entered = parseInt(input.val(), 10);
+			if (!isFinite(entered)) entered = maxPossible;
+			entered = Math.max(1, Math.min(maxPossible, entered));
+			overlay.remove();
+			Path.scrapItem(key, entered);
+		};
+		$('<button>').addClass('buyQuantityOk').text(_('ok')).on('click', commit).appendTo(actions);
+		$('<button>').addClass('buyQuantityCancel').text(_('cancel')).on('click', function () { overlay.remove(); }).appendTo(actions);
+		overlay.on('click', function (e) {
+			if (e.target === overlay[0]) overlay.remove();
+		});
+		input.on('keydown', function (e) {
+			if (e.key === 'Enter') {
+				e.preventDefault();
+				commit();
+			}
+		});
+		overlay.appendTo('body');
+		input.focus().select();
+	},
+
+	scrapItem: function(key, qty) {
 		var have = $SM.get('stores["'+key+'"]', true);
 		if (have <= 0) return;
-		// 不能回收正在携带的最后一件：回收只消耗携带量之外的富余
 		var carried = (Path.outfit && typeof Path.outfit[key] === 'number') ? Path.outfit[key] : 0;
-		if (have - carried <= 0) return;
+		var maxPossible = Math.max(0, have - carried);
+		if (maxPossible <= 0) return;
+		var amount = (typeof qty === 'number') ? Math.max(1, Math.min(maxPossible, Math.floor(qty))) : 1;
 		var costObj = Path.getScrapCost(key);
 		if (!costObj) return;
-		$SM.add('stores["'+key+'"]', -1);
+		$SM.add('stores["'+key+'"]', -amount);
 		var refundText = [];
 		for (var mat in costObj) {
-			var rv = Math.floor(costObj[mat] * 0.3);
+			var rv = Math.floor(costObj[mat] * 0.3 * amount);
 			if (rv > 0) {
 				$SM.add('stores["'+mat+'"]', rv);
 				refundText.push(_(mat) + '+' + rv);
 			}
 		}
-		Notifications.notify(null, _('scrapped ') + _(key) + ' (' + refundText.join(', ') + ')');
+		Notifications.notify(null, _('scrapped {0} {1} ({2})', amount, _(key), refundText.join(', ')));
 		Path.updateOutfitting();
 	},
 	

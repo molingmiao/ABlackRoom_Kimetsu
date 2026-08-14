@@ -561,12 +561,15 @@ div.tooltip:hover {
 }
 
 body.noMask .eventPanel {
-	background-color: black;
+	background-color: #121512;
+	border-color: #2c2e2a;
+	box-shadow: 0 0 0 1px rgba(255,255,255,0.06), 0 8px 20px rgba(0,0,0,0.45);
+	color: #e9e4d5;
 }
 
 .eventPanel:before {
-	background-color:white;
-	opacity: 0.6;
+	background-color: rgba(18,21,18,0.92);
+	opacity: 0.75;
 	content: " ";
 	height: 700px;
 	left: -252px;
@@ -593,7 +596,8 @@ body.noMask .eventPanel:before {
 }
 
 body.noMask .eventPanel:after {
-	border-color: white;
+	border-color: #4d5048;
+	box-shadow: 0 0 0 1px rgba(255,255,255,0.04), 6px 6px 14px rgba(0,0,0,0.45);
 }
 
 .eventPanel .button {
@@ -602,8 +606,9 @@ body.noMask .eventPanel:after {
 }
 
 body.noMask .eventPanel .button {
-	border-color: white;
-	color: white;
+	border-color: #7a7a72;
+	color: #f3efe6;
+	background: rgba(255,255,255,0.02);
 }
 
 /* 无限城战斗：保留武器类型的彩色左边框（否则被上面的白色边框覆盖） */
@@ -623,7 +628,7 @@ body.noMask .eventPanel .button.btnBeacon  { border-left-color: #d4a017; }
 }
 
 body.noMask .eventTitle {
-	color: white;
+	color: #f3efe6;
 }
 
 .eventTitle:after {
@@ -652,7 +657,7 @@ body.noMask .eventTitle:after {
 }
 
 body.noMask #description {
-	color: white;
+	color: #ece4d6;
 }
 
 #description > div {

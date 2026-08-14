@@ -151,6 +151,17 @@ nextScene: 'end'
 },
 
 descend: function() {
+// 坠落时扣掉 1 只引路鸦，并同步刷新面板显示
+if (!Engine.options.testerMode) {
+var crows = Ship.getCrowCount();
+if (crows > 0) {
+$SM.add('game.spaceShip.crows', -1);
+$('#crowRow .row_val', Ship.panel).text($SM.get('game.spaceShip.crows'));
+if ($SM.get('game.spaceShip.crows') <= 0) {
+Button.setDisabled($('#liftoffButton', Ship.panel), true);
+}
+}
+}
 // 与远征一致：把背包（Path.outfit）从家里库存中扣除带走
 if (!Engine.options.testerMode && Path.outfit) {
 for (var k in Path.outfit) {

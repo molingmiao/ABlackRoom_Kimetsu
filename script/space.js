@@ -56,7 +56,7 @@ var Space = {
 		Space.setTitle();
 		AudioEngine.playBackgroundMusic(AudioLibrary.MUSIC_SPACE);
 
-		// 静态背景，不再随时间渐变
+		// 背景颜色由当前设置决定；无限城不额外强制覆盖
 		var body_color = Engine.isLightsOff() ? '#272823' : '#FFFFFF';
 		$('body').addClass('noMask').css({ backgroundColor: body_color });
 		var s = 'linear-gradient(rgba(0,0,0,0) 0%, rgba(0,0,0,0) 100%)';
@@ -634,8 +634,8 @@ var Space = {
 		var enemy = enemyNames[Math.min(enemyNames.length - 1, Math.floor(floor / 4))];
 
 		if (isElite) {
-			hp = Math.floor(hp * 1.6);   // 精英倍率降回 1.6（原 1.8）
-			dmg = Math.floor(dmg * 1.35); // 1.5→1.35
+			hp = Math.floor(hp * 1.3);   // 精英倍率降回 1.6（原 1.8）
+			dmg = Math.floor(dmg * 1.15); // 1.5→1.35
 			enemy = 'elite ' + enemy;
 		}
 		return { enemy: enemy, hp: hp, dmg: dmg, hit: hit, delay: delay, isElite: !!isElite };
@@ -774,15 +774,15 @@ var Space = {
 		// 楼层 boss 数值重平衡（2026-07-27）：
 		//   原血量太厚，玩家 8~15 DPS 需 100+ 秒才能击杀，导致靠药回血硬耗。
 		//   新数值目标：Boss 战 30~90 秒，配合 3 选 1 天赋累积。
-		if (floor === 10) return { enemy: 'lower moon six',              hp: 500,   dmg: 14,  hit: 0.85, delay: 1.0 };
-		if (floor === 20) return { enemy: 'lower moon three',            hp: 900,   dmg: 22,  hit: 0.88, delay: 0.9 };
-		if (floor === 30) return { enemy: 'upper moon four (the dome)',  hp: 1500,  dmg: 32,  hit: 0.90, delay: 0.85 };
-		if (floor === 40) return { enemy: 'upper moon five (the trickster)',  hp: 2400,  dmg: 42,  hit: 0.90, delay: 0.8 };
-		if (floor === 50) return { enemy: 'upper moon four (the puppeteer)', hp: 3500, dmg: 54,  hit: 0.90, delay: 0.75 };
-		if (floor === 60) return { enemy: 'upper moon three (the spearman)', hp: 5000, dmg: 66,  hit: 0.92, delay: 0.75 };
-		if (floor === 70) return { enemy: 'upper moon two (the wisteria one)', hp: 7000, dmg: 78, hit: 0.92, delay: 0.7 };
-		if (floor === 80) return { enemy: 'upper moon one (the sorrowful)',   hp: 9500, dmg: 92, hit: 0.94, delay: 0.7 };
-		if (floor === 90) return { enemy: 'kokushibou reborn',                hp: 13000, dmg: 110, hit: 0.95, delay: 0.65 };
+		if (floor === 10) return { enemy: 'lower moon six',              hp: 200,   dmg: 14,  hit: 0.85, delay: 1.0 };
+		if (floor === 20) return { enemy: 'lower moon three',            hp: 400,   dmg: 18,  hit: 0.88, delay: 0.9 };
+		if (floor === 30) return { enemy: 'upper moon four (the dome)',  hp: 600,  dmg: 24,  hit: 0.90, delay: 0.85 };
+		if (floor === 40) return { enemy: 'upper moon five (the trickster)',  hp: 800,  dmg: 32,  hit: 0.90, delay: 0.8 };
+		if (floor === 50) return { enemy: 'upper moon four (the puppeteer)', hp: 1000, dmg: 42,  hit: 0.90, delay: 0.75 };
+		if (floor === 60) return { enemy: 'upper moon three (the spearman)', hp: 1400, dmg: 54,  hit: 0.92, delay: 0.75 };
+		if (floor === 70) return { enemy: 'upper moon two (the wisteria one)', hp: 1800, dmg: 68, hit: 0.92, delay: 0.7 };
+		if (floor === 80) return { enemy: 'upper moon one (the sorrowful)',   hp: 2200, dmg: 83, hit: 0.94, delay: 0.7 };
+		if (floor === 90) return { enemy: 'kokushibou reborn',                hp: 13000, dmg: 100, hit: 0.95, delay: 0.65 };
 		return null;
 	},
 
