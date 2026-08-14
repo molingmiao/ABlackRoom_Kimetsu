@@ -1154,24 +1154,120 @@ var Room = {
 		});
 	},
 
-	buy: function (buyBtn) {
+	_getBuyMax: function (thing, good) {
+		if (!good || !good.cost) return 0;
+
+		var current = $SM.get('stores["' + thing + '"]', true) || 0;
+		var maxPossible = typeof good.maximum == 'number' ? Math.max(0, good.maximum - current) : Infinity;
+		var affordable = Infinity;
+		var cost = good.cost();
+		for (var k in cost) {
+			var have = $SM.get('stores["' + k + '"]', true) || 0;
+			var available = Math.floor(have / cost[k]);
+			if (available < affordable) {
+				affordable = available;
+			}
+		}
+		if (!isFinite(affordable)) {
+			affordable = maxPossible;
+		} else {
+			affordable = Math.min(affordable, maxPossible);
+		}
+		if (!isFinite(affordable)) {
+			affordable = 0;
+		}
+		return Math.max(0, affordable);
+	},
+
+	_showBuyQuantityDialog: function (buyBtn, thing, good) {
+		var maxPossible = Room._getBuyMax(thing, good);
+		if (maxPossible <= 0) {
+			Notifications.notify(Room, _('not enough materials'));
+			return;
+		}
+
+		if ($('#buyQuantityOverlay').length) {
+			$('#buyQuantityOverlay').remove();
+		}
+
+		var overlay = $('<div>').attr('id', 'buyQuantityOverlay');
+		var panel = $('<div>').attr('id', 'buyQuantityPanel').appendTo(overlay);
+		$('<div>').addClass('buyQuantityTitle').text(_('buy {0}', _(thing))).appendTo(panel);
+		$('<div>').addClass('buyQuantityText').text(_('max buyable: {0}', maxPossible)).appendTo(panel);
+		var input = $('<input>').addClass('buyQuantityInput').attr({
+			type: 'number',
+			min: 1,
+			max: maxPossible,
+			value: maxPossible
+		}).appendTo(panel);
+		var actions = $('<div>').addClass('buyQuantityActions').appendTo(panel);
+		var commit = function () {
+			var entered = parseInt(input.val(), 10);
+			if (!isFinite(entered)) {
+				entered = maxPossible;
+			}
+			entered = Math.max(1, Math.min(maxPossible, entered));
+			overlay.remove();
+			Room.buy(buyBtn, { shiftKey: true, customQuantity: entered });
+		};
+		$('<button>').addClass('buyQuantityOk').text(_('ok')).on('click', commit).appendTo(actions);
+		$('<button>').addClass('buyQuantityCancel').text(_('cancel')).on('click', function () { overlay.remove(); }).appendTo(actions);
+
+		overlay.on('click', function (e) {
+			if (e.target === overlay[0]) overlay.remove();
+		});
+		input.on('keydown', function (e) {
+			if (e.key === 'Enter') {
+				e.preventDefault();
+				commit();
+			}
+		});
+		overlay.appendTo('body');
+		input.focus().select();
+	},
+
+	_getBuyCount: function (thing, good, event) {
+		if (!good || !good.cost) return 1;
+		if (!event || !event.shiftKey) return 1;
+		if (event.customQuantity) return event.customQuantity;
+		Room._showBuyQuantityDialog(event.buyBtn, thing, good);
+		return 0;
+	},
+
+	buy: function (buyBtn, event) {
+		event = event || {};
+		event.buyBtn = buyBtn;
 		var thing = $(buyBtn).attr('buildThing');
 		var good = Room.TradeGoods[thing];
-		var numThings = $SM.get('stores["' + thing + '"]', true);
+		var numThings = $SM.get('stores["' + thing + '"]', true) || 0;
 		if (numThings < 0) numThings = 0;
 		if (good.maximum <= numThings) {
+			return;
+		}
+
+		var quantity = Room._getBuyCount(thing, good, event);
+		if (event && event.shiftKey && quantity === 0) {
+			return;
+		}
+		if (!event || !event.shiftKey) {
+			quantity = 1;
+		}
+		if (good.maximum && numThings + quantity > good.maximum) {
+			quantity = good.maximum - numThings;
+		}
+		if (quantity <= 0) {
 			return;
 		}
 
 		var storeMod = {};
 		var cost = good.cost();
 		for (var k in cost) {
-			var have = $SM.get('stores["' + k + '"]', true);
-			if (have < cost[k] && !Engine.options.testerMode) {
+			var have = $SM.get('stores["' + k + '"]', true) || 0;
+			if (have < cost[k] * quantity && !Engine.options.testerMode) {
 				Notifications.notify(Room, _("not enough " + k));
 				return false;
 			} else {
-				storeMod[k] = have - cost[k];
+				storeMod[k] = have - cost[k] * quantity;
 			}
 		}
 		if (!Engine.options.testerMode) {
@@ -1179,8 +1275,11 @@ var Room = {
 		}
 
 		Notifications.notify(Room, good.buildMsg);
+		if (quantity > 1) {
+			Notifications.notify(Room, _('bought {0} {1}', quantity, _(thing)));
+		}
 
-		$SM.add('stores["' + thing + '"]', 1);
+		$SM.add('stores["' + thing + '"]', quantity);
 
 		// audio
 		AudioEngine.playSound(AudioLibrary.BUY);
