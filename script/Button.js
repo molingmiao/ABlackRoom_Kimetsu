@@ -12,10 +12,10 @@ var Button = {
 			.attr('id', typeof(options.id) != 'undefined' ? options.id : "BTN_" + Engine.getGuid())
 			.addClass('button')
 			.text(typeof(options.text) != 'undefined' ? options.text : "button")
-			.click(function() {
+			.click(function(event) {
 				if(!$(this).hasClass('disabled')) {
 					Button.cooldown($(this));
-					$(this).data("handler")($(this));
+					$(this).data("handler")($(this), event);
 				}
 			})
 			.data("handler",  typeof options.click == 'function' ? options.click : function() { Engine.log("click"); })
