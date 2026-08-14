@@ -46,6 +46,7 @@ var Space = {
 		Space._pillarIndex = 0;
 		Space._lastChapter = null;
 		Space._potionEffect = null;
+		Space._potionCharges = 0;
 
 		// 战前确保 HP 至少 30，给玩家行动余地
 		World.setHp(Math.max(30, World.health || 30));
@@ -194,6 +195,10 @@ var Space = {
 		// 随时离开无限城
 		$('<div>').addClass('floorExitBtn').text(_('leave the castle'))
 			.click(Space.exitCastle).appendTo(hdr);
+		// 键位提示
+		$('<div>').addClass('floorHotkeyHint')
+			.text(_('hotkeys: QWERTY attack · 1-6 heal / potion'))
+			.appendTo(hdr);
 		var statusBar = $('<div>').addClass('floorStatus').appendTo(hdr);
 		$('<span>').addClass('floorHp')
 			.text(_('hp: {0}/{1}', World.health, World.getMaxHealth()))
@@ -215,14 +220,22 @@ var Space = {
 				$('<span>').addClass('talentChip').text(_(t.nameKey) + ' Lv.' + Space.getTalentLevel(t.id)).appendTo(talBar);
 			});
 		}
-		// 元进程状态提示：治疗加成 + 探索者赐福
+		// 元进程状态提示：治疗加成 + 探索者赐福 + 累计楼层永久 buff
 		var _mHealMult = Space.getHealMult();
 		var _mExplorer = Space.hasExplorerBoon();
-		if (_mHealMult > 1 || _mExplorer) {
+		var _pHp = Space.getPermanentHpBonus();
+		var _pDmg = Space.getPermanentDmgMult();
+		var _pDR = Space.getPermanentDR();
+		var _tFloor = Space.getTotalFloors();
+		if (_mHealMult > 1 || _mExplorer || _pHp > 0 || _pDmg > 0 || _pDR > 0) {
 			var metaBar = $('<div>').addClass('floorMeta').appendTo(hdr);
 			$('<span>').addClass('talentLabel').text(_('legacy:') + ' ').appendTo(metaBar);
 			if (_mHealMult > 1) $('<span>').addClass('metaChip').text(_('heal +{0}%', Math.round((_mHealMult - 1) * 100))).appendTo(metaBar);
-			if (_mExplorer)     $('<span>').addClass('metaChip').text(_('explorer +5% hp')).appendTo(metaBar);
+			if (_mExplorer)     $('<span>').addClass('metaChip').text(_('explorer +15% hp')).appendTo(metaBar);
+			if (_pHp > 0)       $('<span>').addClass('metaChip').text(_('depth +{0} hp', _pHp)).appendTo(metaBar);
+			if (_pDmg > 0)      $('<span>').addClass('metaChip').text(_('depth +{0}% dmg', Math.round(_pDmg * 100))).appendTo(metaBar);
+			if (_pDR > 0)       $('<span>').addClass('metaChip').text(_('depth +{0}% dr', Math.round(_pDR * 100))).appendTo(metaBar);
+			if (_tFloor > 0)    $('<span>').addClass('metaChip').text(_('floors traversed: {0}', _tFloor)).appendTo(metaBar);
 		}
 
 		// 行动菜单：进入节点前的准备（吃肉 / 用药品 / 用紫藤油）
@@ -233,6 +246,18 @@ var Space = {
 		Space._addActionBtn(actionRow, 'cured meat', _('eat cured meat (+{0} hp)', World.MEAT_HEAL || 8));
 		Space._addActionBtn(actionRow, 'medicine',   _('use medicine (+{0} hp)',   World.MEDS_HEAL || 20));
 		Space._addActionBtn(actionRow, 'wisteria oil', _('use wisteria oil (+30 hp)'));
+
+		// 整顿栏热键：1 熏肉 / 2 药剂 / 3 藤花精油
+		var _prepKeys = ['1', '2', '3'];
+		actionRow.children('.floorActionBtn').each(function(i) {
+			if (i < _prepKeys.length) {
+				var $b = $(this);
+				$b.attr('data-hotkey', _prepKeys[i]);
+				if (!$b.children('.hotkeyBadge').length) {
+					$('<span>').addClass('hotkeyBadge').text(_prepKeys[i]).appendTo($b);
+				}
+			}
+		});
 
 		// 节点选择区
 		var nodeWrap = $('<div>').addClass('floorNodeWrap').appendTo(panel);
@@ -356,6 +381,8 @@ var Space = {
 	afterNode: function() {
 		if (Space.done) return;
 		Space.currentFloor++;
+		// 元进程：每推进一层累计 +1（用于跨 run 解锁永久 buff）
+		try { Space.addTotalFloors(1); } catch (e) { /* ignore */ }
 		if (Space.currentFloor > Space.MAX_FLOOR) {
 			// 不应该到这里（最后一层是 Muzan，胜利由 triggerMuzan 处理）
 			return;
@@ -412,31 +439,67 @@ var Space = {
 		var cur = Space.getMetaHealed();
 		$SM.set('game.castleMeta.totalHealed', cur + amt, true);
 	},
-	// 治疗加成（元进程累计回复解锁）：>=500 +5%, >=1000 +10%, >=2000 +15%, >=5000 +20%
+	// 治疗加成（元进程累计回复解锁）——阈值下调、上限上调，让每次积累都能感受到
 	getHealMult: function() {
 		var t = Space.getMetaHealed();
-		if (t >= 5000) return 1.20;
-		if (t >= 2000) return 1.15;
-		if (t >= 1000) return 1.10;
-		if (t >= 500)  return 1.05;
+		if (t >= 2000) return 1.25;
+		if (t >= 1000) return 1.20;
+		if (t >= 500)  return 1.15;
+		if (t >= 200)  return 1.10;
 		return 1;
 	},
-	// 起始技能授予：peak 5→+1, 10→+2, 15→+3, 20→+5
+	// ---- 累计楼层元进程（2026-07-27 新增）----
+	// 每次入城推进到下一层 +1，用于解锁永久 buff。跨 run 只增不减。
+	getTotalFloors: function() { return $SM.get('game.castleMeta.totalFloors', true) || 0; },
+	addTotalFloors: function(n) {
+		var cur = Space.getTotalFloors();
+		$SM.set('game.castleMeta.totalFloors', cur + (n || 1), true);
+	},
+	// 累计楼层解锁的永久无限城 buff（仅在无限城中生效）
+	//   ≥20   → 起始 +8 max HP
+	//   ≥50   → +5% 武器伤害
+	//   ≥100  → +5% 减伤
+	//   ≥200  → 起始额外 +8 max HP（总 +16）
+	//   ≥500  → 再 +5% dmg / +5% DR（总 +10% / +10%）
+	getPermanentHpBonus: function() {
+		var t = Space.getTotalFloors();
+		var b = 0;
+		if (t >= 20)  b += 8;
+		if (t >= 200) b += 8;
+		return b;
+	},
+	getPermanentDmgMult: function() {
+		var t = Space.getTotalFloors();
+		var m = 0;
+		if (t >= 50)  m += 0.05;
+		if (t >= 500) m += 0.05;
+		return m;
+	},
+	getPermanentDR: function() {
+		var t = Space.getTotalFloors();
+		var d = 0;
+		if (t >= 100) d += 0.05;
+		if (t >= 500) d += 0.05;
+		return d;
+	},
+	// 起始技能授予：门槛下调、增量提升
+	//   3→+1, 6→+2, 10→+3, 15→+5, 20→+8
 	_grantStartingTalents: function() {
 		var meta = $SM.get('game.castleMeta.peakTalent') || {};
 		Space.TALENTS.forEach(function(t) {
 			var peak = meta[t.id] || 0;
 			var grant = 0;
-			if (peak >= 20) grant = 5;
-			else if (peak >= 15) grant = 3;
-			else if (peak >= 10) grant = 2;
-			else if (peak >= 5)  grant = 1;
+			if (peak >= 20) grant = 8;
+			else if (peak >= 15) grant = 5;
+			else if (peak >= 10) grant = 3;
+			else if (peak >= 6)  grant = 2;
+			else if (peak >= 3)  grant = 1;
 			if (grant > 0) {
 				$SM.set('character.infinityTalents["' + t.id + '"]', Math.min(t.maxLevel, grant), true);
 			}
 		});
 	},
-	// 探索者赐福：所有地标类型探索过 → 入城 +5% max HP
+	// 探索者赐福：所有地标类型探索过 → 入城 +15% max HP（原 5%，杯水车薪）
 	hasExplorerBoon: function() {
 		return !!$SM.get('game.castleMeta.perfectExploration', true);
 	},
@@ -446,12 +509,23 @@ var Space = {
 		$SM.set('game.castleMeta.bossKilled', n + 1, true);
 	},
 	getMaxHpBonus: function() {
+		// = 硬体术天赋（本 run） + 累计层数永久 HP（跨 run） + 探索者赐福 15%
 		var bonus = Space.getTalentLevel('hardBody') * 5;
-		if (Space.hasExplorerBoon()) bonus += Math.floor(85 * 0.05);
+		bonus += Space.getPermanentHpBonus();
+		if (Space.hasExplorerBoon()) {
+			var base = 85; // 顶级护甲上限，用作参考基数
+			bonus += Math.floor(base * 0.15); // 5%→15%
+		}
 		return bonus;
 	},
-	getDamageMult: function() { return 1 + Space.getTalentLevel('sharpEdge') * 0.02; },
-	getDamageReduction: function() { return Math.min(0.30, Space.getTalentLevel('ironWall') * 0.01); },
+	getDamageMult: function() {
+		// 快刀术（本 run） × 累计层数永久增伤（跨 run）
+		return (1 + Space.getTalentLevel('sharpEdge') * 0.02) * (1 + Space.getPermanentDmgMult());
+	},
+	getDamageReduction: function() {
+		// 铁壁（本 run，上限 30%）+ 累计层数永久减伤（跨 run），合计硬上限在 damage() 里 50%
+		return Math.min(0.30, Space.getTalentLevel('ironWall') * 0.01);
+	},
 	getLifestealPct: function() {
 		var base = Space.getTalentLevel('bloodDrink') * 0.01;
 		// 呼吸法加成：水/炎/雷各 +5%，累计
@@ -518,12 +592,21 @@ var Space = {
 	// ---- 节点：战斗 ----
 
 	_pickEnemy: function(floor, isElite) {
-		// 大幅提升：初层 200 HP、+30/层；伤害 8+2/层；命中 0.85→上限 0.95；
-		// 攻击频率翻倍（delay 减半）：基础 1.0s，下限 0.5s
-		var hp = Math.floor(200 + floor * 30);
-		var dmg = Math.floor(8 + floor * 2);
+		// 数值重平衡（2026-07-27）：
+		//   目标——普通鬼单场 6~15 秒，前 3 层缓入门。
+		//   参考玩家满装：日轮铳/雷鸣铳约 8~12 DPS；顶级护甲 85 HP。
+		// 前 3 层作为熟悉阶段，用更低系数。
+		var hp, dmg;
+		if (floor <= 3) {
+			hp  = Math.floor(50 + floor * 12);   // F1=62, F2=74, F3=86
+			dmg = Math.floor(4 + floor * 1.0);   // F1=5, F2=6, F3=7
+		} else {
+			hp  = Math.floor(70 + floor * 15);   // F4=130, F10=220, F20=370
+			dmg = Math.floor(5 + floor * 1.3);   // F4=10, F10=18, F20=31
+		}
 		var hit = 0.85 + Math.min(0.10, floor * 0.003);
-		var delay = Math.max(0.5, 1.0 - floor * 0.01);
+		// 攻速：从 1.2s 慢慢缩到 0.7s（原 1.0→0.5，明显放缓）
+		var delay = Math.max(0.7, 1.2 - floor * 0.008);
 
 		var enemyNames = [
 			'forest demon', 'claw demon', 'blood mist demon',
@@ -534,8 +617,8 @@ var Space = {
 		var enemy = enemyNames[Math.min(enemyNames.length - 1, Math.floor(floor / 4))];
 
 		if (isElite) {
-			hp = Math.floor(hp * 1.8);
-			dmg = Math.floor(dmg * 1.5);
+			hp = Math.floor(hp * 1.6);   // 精英倍率降回 1.6（原 1.8）
+			dmg = Math.floor(dmg * 1.35); // 1.5→1.35
 			enemy = 'elite ' + enemy;
 		}
 		return { enemy: enemy, hp: hp, dmg: dmg, hit: hit, delay: delay, isElite: !!isElite };
@@ -553,6 +636,7 @@ var Space = {
 		{ id:'frailty', nameKey:'vial of frailty',   descKey:'next fight: your blows land softer',           effect:{ enemyHpMult:1.6 },                  kind:'curse' }
 	],
 	_potionEffect: null,
+	_potionCharges: 0, // buff/mixed 药水剩余可持续场次（curse 恒为 1）
 
 	_randomPotion: function() {
 		return Space.POTIONS[Math.floor(Math.random() * Space.POTIONS.length)];
@@ -561,18 +645,28 @@ var Space = {
 	_drinkPotion: function(potion) {
 		if (!potion) return;
 		Space._potionEffect = potion.effect;
+		// 增益/混合类持续 3 场，诅咒 1 场（避免玩家被反复扣血）
+		Space._potionCharges = (potion.kind === 'curse') ? 1 : 3;
 		var tag = potion.kind === 'curse' ? _('(curse)') : (potion.kind === 'mixed' ? _('(mixed)') : _('(boon)'));
-		Notifications.notify(null, _('you gulp down {0} {1} \u2014 {2}', _(potion.nameKey), tag, _(potion.descKey)));
+		var chargesText = (Space._potionCharges > 1) ? _(' [x{0} fights]', Space._potionCharges) : '';
+		Notifications.notify(null, _('you gulp down {0} {1} \u2014 {2}{3}', _(potion.nameKey), tag, _(potion.descKey), chargesText));
 	},
 
-	// 构建下一场战斗时应用药水效果（改敌人 hp/dmg 或回满血），用后即清（只一场）
+	// 构建下一场战斗时应用药水效果（改敌人 hp/dmg 或回满血）
+	// 每场战斗消耗 1 层；耗尽后清空。healFull 只在首场触发一次。
 	_applyPotion: function(e) {
 		var pot = Space._potionEffect;
 		if (!pot) return e;
 		if (pot.enemyHpMult)  e.hp  = Math.max(1, Math.floor(e.hp  * pot.enemyHpMult));
 		if (pot.enemyDmgMult) e.dmg = Math.max(1, Math.floor(e.dmg * pot.enemyDmgMult));
-		if (pot.healFull) World.setHp(World.getMaxHealth());
-		Space._potionEffect = null;
+		if (pot.healFull) {
+			World.setHp(World.getMaxHealth());
+			pot.healFull = false; // 只回满一次，避免多场都回满
+		}
+		Space._potionCharges = Math.max(0, (Space._potionCharges || 1) - 1);
+		if (Space._potionCharges <= 0) {
+			Space._potionEffect = null;
+		}
 		return e;
 	},
 
@@ -660,16 +754,18 @@ var Space = {
 	// ---- 节点：精英楼层 Boss（每 10 层）----
 
 	_bossDef: function(floor) {
-		// 楼层 boss 数据：HP 大幅提升，高伤高命中快攻击（每 10 层一个）
-		if (floor === 10) return { enemy: 'lower moon six',              hp: 1200,  dmg: 18,  hit: 0.85, delay: 0.9 };
-		if (floor === 20) return { enemy: 'lower moon three',            hp: 2400,  dmg: 28,  hit: 0.88, delay: 0.8 };
-		if (floor === 30) return { enemy: 'upper moon four (the dome)',  hp: 4500,  dmg: 42,  hit: 0.90, delay: 0.7 };
-		if (floor === 40) return { enemy: 'upper moon five (the trickster)',  hp: 7000,  dmg: 55,  hit: 0.90, delay: 0.65 };
-		if (floor === 50) return { enemy: 'upper moon four (the puppeteer)', hp: 10000, dmg: 70,  hit: 0.90, delay: 0.6 };
-		if (floor === 60) return { enemy: 'upper moon three (the spearman)', hp: 14000, dmg: 85,  hit: 0.92, delay: 0.6 };
-		if (floor === 70) return { enemy: 'upper moon two (the wisteria one)', hp: 20000, dmg: 100, hit: 0.92, delay: 0.55 };
-		if (floor === 80) return { enemy: 'upper moon one (the sorrowful)',   hp: 28000, dmg: 120, hit: 0.94, delay: 0.55 };
-		if (floor === 90) return { enemy: 'kokushibou reborn',                hp: 40000, dmg: 150, hit: 0.95, delay: 0.5 };
+		// 楼层 boss 数值重平衡（2026-07-27）：
+		//   原血量太厚，玩家 8~15 DPS 需 100+ 秒才能击杀，导致靠药回血硬耗。
+		//   新数值目标：Boss 战 30~90 秒，配合 3 选 1 天赋累积。
+		if (floor === 10) return { enemy: 'lower moon six',              hp: 500,   dmg: 14,  hit: 0.85, delay: 1.0 };
+		if (floor === 20) return { enemy: 'lower moon three',            hp: 900,   dmg: 22,  hit: 0.88, delay: 0.9 };
+		if (floor === 30) return { enemy: 'upper moon four (the dome)',  hp: 1500,  dmg: 32,  hit: 0.90, delay: 0.85 };
+		if (floor === 40) return { enemy: 'upper moon five (the trickster)',  hp: 2400,  dmg: 42,  hit: 0.90, delay: 0.8 };
+		if (floor === 50) return { enemy: 'upper moon four (the puppeteer)', hp: 3500, dmg: 54,  hit: 0.90, delay: 0.75 };
+		if (floor === 60) return { enemy: 'upper moon three (the spearman)', hp: 5000, dmg: 66,  hit: 0.92, delay: 0.75 };
+		if (floor === 70) return { enemy: 'upper moon two (the wisteria one)', hp: 7000, dmg: 78, hit: 0.92, delay: 0.7 };
+		if (floor === 80) return { enemy: 'upper moon one (the sorrowful)',   hp: 9500, dmg: 92, hit: 0.94, delay: 0.7 };
+		if (floor === 90) return { enemy: 'kokushibou reborn',                hp: 13000, dmg: 110, hit: 0.95, delay: 0.65 };
 		return null;
 	},
 
@@ -1439,6 +1535,7 @@ try { World.returnOutfit(); } catch (e) { /* ignore */ }
 // 天赋只在本次 run 内有效：出无限城即清空
 try { Space.clearTalents(); } catch (e) { /* ignore */ }
 Space._potionEffect = null;
+Space._potionCharges = 0;
 $('body').stop().removeClass('noMask').css(
 'background-color', Engine.isLightsOff() ? '#272823' : '#FFFFFF');
 $('#spacePanel').empty().attr('style', '');

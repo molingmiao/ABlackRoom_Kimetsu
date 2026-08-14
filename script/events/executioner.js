@@ -2,9 +2,9 @@ Enemies = window.Enemies ?? {};
 Enemies.Executioner = {
   'guard': {
     combat: true,
-    notification: _('tripped a motion sensor.'),
-    enemy: 'mechanical guard',
-    enemyName: _('mechanical guard'),
+    notification: _('a trap of demon breath springs underfoot.'),
+    enemy: 'train guard demon',
+    enemyName: _('train guard demon'),
     ranged: true,
     chara: 'G',
     damage: 10,
@@ -31,9 +31,9 @@ Enemies.Executioner = {
   },
   'quadruped': {
     combat: true,
-    notification: _('a mobile defence platform trundles around the corner.'),
-    enemy: 'mechanical quadruped',
-    enemyName: _('mechanical quadruped'),
+    notification: _('a multi-leg blood demon drags itself round the overturned seat.'),
+    enemy: 'multi-leg blood demon',
+    enemyName: _('multi-leg blood demon'),
     ranged: false,
     chara: 'Q',
     damage: 8,
@@ -50,9 +50,9 @@ Enemies.Executioner = {
   },
   'medic': {
     combat: true,
-    notification: _('a medical drone wheels out of control.'),
-    enemy: 'broken medic',
-    enemyName: _('broken medic'),
+    notification: _('a blood-doctor demon stumbles out, syringe-nails dripping.'),
+    enemy: 'blood-doctor demon',
+    enemyName: _('blood-doctor demon'),
     ranged: false,
     chara: 'M',
     damage: 15,
@@ -80,9 +80,9 @@ Enemies.Executioner = {
   },
   'turret': {
     combat: true,
-    notification: _('one of the defence turrets still works.'),
-    enemy: 'defence turret',
-    enemyName: _('defence turret'),
+    notification: _('one of the watcher-demon eyes is still alive.'),
+    enemy: 'watcher demon eye',
+    enemyName: _('watcher demon eye'),
     ranged: true,
     chara: 'T',
     damage: 25,
@@ -110,16 +110,16 @@ Enemies.Executioner = {
 };
 
 Events.Executioner = {
-  "executioner-intro": { /* Exploring a ravaged battleship */
-    title: _('A Ravaged Battleship'),
+  "executioner-intro": { /* Exploring a derailed train */
+    title: _('A Derailed Train'),
     audio: AudioLibrary.LANDMARK_CRASHED_SHIP,
     scenes: {
       'start': {
-        notification: _('the remains of a huge ship are embedded in the earth.'),
+        notification: _('the wreckage of a huge train is half-buried in the earth.'),
         text: [
-          _('the remains of a massive battleship lie here, like a silent sealed city.'),
-          _('it lists to the side in a deep crevasse, cut when it fell from the sky.'), 
-          _('the hatches are all sealed, but the hull is blown out just above the dirt, providing an entrance.')
+          _('the wreck of a massive train lies here, like a silent sealed city.'),
+          _('it lists to the side in a deep crevasse, torn open when it derailed.'),
+          _('the doors are all sealed, but the hull is blown out just above the dirt, providing an entrance.')
         ],
         buttons: {
           'enter': {
@@ -135,7 +135,7 @@ Events.Executioner = {
       },
       '1': {
         text: [
-          _('the interior of the ship is cold and dark. what little light there is only accentuates its harsh angles.'),
+          _('the interior of the train is cold and dark. what little light there is only accentuates its harsh angles.'),
           _('the walls hum faintly.')
         ],
         buttons: {
@@ -151,8 +151,8 @@ Events.Executioner = {
       },
       '2-1': {
         'text': [
-          _('thick, sticky webbing covers the walls of the corridor.'), 
-          _('deeper into the ship, the darkness seems almost to writhe.'), 
+          _('thick, sticky webbing covers the walls of the carriage.'),
+          _('deeper into the wreck, the darkness seems almost to writhe.'),
           _('a small knapsack hangs from a cluster of webs, a few feet from the floor.')
         ],
         loot: {
@@ -184,9 +184,9 @@ Events.Executioner = {
         }
       },
       '3-1': {
-        notification: _('a huge arthropod lunges from the shadows, its mandibles thrashing.'),
+        notification: _('a web-spawn demon lunges from the shadows, its mandibles thrashing.'),
         combat: true,
-        enemy: 'chitinous horror',
+        enemy: 'web-spawn demon',
         chara: 'H',
         damage: 1,
         hit: 0.7,
@@ -218,9 +218,9 @@ Events.Executioner = {
         }
       },
       '4-1': {
-        notification: _('the webs part, and a grotesque insect lurches forward.'),
+        notification: _('the webs part, and a web-mother demon lurches forward.'),
         combat: true,
-        enemy: 'chitinous queen',
+        enemy: 'web-mother demon',
         chara: 'Q',
         damage: 1,
         hit: 0.7,
@@ -252,9 +252,9 @@ Events.Executioner = {
         }
       },
       '2-2': {
-        notification: _('an operative waits in ambush around the corner.'),
+        notification: _('a passenger demon waits in ambush around the corner.'),
         combat: true,
-        enemy: 'operative',
+        enemy: 'passenger demon',
         chara: 'O',
         damage: 8,
         hit: 0.8,
@@ -292,8 +292,8 @@ Events.Executioner = {
       },
       '3-2': {
         'text': [
-          _('the military has set up a small camp just inside the ship.'), 
-          _('crude attempts have been made to cut into the walls.'), 
+          _('slayers set up a small camp just inside the wreck.'),
+          _('crude attempts have been made to cut into the walls.'),
           _('scraps of copper wire litter the floor.'),
           _('two bedrolls are wedged into a corner.')
         ],
@@ -331,9 +331,9 @@ Events.Executioner = {
         }
       },
       '4-2': {
-        notification: _('a dusty researcher clumsily hides in the shadows.'),
+        notification: _('a blood-stained passenger hides clumsily in the shadows.'),
         combat: true,
-        enemy: 'researcher',
+        enemy: 'lost passenger',
         chara: 'R',
         damage: 1,
         hit: 0.8,
@@ -405,7 +405,7 @@ Events.Executioner = {
       },
       '3-3': {
         'text': [
-          _('the partially devoured remains of several wanderers are piled before a dark corridor.'), 
+          _('the partially devoured remains of several slayers are piled before a dark corridor.'),
           _('shuffling noises can be heard from within.')
         ],
         loot: {
@@ -433,8 +433,8 @@ Events.Executioner = {
       },
       '4-3': {
         combat: true,
-        enemy: 'ancient beast',
-        enemyName: _('ancient beast'),
+        enemy: 'ancient demon beast',
+        enemyName: _('ancient demon beast'),
         chara: 'A',
         damage: 6,
         hit: 0.8,
@@ -457,7 +457,7 @@ Events.Executioner = {
             chance: 0.8
           }
         },
-        notification: _('an ancient beast has made these ruins its home.'),
+        notification: _('an ancient demon beast has made this wreck its den.'),
         buttons: {
           'continue': {
             text: _('continue'),
@@ -473,8 +473,8 @@ Events.Executioner = {
       },
       '5': {
         'text': [
-          _('a maintenance panel is embedded in the wall next to a large sealed door.'), 
-          _('perhaps the ship’s systems are still operational.')
+          _('a maintenance panel is embedded in the wall next to a large sealed door.'),
+          _('perhaps the train\'s systems are still operational.')
         ],
         buttons: {
           'power': {
@@ -489,9 +489,9 @@ Events.Executioner = {
       },
       '6': {
         combat: true,
-        notification: _('as the lights come online, so too do the defence systems.'),
-        enemy: 'automated turret',
-        enemyName: _('automated turret'),
+        notification: _('as the lanterns flicker back, so too do the watcher-eyes awaken.'),
+        enemy: 'self-walking demon eye',
+        enemyName: _('self-walking demon eye'),
         ranged: true,
         chara: 'T',
         damage: 10,
@@ -543,39 +543,39 @@ Events.Executioner = {
     }
   },
 
-  "executioner-antechamber": { /* Deeper into a ravaged battleship */
-    title: _('A Ravaged Battleship'),
+  "executioner-antechamber": { /* Deeper into a derailed train */
+    title: _('A Derailed Train'),
     audio: AudioLibrary.LANDMARK_CRASHED_SHIP,
     scenes: {
       'start': {
         'text': [
-          _('a large hatch opens into a wide corridor.'),
-          _('the corridor leads to a bank of elevators, which appear to be functional.')
+          _('a large door opens into a wide corridor.'),
+          _('the corridor leads to a bank of elevator cages, which appear to be functional.')
         ],
         buttons: {
           'engineering': {
-            text: _('engineering'),
+            text: _('engine car'),
             available: function() {
               return !World.state.engineering;
             },
             nextEvent: 'executioner-engineering'
           },
           'medical': {
-            text: _('medical'),
+            text: _('medical car'),
             available: function() {
               return !World.state.medical;
             },
             nextEvent: 'executioner-medical'
           },
           'martial': {
-            text: _('martial'),
+            text: _('cargo car'),
             available: function() {
               return !World.state.martial;
             },
             nextEvent: 'executioner-martial'
           },
           'command': {
-            text: _('command deck'),
+            text: _("conductor's cabin"),
             available: function() {
               return World.state.engineering && World.state.medical && World.state.martial;
             },
@@ -590,8 +590,8 @@ Events.Executioner = {
     }
   },
 
-  "executioner-engineering": { /* Engineering wing */
-    title: _('Engineering Wing'),
+  "executioner-engineering": { /* Engine car */
+    title: _('Engine Car'),
     audio: AudioLibrary.LANDMARK_CRASHED_SHIP,
     scenes: {
       'start': {
@@ -613,7 +613,7 @@ Events.Executioner = {
 
       '1-1': {
         text: [
-          _('an automated assembly line performs its empty routines, long since deprived of materials.'),
+          _('an idle forge assembly performs its empty routines, long since deprived of steel.'),
           _('its final works lie forgotten, covered by a thin layer of dust.')
         ],
         loot: {
@@ -641,9 +641,9 @@ Events.Executioner = {
       },
       '2-1a': {
         combat: true,
-        notification: _('assembly arms spin wildly out of control.'),
-        enemy: 'unruly welder',
-        enemyName: _('unruly welder'),
+        notification: _('forge arms spin wildly out of control.'),
+        enemy: 'unruly forge demon',
+        enemyName: _('unruly forge demon'),
         ranged: false,
         chara: 'W',
         damage: 13,
@@ -677,8 +677,8 @@ Events.Executioner = {
       },
       '2-1b': {
         text: [
-          _('assembly arms spark and jitter.'),
-          _('a cacophony of decrepit machinery fills the room.')
+          _('forge arms spark and jitter.'),
+          _('a cacophony of decrepit apparatus fills the room.')
         ],
         buttons: {
           'continue': {
@@ -724,7 +724,7 @@ Events.Executioner = {
       },
       '2-2': {
         text: [
-          _('must have been the engine room, once. the massive machines now stand inert, twisted and scorched by explosions.'),
+          _('must have been the engine car, once. the massive machines now stand inert, twisted and scorched by explosions.'),
           _('the destruction is uniform and precise.'),
           _('bits of them can be scavenged.')
         ],
@@ -763,8 +763,8 @@ Events.Executioner = {
       },
       '3-2b': {
         text: [
-          _('none of the ship\'s engines escaped the destruction.'),
-          _('it\'s no mystery why she no longer flies.')
+          _('none of the train\'s engines escaped the destruction.'),
+          _('it\'s no mystery why she no longer runs.')
         ],
         buttons: {
           'continue': {
@@ -813,7 +813,7 @@ Events.Executioner = {
       },
       '2-3b': {
         text: [
-          _('rows of inert security robots hang suspended from the ceiling.'),
+          _('rows of inert watcher-demons hang suspended from the ceiling.'),
           _('wires run overhead, corroded and useless.')
         ],
         buttons: {
@@ -868,8 +868,8 @@ Events.Executioner = {
 
       '4': {
         text: [
-          _('marks on the door read \'research and development.\' everything seems mostly untouched, but dead.'),
-          _('one machine thrums with power, and might still work.')
+          _("marks on the door read 'research and development.' everything seems mostly untouched, but dead."),
+          _('one apparatus thrums with power, and might still work.')
         ],
         buttons: {
           'use': {
@@ -922,7 +922,7 @@ Events.Executioner = {
       },
       '5-2': {
         text: [
-          _('the machines here look unfinished, abandoned by their creator. wires and other scrap are scattered about the work benches.')
+          _('the apparatuses here look unfinished, abandoned by their maker. wires and other scrap are scattered about the work benches.')
         ],
         buttons: {
           'continue': {
@@ -960,7 +960,7 @@ Events.Executioner = {
       },
       '7-intro': {
         text: [
-          _('clattering metal and old servos. something is coming...')
+          _('clattering metal and old gears. something is coming...')
         ],
         buttons: {
           'fight': {
@@ -971,9 +971,9 @@ Events.Executioner = {
       },
       '7': {
         combat: true,
-        notification: _('an unfinished automaton whirs to life.'),
-        enemy: 'unstable prototype',
-        enemyName: _('unstable prototype'),
+        notification: _('an unfinished prototype demon whirs to life.'),
+        enemy: 'unstable prototype demon',
+        enemyName: _('unstable prototype demon'),
         ranged: false,
         chara: 'P',
         damage: 5,
@@ -1030,8 +1030,8 @@ Events.Executioner = {
     }
   },
 
-  "executioner-martial": { /* Martial wing */
-    title: _('Martial Wing'),
+  "executioner-martial": { /* Cargo car */
+    title: _('Cargo Car'),
     audio: AudioLibrary.LANDMARK_CRASHED_SHIP,
     scenes: {
       'start': {
@@ -1058,7 +1058,7 @@ Events.Executioner = {
         buttons: {
           'explode': {
             text: _('blow it down'),
-            cost: { grenade: 1 },
+            cost: { 'wisteria bomb': 1 },
             nextScene: { 1: '2-1' }
           },
           'right': {
@@ -1194,7 +1194,7 @@ Events.Executioner = {
       },
       '4-2': {
         text: [
-          _('crew cabins flank the hall, devoid of life.'),
+          _('berths flank the hall, devoid of life.'),
           _('a few useful items can be scavenged.')
         ],
         loot: {
@@ -1223,7 +1223,7 @@ Events.Executioner = {
 
       '2-3': {
         text: [
-          _('ruined defence turrets flank the corridor.'),
+          _('ruined watcher-eyes flank the corridor.'),
           _('could put the scrap to good use.')
         ],
         loot: {
@@ -1261,7 +1261,7 @@ Events.Executioner = {
       },
       '3-3b': {
         text: [
-          _('small sensors in the walls still look to be operational.'),
+          _('small watch-eyes in the walls still look to be operational.'),
           _('easily avoided.')
         ],
         buttons: {
@@ -1374,7 +1374,7 @@ Events.Executioner = {
       },
       '8-1b': {
         text: [
-          _('slipped past an automated sentry.'),
+          _('slipped past a watcher-demon sentry.'),
           _('if only they\'d been destroyed along with everything else.')
         ],
         buttons: {
@@ -1407,7 +1407,7 @@ Events.Executioner = {
 
       '7-2': {
         text: [
-          _('the corridor passes through a security checkpoint. the defences are blown apart, ragged edges scorched by laser fire.'),
+          _('the corridor passes through a security checkpoint. the defences are blown apart, ragged edges scorched by the fires.'),
           _('past the checkpoint, banks of containment cells can be seen.')
         ],
         buttons: {
@@ -1439,7 +1439,7 @@ Events.Executioner = {
       },
       '8-2b': {
         text: [
-          _('the guards died at their posts, shot through with superheated plasma.'),
+          _('the guards died at their posts, slain by demon fire.'),
           _('their weapons lie on the floor beside them.')
         ],
         loot: {
@@ -1484,7 +1484,7 @@ Events.Executioner = {
       '10': {
         'text': [
           _('the corridor opens onto a vast training complex, obstacles and features blackened by real combat.'),
-          _('a regenerative machine hums uncannily by one of the courses.')
+          _('a regenerative apparatus hums uncannily by one of the courses.')
         ],
         buttons: {
           'use': {
@@ -1508,7 +1508,7 @@ Events.Executioner = {
       '11': {
         'text': [
           _('motion from the centre of the yard.'),
-          _('a sparring automaton, still fully function and crusted with timeworn blood, lunges forward.')
+          _('a sparring demon, still fully functioning and crusted with timeworn blood, lunges forward.')
         ],
         buttons: {
           'engage': {
@@ -1519,9 +1519,9 @@ Events.Executioner = {
       },
       '12': {
         combat: true,
-        notification: _('the machine attacks, blades whirling.'),
-        enemy: 'murderous robot',
-        enemyName: _('murderous robot'),
+        notification: _('the sparring demon attacks, claws whirling.'),
+        enemy: 'sparring demon',
+        enemyName: _('sparring demon'),
         ranged: false,
         chara: 'M',
         damage: 10,
@@ -1557,8 +1557,8 @@ Events.Executioner = {
       },
       '13': {
         'text': [
-          _('the ruins of the sparring machine clatter to the ground.'),
-          _('picked this deck clean.')
+          _('the ruins of the sparring demon clatter to the ground.'),
+          _('picked this car clean.')
         ],
         onLoad: () => {
           World.state.martial = true;
@@ -1573,14 +1573,14 @@ Events.Executioner = {
     }
   },
 
-  "executioner-medical": { /* Medical wing */
-    title: _('Medical Wing'),
+  "executioner-medical": { /* Medical car */
+    title: _('Medical Car'),
     audio: AudioLibrary.LANDMARK_CRASHED_SHIP,
     scenes: {
       'start': {
         'text': [
           _('elevator doors open to an empty corridor.'),
-          _('a few dusty corpses can be seen further down, but this deck appears to have been spared most of the combat.')
+          _('a few dusty corpses can be seen further down, but this car appears to have been spared most of the combat.')
         ],
         buttons: {
           'continue': {
@@ -1642,8 +1642,8 @@ Events.Executioner = {
       },
       '3b': {
         'text': [
-          _('automated guardians still stalk the halls, unaware that their masters have long gone.'),
-          _('clumsy machines, and easily avoided.')
+          _('watcher-demons still stalk the halls, unaware that their masters have long gone.'),
+          _('clumsy demons, and easily avoided.')
         ],
         buttons: {
           'continue': {
@@ -1658,8 +1658,8 @@ Events.Executioner = {
       },
       '4': {
         'text': [
-          _('medical gurneys are fixed to grooves running down the corridor walls.'),
-          _('the automated patient transport system now sits motionless.')
+          _('medical cots are fixed to grooves running down the corridor walls.'),
+          _('the mechanical patient conveyance now sits motionless.')
         ],
         buttons: {
           'continue': {
@@ -1706,7 +1706,7 @@ Events.Executioner = {
       },
       '6-1b': {
         'text': [
-          _('more medical robots stand frozen, attached by a network of wires.'),
+          _('more blood-doctor demons stand frozen, attached by a network of roots.'),
           _('they take no notice of the intrusion.')
         ],
         buttons: {
@@ -1846,9 +1846,9 @@ Events.Executioner = {
 
       '8': {
         combat: true,
-        notification: _('something\'s wrong with this robot.'),
-        enemy: 'unstable automaton',
-        enemyName: _('unstable automaton'),
+        notification: _('something\'s wrong with this demon.'),
+        enemy: 'unstable demon',
+        enemyName: _('unstable demon'),
         ranged: false,
         chara: 'A',
         damage: 10,
@@ -1910,7 +1910,7 @@ Events.Executioner = {
       '10b': {
         'text': [
           _('slipped through unnoticed.'),
-          _('air whistles as the doors open. this section must have lower pressure than the rest of the ship.')
+          _('air whistles as the doors open. this section must have lower pressure than the rest of the train.')
         ],
         buttons: {
           'continue': {
@@ -1979,7 +1979,7 @@ Events.Executioner = {
       },
       '13-1b': {
         'text': [
-          _('security drones still patrol the hallways.'),
+          _('watcher-demons still patrol the hallways.'),
           _('predictable paths.')
         ],
         buttons: {
@@ -2097,9 +2097,9 @@ Events.Executioner = {
       },
       '16': {
         combat: true,
-        notification: _('a mutated beast leaps from its cell.'),
-        enemy: 'malformed experiment',
-        enemyName: _('malformed experiment'),
+        notification: _('a malformed demon leaps from its cell.'),
+        enemy: 'malformed experiment demon',
+        enemyName: _('malformed experiment demon'),
         ranged: false,
         chara: 'E',
         damage: 5,
@@ -2146,13 +2146,13 @@ Events.Executioner = {
     }
   },
 
-  "executioner-command": { /* Command deck */
-    title: _('Command Deck'),
+  "executioner-command": { /* Conductor's cabin */
+    title: _("Conductor's Cabin"),
     audio: AudioLibrary.LANDMARK_CRASHED_SHIP,
     scenes: {
       'start': {
         'text': [
-          _('the path to the command bridge is wide, walls adorned with decorative shields.'),
+          _('the path to the conductor\'s cabin is wide, walls adorned with decorative shields.'),
           _('fighting hadn\'t reached here, it seems.')
         ],
         buttons: {
@@ -2184,7 +2184,7 @@ Events.Executioner = {
       },
       '2': {
         'text': [
-          _('detour through the officer\'s lounge.'),
+          _('detour through the conductor\'s lounge.'),
           _('might be something useful here.')
         ],
         buttons: {
@@ -2250,7 +2250,7 @@ Events.Executioner = {
       },
       '4': {
         'text': [
-          _('the command deck is empty, save for a squat figure sitting motionless in the centre of the room.'),
+          _('the conductor\'s cabin is empty, save for a squat figure sitting motionless in the centre of the room.'),
           _('in a flash, the figure is standing.')
         ],
         buttons: {
@@ -2266,8 +2266,8 @@ Events.Executioner = {
       },
       '5': {
         'text': [
-          _('wanderer form, but not quite flesh. not quite metal either. a crystal set into its chest pulses with light.'),
-          _('it says it saw the rebellion coming. said it made arrangements.'),
+          _('slayer form, but not quite flesh. not quite metal either. a crystal set into its chest pulses with light.'),
+          _('it says it saw the corps coming. said it made arrangements.'),
           _('says it can\'t die.')
         ],
         buttons: {
@@ -2279,9 +2279,9 @@ Events.Executioner = {
       },
       '6': {
         combat: true,
-        notification: _('the immortal wanderer attacks.'),
-        enemy: 'immortal wanderer',
-        enemyName: _('immortal wanderer'),
+        notification: _('the immortal upper moon attacks.'),
+        enemy: 'immortal upper moon',
+        enemyName: _('immortal upper moon'),
         ranged: false,
         chara: '@',
         damage: 12,

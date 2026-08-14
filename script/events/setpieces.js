@@ -2531,7 +2531,7 @@ Events.Setpieces = {
 						max: 10,
 						chance: 1
 					},
-					grenade: {
+					'wisteria bomb': {
 						min: 1,
 						max: 5,
 						chance: 0.8

@@ -375,6 +375,26 @@ div.button div.cooldown {
 	background-color: #DDDDDD;
 }
 
+/* 热键角标（Q/W/E/R/T/Y、1..6）：显示在按钮右上角，键盘玩家的辅助提示 */
+.hotkeyBadge {
+	position: absolute;
+	top: 1px;
+	right: 3px;
+	font-size: 9px;
+	line-height: 11px;
+	padding: 0 3px;
+	color: #666;
+	background-color: rgba(255, 255, 255, 0.75);
+	border: 1px solid #999;
+	border-radius: 2px;
+	pointer-events: none;
+	opacity: 0.85;
+	font-family: 'Times New Roman', serif;
+	letter-spacing: 0;
+	z-index: 2;
+}
+.button.disabled .hotkeyBadge { opacity: 0.35; }
+
 /* Up/Down buttons. They're complicated! */
 
 .upBtn, .dnBtn, .upManyBtn, .dnManyBtn {

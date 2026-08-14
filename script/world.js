@@ -148,7 +148,7 @@ var World = {
     World.LANDMARKS[World.TILE.BOREHOLE] = { num: 10, minRadius: 15, maxRadius: World.RADIUS * 1.5, scene: 'borehole', label:  _('A&nbsp;Borehole')};
     World.LANDMARKS[World.TILE.BATTLEFIELD] = { num: 5, minRadius: 18, maxRadius: World.RADIUS * 1.5, scene: 'battlefield', label:  _('A&nbsp;Battlefield')};
     World.LANDMARKS[World.TILE.SWAMP] = { num: 1, minRadius: 15, maxRadius: World.RADIUS * 1.5, scene: 'swamp', label:  _('A&nbsp;Murky&nbsp;Swamp')};
-    World.LANDMARKS[World.TILE.EXECUTIONER] = { num: 1, minRadius: 28, maxRadius: 28, scene: 'executioner', 'label': _('A&nbsp;Ravaged&nbsp;Battleship')};
+    World.LANDMARKS[World.TILE.EXECUTIONER] = { num: 1, minRadius: 28, maxRadius: 28, scene: 'executioner', 'label': _('A&nbsp;Derailed&nbsp;Train')};
 
     // Only add the cache if there is prestige data
     if($SM.get('previous.stores')) {
@@ -981,7 +981,7 @@ var World = {
         $('body').removeClass('world-active');
         $('body').removeClass('noMask').css('background-color', Engine.isLightsOff() ? '#272823' : '#FFFFFF');
         // 无限城中死亡：一并清理天赋 + 药水态 + 空面板
-        try { if (window.Space) { Space.done = true; Space.clearTalents(); Space._potionEffect = null; Space.clearPillarTimers(); $('#spacePanel').empty().attr('style', ''); } } catch (e) { /* ignore */ }
+        try { if (window.Space) { Space.done = true; Space.clearTalents(); Space._potionEffect = null; Space._potionCharges = 0; Space.clearPillarTimers(); $('#spacePanel').empty().attr('style', ''); } } catch (e) { /* ignore */ }
         Engine.activeModule = Room;
         $('div.headerButton').removeClass('selected');
         Room.tab.addClass('selected');

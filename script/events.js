@@ -200,6 +200,9 @@ var Events = {
 		}
 		$('<div>').addClass('clear').appendTo(healBtns);
 		Events.setHeal(healBtns);
+
+		// 绑定热键：Q/W/E/R/T/Y 攻击，1..6 医疗（角标显示所绑按键）
+		Events._bindCombatHotkeys();
 		
 		// Set up the enemy attack timers
 		Events.startEnemyAttacks();
@@ -497,6 +500,40 @@ var Events = {
 		AudioEngine.playSound(AudioLibrary.USE_MEDS);
 	},
 
+	// ---- 热键绑定（战斗按钮）----
+	// 战斗攻击键：Q/W/E/R/T/Y（按 DOM 顺序），医疗键：1..6
+	// 每个绑定按钮显示右上角热键角标
+	HOTKEYS_ATTACK: ['q','w','e','r','t','y'],
+	HOTKEYS_HEAL:   ['1','2','3','4','5','6'],
+
+	_tagHotkey: function(btn, key) {
+		if (!btn || !btn.length || !key) return;
+		btn.attr('data-hotkey', key);
+		// 重绑时先清旧角标（例如战斗中拳脚被 prepend 导致 QWERTY 顺位整体后移）
+		btn.children('.hotkeyBadge').remove();
+		$('<span>').addClass('hotkeyBadge').text(key.toUpperCase()).appendTo(btn);
+	},
+
+	_bindCombatHotkeys: function() {
+		// 攻击按钮：优先按 #attackButtons 内顺序绑定；兜底捕获 #attack_fists（它有时被直接 prepend 到 #buttons）
+		var $attackBtns = $('#attackButtons > .button');
+		var $strayFists = $('#buttons > #attack_fists');
+		var attackList = $attackBtns.get();
+		$strayFists.each(function() {
+			if (attackList.indexOf(this) < 0) attackList.unshift(this); // 拳脚放最前，占用 Q
+		});
+		attackList.forEach(function(el, i) {
+			if (i < Events.HOTKEYS_ATTACK.length) {
+				Events._tagHotkey($(el), Events.HOTKEYS_ATTACK[i]);
+			}
+		});
+		$('#healButtons > .button').each(function(i) {
+			if (i < Events.HOTKEYS_HEAL.length) {
+				Events._tagHotkey($(this), Events.HOTKEYS_HEAL[i]);
+			}
+		});
+	},
+
 	createAttackButton: function(weaponName) {
 		var weapon = World.Weapons[weaponName];
 		var cd = weapon.cooldown;
@@ -704,6 +741,8 @@ var Events = {
 						var fists = $('#attack_fists');
 						if(fists.length === 0) {
 							Events.createAttackButton('fists').prependTo('#buttons', Events.eventPanel());
+							// 新加入的拳脚按钮也要重新绑定热键
+							try { Events._bindCombatHotkeys(); } catch (e) { /* ignore */ }
 						} else {
 							Button.setDisabled(fists, false);
 						}
@@ -869,6 +908,18 @@ var Events = {
 				msg = _('miss');
 				dmg = 0;
 			} else {
+				// 无限城：敌方命中玩家时，应用玩家的减伤天赋（Iron Wall / 永久 DR）
+				try {
+					if (fighter.attr('id') === 'enemy' && enemy.attr('id') === 'wanderer'
+						&& window.Space && Engine.activeModule === Space) {
+						var _dr = 0;
+						if (Space.getDamageReduction)    _dr += Space.getDamageReduction();
+						if (Space.getPermanentDR)        _dr += Space.getPermanentDR();
+						_dr = Math.min(0.5, _dr); // 全局硬上限 50%，避免过强
+						if (_dr > 0) dmg = Math.max(1, Math.floor(dmg * (1 - _dr)));
+					}
+				} catch (e) { /* ignore */ }
+
 				if (energised) {
 					dmg *= this.ENERGISE_MULTIPLIER;
 				}
@@ -1097,6 +1148,8 @@ var Events = {
 						}
 						$('<div>').addClass('clear').appendTo(healBtns);
 						Events.setHeal(healBtns);
+						// 战后收殓界面同样绑定 1..6 医疗热键
+						try { Events._bindCombatHotkeys(); } catch (e) { /* ignore */ }
 					}
 					$('<div>').addClass('clear').appendTo(exitBtns);
 

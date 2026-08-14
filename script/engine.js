@@ -82,6 +82,10 @@
         name: _('thunder breath I'),
         desc: _('ranged shots land with extra force'),
         notify: _('every shot now arrives a moment ahead of expectation.')
+      },
+      'total concentration': {
+        name: _('total concentration'),
+        desc: _('near death in combat triggers one emergency recovery')
       }
     },
 
@@ -318,6 +322,26 @@
       // Register keypress handlers
       $('body').off('keydown').keydown(Engine.keyDown);
       $('body').off('keyup').keyup(Engine.keyUp);
+
+      // 热键（QWERTY / 1..6）——绑在 document 上并用 keydown 触发，响应更快也不受焦点影响
+      $(document).off('keydown.hotkey').on('keydown.hotkey', function(e) {
+        var key = Engine._resolveHotkey(e);
+        if (!key) return;
+        // 长按去重：重复触发时直接返回，但**不 preventDefault**——否则会破坏 WASD 走路等其它按键流程
+        if (Engine._hotkeyDown[key]) return;
+        Engine._hotkeyDown[key] = true;
+        if (Engine._tryHotkey(e)) {
+          // 仅在命中热键按钮时阻断事件冒泡（避免继续走到 body → activeModule.keyDown）
+          e.preventDefault();
+          e.stopPropagation();
+          return false;
+        }
+        // 未命中：让事件正常冒泡，World.keyDown 等仍可响应（WASD 走路）
+      });
+      $(document).off('keyup.hotkey').on('keyup.hotkey', function(e) {
+        var key = Engine._resolveHotkey(e);
+        if (key) Engine._hotkeyDown[key] = false;
+      });
 
       // Register swipe handlers
       swipeElement = $('#outerSlider');
@@ -907,8 +931,56 @@
       return jQuery.inArray(e.keycode, [37,38,39,40]) < 0;
     },
 
+    // ---- 热键系统（2026-07-27）----
+    // Q/W/E/R/T/Y 触发战斗中的攻击按钮（按 DOM 顺序：双手→副手→道具）
+    // 1..6 触发战斗中的医疗按钮，也用于无限城整顿栏（熏肉/药剂/藤花精油）
+    // 事件面板 (.eventPanel) 内的按钮优先，其次才是背后场景中的按钮
+    HOTKEY_KEYS: {
+      81: 'q', 87: 'w', 69: 'e', 82: 'r', 84: 't', 89: 'y',
+      49: '1', 50: '2', 51: '3', 52: '4', 53: '5', 54: '6'
+    },
+    _HOTKEY_ALL: 'qwerty123456',
+    _hotkeyDown: {}, // 记录已按下的键，避免长按重复触发
+    _resolveHotkey: function(e) {
+      // 优先用现代 e.key（如 'q'、'1'、'Enter'），兜底用 e.which/keyCode
+      var k = null;
+      if (typeof e.key === 'string' && e.key.length === 1) {
+        k = e.key.toLowerCase();
+      }
+      if (!k && Engine.HOTKEY_KEYS) {
+        k = Engine.HOTKEY_KEYS[e.which || e.keyCode];
+      }
+      if (!k || Engine._HOTKEY_ALL.indexOf(k) < 0) return null;
+      return k;
+    },
+    _tryHotkey: function(e) {
+      var key = Engine._resolveHotkey(e);
+      if (!key) return false;
+      // 若焦点在输入框，热键让给输入
+      var t = document.activeElement;
+      if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return false;
+
+      // 收集候选：事件面板内的按钮优先（战斗中的攻击/医疗按钮）
+      // 选择器用 [data-hotkey]，不限定 .button class——兼容 .floorActionBtn 等非 Button.Button 元素
+      var $inEvent = $('.eventPanel [data-hotkey="' + key + '"]:visible');
+      var $rest = $('[data-hotkey="' + key + '"]:visible').not('.eventPanel [data-hotkey]');
+      var candidates = $.merge($inEvent.get(), $rest.get());
+      for (var i = 0; i < candidates.length; i++) {
+        var $b = $(candidates[i]);
+        if ($b.hasClass('disabled')) continue;
+        if ($b.data('onCooldown')) continue;
+        // 触发点击（Button.Button 用 .click(fn) 绑定；.floorActionBtn 也用 .click(fn) 绑定）
+        $b.trigger('click');
+        return true;
+      }
+      return false;
+    },
+
     keyUp: function(e) {
       Engine.pressed = false;
+      // 热键已在 document.keydown.hotkey 中处理，这里不再重复分发；
+      // 若该键是一个热键且当前有匹配按钮，直接吞掉，防止落入下方 tab 导航默认逻辑
+      if (Engine._resolveHotkey(e)) return false;
       if(Engine.activeModule.keyUp) {
         Engine.activeModule.keyUp(e);
       } else {
