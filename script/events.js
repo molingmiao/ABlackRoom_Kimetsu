@@ -445,7 +445,7 @@ var Events = {
 		});
 		btn.addClass('btnHeal');
 
-		if((Path.outfit['wisteria oil'] ?? 0) > 0) {
+		if((Path.outfit['wisteria oil'] ?? 0) <= 0) {
 			Button.setDisabled(btn, true);
 		}
 
@@ -1538,7 +1538,9 @@ var Events = {
 	},
 
 	buttonClick: function(btn) {
-		var info = Events.activeEvent().scenes[Events.activeScene].buttons[btn.attr('id')];
+		var sourceEvent = Events.activeEvent();
+		if (!sourceEvent || sourceEvent.ending) return;
+		var info = sourceEvent.scenes[Events.activeScene].buttons[btn.attr('id')];
 		// Cost
 		var costMod = {};
 		if(info.cost && !Engine.options.testerMode) {
@@ -1610,7 +1612,7 @@ var Events = {
 		// Next Scene
 		if(info.nextScene) {
 			if(info.nextScene == 'end') {
-				Events.endEvent();
+				Events.endEvent(info.onEnd, sourceEvent);
 			} else if(typeof info.nextScene === 'string') {
 				// 兼容直接写字符串 scene 名（防御性，避免 for..in 把字符串当成下标对象遍历）
 				Events.loadScene(info.nextScene);
@@ -1753,21 +1755,27 @@ var Events = {
 		Events._eventTimeout = Engine.setTimeout(Events.triggerEvent, nextEvent * 60 * 1000);
 	},
 
-	endEvent: function() {
+	endEvent: function(onEnd, sourceEvent) {
+		var event = sourceEvent || Events.activeEvent();
+		if (!event || event.ending) return;
+		event.ending = true;
+		var panel = event.eventPanel;
 		AudioEngine.stopEventMusic();
-		Events.eventPanel().animate({opacity:0}, Events._PANEL_FADE, 'linear', function() {
-			Events.eventPanel().remove();
-			Events.activeEvent().eventPanel = null;
-			Events.eventStack.shift();
+		panel.animate({opacity:0}, Events._PANEL_FADE, 'linear', function() {
+			panel.remove();
+			event.eventPanel = null;
+			var index = Events.eventStack.indexOf(event);
+			if (index >= 0) Events.eventStack.splice(index, 1);
 			Engine.log(Events.eventStack.length + ' events remaining');
-			Engine.keyLock = false;
-			Engine.tabNavigation = true;
-			Button.saveCooldown = true;
+			Engine.keyLock = Events.eventStack.length > 0;
+			Engine.tabNavigation = !Engine.keyLock;
+			Button.saveCooldown = !Engine.keyLock;
 			if (Events.BLINK_INTERVAL) {
 				Events.stopTitleBlink();
 			}
 			// Force refocus on the body. I hate you, IE.
 			$('body').focus();
+			if (typeof onEnd === 'function') onEnd();
 		});
 	},
 

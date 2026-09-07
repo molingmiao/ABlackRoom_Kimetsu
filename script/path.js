@@ -270,13 +270,15 @@ var Path = {
 		// 装备栏：3 类×2 槽（主武器/副武器/道具）
 		$('<div>').attr({'id': 'equipDoll', 'data-legend': _('equipment')}).appendTo(suppliesRow);
 
-		// 一键装满 + 出发 并排：autoFill 在左，embark 在右
+		Path.createLoadoutPanel();
+
+		// 补齐配置与出发并排；补齐不会替换玩家选择的装备。
 		var buttonsRow = $('<div>').attr('id', 'pathButtonsRow').appendTo(this.scroller);
 		new Button.Button({
 			id: 'autoFillBtn',
-			text: _('auto fill'),
+			text: _('refill my loadout'),
 			click: Path.autoFillSupplies,
-			width: '80px'
+			width: '120px'
 		}).appendTo(buttonsRow);
 		new Button.Button({
 			id: 'embarkButton',
@@ -287,6 +289,7 @@ var Path = {
 		}).appendTo(buttonsRow);
 		
 		Path.outfit = $SM.get('outfit');
+		Path.updateLoadoutPanel();
 		
 		Engine.updateSlider();
 		
@@ -716,54 +719,180 @@ var Path = {
 		}
 	},
 
-	// 一键装满：重置装备为每类最强 2 件各 1 把；消耗品按预设上限装载，不填满
-	autoFillSupplies: function() {
-		Path.autoEquipStrongest();
-
-		Path.outfit = {};
-		$SM.set('outfit', Path.outfit, true);
-
-		// 1. 每类已装备的武器各 1 把
+	// Saved preparation targets are independent of the current expedition inventory.
+	LOADOUT_NAMES: { expedition: 'expedition loadout', castle: 'infinity castle loadout' },
+	loadoutCount: function(value) {
+		return typeof value === 'number' && isFinite(value) ? Math.max(0, Math.floor(value)) : 0;
+	},
+	getLoadoutId: function() {
+		var id = $SM.get('character.selectedLoadout');
+		return id === 'castle' ? 'castle' : 'expedition';
+	},
+	getLoadout: function(id) {
+		if (!Object.prototype.hasOwnProperty.call(Path.LOADOUT_NAMES, id)) return null;
+		var profile = $SM.get('character.loadouts["' + id + '"]');
+		return profile && profile.targets && typeof profile.targets === 'object' && !Array.isArray(profile.targets) ? profile : null;
+	},
+	getLoadoutEquipment: function(source) {
+		var equipment = {};
 		for (var cat in Path.WeaponCategory) {
-			var equipped = Path.getEquipped(cat);
-			equipped.forEach(function(wKey) {
-				var have = $SM.get('stores["'+wKey+'"]', true) || 0;
-				if (have <= 0) return;
-				Path.outfit[wKey] = 1;
-				$SM.set('outfit["'+wKey+'"]', 1, true);
-			});
-		}
-
-		// 2. 消耗品预设上限（受库存 & 背包空间双重约束）
-		var caps = {
-			'cured meat':      20,
-			'wisteria bullet': 10,
-			'solar crystal':   10,
-			'kusarigama':      10,
-			'wisteria bomb':    5,
-			'torch':            5,
-			'medicine':        10,
-			'wisteria oil':     5
-		};
-		var used = 0;
-		for (var uk in Path.outfit) used += (Path.outfit[uk] || 0) * Path.getWeight(uk);
-		var capacity = Path.getCapacity();
-		for (var itemKey in caps) {
-			var target = caps[itemKey];
-			var stored = $SM.get('stores["'+itemKey+'"]', true) || 0;
-			var want = Math.min(target, stored);
-			var weight = Path.getWeight(itemKey);
-			var space = capacity - used;
-			var byWeight = weight > 0 ? Math.floor(space / weight) : want;
-			want = Math.min(want, byWeight);
-			if (want > 0) {
-				Path.outfit[itemKey] = want;
-				$SM.set('outfit["'+itemKey+'"]', want, true);
-				used += want * weight;
+			var slots = source ? source[cat] : Path.getEquippedSlots(cat);
+			slots = Array.isArray(slots) ? slots : [];
+			equipment[cat] = [];
+			for (var i = 0; i < Path.SLOT_LIMIT; i++) {
+				var key = slots[i];
+				equipment[cat].push(Path.WeaponCategory[cat].indexOf(key) >= 0 && equipment[cat].indexOf(key) < 0 ? key : null);
 			}
 		}
-
+		return equipment;
+	},
+	saveLoadout: function() {
+		var targets = {};
+		for (var key in Path.outfit) {
+			var count = Path.loadoutCount(Path.outfit[key]);
+			if (count > 0) targets[key] = count;
+		}
+		var equipment = Path.getLoadoutEquipment();
+		for (var cat in equipment) equipment[cat].forEach(function(key) {
+			if (key) targets[key] = Math.max(1, targets[key] || 0);
+		});
+		var id = Path.getLoadoutId();
+		$SM.set('character.loadouts["' + id + '"]', { version: 1, targets: targets, equipped: equipment });
+		Path.updateLoadoutPanel();
+		Path.showLoadoutResult(_('saved {0}; equipped weapons and target quantities recorded.', _(Path.LOADOUT_NAMES[id])));
+	},
+	// The suggestion uses the selected weapons and reserves healing supplies before ammo.
+	createSuggestedLoadout: function() {
+		var id = Path.getLoadoutId();
+		var targets = {}, equipment = Path.getLoadoutEquipment(), free = Path.getCapacity();
+		var weapons = [];
+		for (var cat in equipment) equipment[cat].forEach(function(key) {
+			if (!key) return;
+			targets[key] = 1;
+			free -= Path.getWeight(key);
+			weapons.push(key);
+		});
+		var add = function(key, count) {
+			count = Math.max(0, Math.min(count, Math.floor((free + 0.000001) / Path.getWeight(key))));
+			if (!count) return;
+			targets[key] = (targets[key] || 0) + count;
+			free -= count * Path.getWeight(key);
+		};
+		add('cured meat', Math.max(1, Math.min(20, Math.floor(free * 0.3))));
+		if ($SM.get('stores.medicine', true) > 0) add('medicine', Math.min(10, Math.ceil(free * 0.25)));
+		var ammo = {};
+		weapons.forEach(function(key) {
+			var cost = World.Weapons[key] && World.Weapons[key].cost;
+			for (var item in cost) ammo[item] = Math.max(ammo[item] || 0, Path.loadoutCount(cost[item]) * 10);
+		});
+		for (var item in ammo) add(item, Math.max(0, ammo[item] - (targets[item] || 0)));
+		if (id === 'expedition' && $SM.get('stores.torch', true) > 0) add('torch', 5);
+		if ($SM.get('stores["wisteria oil"]', true) > 0) add('wisteria oil', 5);
+		add('cured meat', Math.max(0, 20 - (targets['cured meat'] || 0)));
+		$SM.set('character.loadouts["' + id + '"]', { version: 1, targets: targets, equipped: equipment });
+		Path.updateLoadoutPanel();
+		Path.showLoadoutResult(_('suggested targets saved; refill, adjust supplies, then save to customize.'));
+	},
+	// Pure planner. Before departure, outfit selects from stores; stores already include it.
+	planLoadout: function(profile, current, stores, capacity) {
+		var result = { outfit: {}, added: 0, shortages: [], adjusted: [] }, used = 0;
+		var targets = profile.targets || {}, keys = [], equipment = Path.getLoadoutEquipment(profile.equipped || {});
+		var append = function(key) { if (key && keys.indexOf(key) < 0 && Path.loadoutCount(targets[key]) > 0) keys.push(key); };
+		for (var key in current) {
+			var requested = Path.loadoutCount(current[key]);
+			var count = Math.min(requested, Path.loadoutCount(stores[key]));
+			if (requested !== count) result.adjusted.push(key);
+			if (count > 0) result.outfit[key] = count;
+			used += count * Path.getWeight(key);
+		}
+		for (var cat in equipment) equipment[cat].forEach(append);
+		append('cured meat');
+		append('medicine');
+		Object.keys(targets).forEach(append);
+		keys.forEach(function(key) {
+			var target = Path.loadoutCount(targets[key]), currentCount = result.outfit[key] || 0;
+			var needed = Math.max(0, target - currentCount), stock = Path.loadoutCount(stores[key]);
+			var available = Math.max(0, stock - currentCount);
+			var byWeight = Math.max(0, Math.floor((capacity - used + 0.000001) / Path.getWeight(key)));
+			var added = Math.min(needed, available, byWeight);
+			if (added > 0) {
+				result.outfit[key] = currentCount + added;
+				used += added * Path.getWeight(key);
+				result.added += added;
+			}
+			if (added < needed) result.shortages.push({
+				key: key, missing: needed - added,
+				stock: Math.max(0, needed - available), space: Math.max(0, Math.min(needed, available) - added)
+			});
+		});
+		return result;
+	},
+	autoFillSupplies: function() {
+		var profile = Path.getLoadout(Path.getLoadoutId());
+		if (!profile) {
+			Path.showLoadoutResult(_('no saved loadout; save current supplies or create suggested targets first.'));
+			return;
+		}
+		var result = Path.planLoadout(profile, Path.outfit || {}, $SM.get('stores') || {}, Path.getCapacity());
+		Path.outfit = result.outfit;
+		$SM.set('outfit', Path.outfit);
+		var messages = [_('refilled {0} items; existing equipment and extra supplies kept.', result.added)];
+		if (result.adjusted.length) messages.push(_('stock changed; unavailable selections adjusted: {0}', result.adjusted.map(function(key) { return _(key); }).join(', ')));
+		result.shortages.forEach(function(shortage) {
+			var reasons = [];
+			if (shortage.stock) reasons.push(_('stock short by {0}', shortage.stock));
+			if (shortage.space) reasons.push(_('bag space short by {0} items', shortage.space));
+			messages.push(_('{0}: still need {1} ({2})', _(shortage.key), shortage.missing, reasons.join(', ')));
+		});
 		Path.updateOutfitting();
+		Path.showLoadoutResult(messages.join('\n'));
+	},
+	applyLoadoutEquipment: function() {
+		var profile = Path.getLoadout(Path.getLoadoutId());
+		if (!profile) return;
+		var equipment = Path.getLoadoutEquipment(profile.equipped || {}), missing = [];
+		for (var cat in equipment) {
+			equipment[cat] = equipment[cat].map(function(key) {
+				if (key && !($SM.get('stores["' + key + '"]', true) > 0)) { missing.push(_(key)); return null; }
+				return key;
+			});
+		}
+		$SM.set('character.equippedInit', true, true);
+		$SM.set('character.equipped', equipment);
+		Path.updateOutfitting();
+		Path.showLoadoutResult(missing.length ? _('loadout equipped; unavailable weapons: {0}', missing.join(', ')) : _('loadout equipment applied; refill supplies before departure.'));
+	},
+	createLoadoutPanel: function() {
+		var panel = $('<div>').attr('id', 'loadoutPanel').appendTo(Path.scroller);
+		var row = $('<div>').addClass('loadoutControls').appendTo(panel);
+		$('<label>').attr('for', 'loadoutSelect').text(_('my loadouts')).appendTo(row);
+		var select = $('<select>').attr('id', 'loadoutSelect').appendTo(row);
+		Object.keys(Path.LOADOUT_NAMES).forEach(function(id) { $('<option>').attr('value', id).text(_(Path.LOADOUT_NAMES[id])).appendTo(select); });
+		select.val(Path.getLoadoutId()).on('change', function() {
+			$SM.set('character.selectedLoadout', $(this).val());
+			Path.updateLoadoutPanel();
+			Path.showLoadoutResult('');
+		});
+		$('<button>').attr({ id: 'saveLoadoutBtn', type: 'button' }).text(_('save current loadout')).on('click', Path.saveLoadout).appendTo(row);
+		$('<button>').attr({ id: 'suggestLoadoutBtn', type: 'button' }).text(_('create suggested targets')).on('click', Path.createSuggestedLoadout).appendTo(row);
+		$('<button>').attr({ id: 'equipLoadoutBtn', type: 'button' }).text(_('apply saved equipment')).on('click', Path.applyLoadoutEquipment).appendTo(row);
+		$('<div>').attr('id', 'loadoutSummary').appendTo(panel);
+		$('<div>').addClass('loadoutHint').text(_('refill only adds missing supplies; use apply saved equipment to change weapon slots.')).appendTo(panel);
+		$('<div>').attr({ id: 'loadoutResult', role: 'status', 'aria-live': 'polite' }).appendTo(panel);
+	},
+	updateLoadoutPanel: function() {
+		var profile = Path.getLoadout(Path.getLoadoutId()), parts = [];
+		$('#loadoutSelect').val(Path.getLoadoutId());
+		$('#equipLoadoutBtn').prop('disabled', !profile);
+		$('#suggestLoadoutBtn').toggle(!profile);
+		if (profile) Object.keys(profile.targets).forEach(function(key) {
+			var count = Path.loadoutCount(profile.targets[key]);
+			if (count) parts.push(_(key) + ' × ' + count);
+		});
+		$('#loadoutSummary').text(profile ? _('target supplies: {0}', parts.join(', ') || _('none')) : _('no saved loadout; save current supplies or create suggested targets first.'));
+	},
+	showLoadoutResult: function(message) {
+		$('#loadoutResult').text(message);
 	},
 	
 	onArrival: function(transition_diff) {

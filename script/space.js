@@ -48,9 +48,8 @@ var Space = {
 		Space._potionEffect = null;
 		Space._potionCharges = 0;
 		Space._pendingAmbushTalentChoices = 0;
-
-		// 战前确保 HP 至少 30，给玩家行动余地
-		World.setHp(Math.max(30, World.health || 30));
+		Space._sharpenedNext = false;
+		Space._sharpenedBattle = false;
 
 		Engine.keyLock = false;
 		Space.setTitle();
@@ -65,6 +64,9 @@ var Space = {
 
 		// 元进程：授予历次最高等级的起始技能
 		try { Space._grantStartingTalents(); } catch (e) { /* ignore */ }
+		// 继承天赋之后再按新的生命上限完成入城整备。
+		World.setHp(World.getMaxHealth());
+		if (window.CastleReport) CastleReport.begin();
 
 		// 生成节点数据
 		Space.generateFloors();
@@ -146,8 +148,9 @@ var Space = {
 		if (floor < 5)  { weights.elite = 0.05; weights.ambush = 0; weights.hashira = 0.06; }
 		if (floor > 25) { weights.elite = 0.22; weights.ambush = 0.12; weights.rest = 0.12; }
 		var typeOrder = ['battle', 'elite', 'shop', 'rest', 'treasure', 'ambush', 'shrine', 'hashira'];
+		var totalWeight = typeOrder.reduce(function(total, type) { return total + weights[type]; }, 0);
 		for (var i = 1; i < count; i++) {
-			var r = Math.random();
+			var r = Math.random() * totalWeight;
 			var acc = 0;
 			for (var j = 0; j < typeOrder.length; j++) {
 				acc += weights[typeOrder[j]];
@@ -244,9 +247,10 @@ var Space = {
 		$('<div>').addClass('floorSubTitle').text(_('prepare:')).appendTo(actionBar);
 		var actionRow = $('<div>').addClass('floorActionRow').appendTo(actionBar);
 
-		Space._addActionBtn(actionRow, 'cured meat', _('eat cured meat (+{0} hp)', World.MEAT_HEAL || 8));
-		Space._addActionBtn(actionRow, 'medicine',   _('use medicine (+{0} hp)',   World.MEDS_HEAL || 20));
-		Space._addActionBtn(actionRow, 'wisteria oil', _('use wisteria oil (+30 hp)'));
+		['cured meat', 'medicine', 'wisteria oil'].forEach(function(item) {
+			var heal = Math.min(Events.getHealingAmount(item), Math.max(0, World.getMaxHealth() - World.health));
+			Space._addActionBtn(actionRow, item, _('use {0} (+{1} hp)', _(item), heal));
+		});
 
 		// 整顿栏热键：1 熏肉 / 2 药剂 / 3 藤花精油
 		var _prepKeys = ['1', '2', '3'];
@@ -323,16 +327,10 @@ var Space = {
 	_addActionBtn: function(parent, item, label) {
 		var have = (Path.outfit && Path.outfit[item]) || 0;
 		var btn = $('<div>').addClass('floorActionBtn menuBtn').text(label + '  \u00d7' + have);
-		if (have <= 0) btn.addClass('disabled');
+		if (have <= 0 || World.health >= World.getMaxHealth()) btn.addClass('disabled');
 		btn.click(function() {
 			if (btn.hasClass('disabled')) return;
-			var heal = 0;
-			if (item === 'cured meat') heal = World.MEAT_HEAL || 8;
-			else if (item === 'medicine') heal = World.MEDS_HEAL || 20;
-			else if (item === 'wisteria oil') heal = 30;
-			Path.outfit[item] = (Path.outfit[item] || 0) - 1;
-			$SM.set('outfit["' + item + '"]', Path.outfit[item]);
-			World.setHp(Math.min(World.getMaxHealth(), World.health + heal));
+			Events.doHeal(item, Events.getBaseHealingAmount(item), btn);
 			Space.showFloor(); // 刷新 UI（含 HP/背包）
 		});
 		btn.appendTo(parent);
@@ -413,22 +411,31 @@ var Space = {
 	// 战斗结束推进：先把未拾取掉落送回仓库，再触发天赋选择（或直接进入下一层）
 	// 延后一帧：让按钮的 nextScene:'end' 先把战斗事件淡出关闭，再打开天赋事件，避免被 endEvent 立即关掉
 	afterBattle: function() {
-		Space._collectRemainingLoot();
-		setTimeout(function() { Space._offerTalent(); }, 400);
+		if (!Space.done) Space._offerTalent();
+	},
+	_afterBossBattle: function() {
+		if (!Space.done) Space._offerTalent({ batchLeft: 2 });
 	},
 
 	// ---- 天赋系统：胜利后 3 选 1，可加已有天赋等级或选新天赋。仅本次 run 有效（returnToShip 清除）----
 	TALENTS: [
 		{ id: 'hardBody',   nameKey: 'hardened body',   maxLevel: 20, per: 5,    descKey: '+{0} max hp per level' },
-		{ id: 'sharpEdge',  nameKey: 'sharpened edge',  maxLevel: 20, per: 0.02, descKey: '+{0}% weapon damage per level' },
-		{ id: 'ironWall',   nameKey: 'iron wall',       maxLevel: 20, per: 0.01, descKey: '+{0}% damage reduction per level (cap 30%)' },
-		{ id: 'bloodDrink', nameKey: 'blood drinker',   maxLevel: 20, per: 0.01, descKey: '+{0}% lifesteal per level (needs water breath)' },
+		{ id: 'sharpEdge',  nameKey: 'sharpened edge',  maxLevel: 20, per: 0.04, descKey: '+{0}% weapon damage per level' },
+		{ id: 'ironWall',   nameKey: 'iron wall',       maxLevel: 20, per: 0.015, descKey: '+{0}% damage reduction per level (cap 30%)' },
+		{ id: 'bloodDrink', nameKey: 'blood drinker',   maxLevel: 20, per: 0.01, descKey: '+{0}% lifesteal per level' },
 		{ id: 'steadyHand', nameKey: 'steady hand',     maxLevel: 20, per: 0.01, descKey: '+{0}% hit chance per level' },
-		{ id: 'swiftBlade', nameKey: 'swift blade',     maxLevel: 20, per: 0.01, descKey: '-{0}% weapon cooldown per level (cap 50%)' }
+		{ id: 'swiftBlade', nameKey: 'swift blade',     maxLevel: 20, per: 0.015, descKey: '-{0}% weapon cooldown per level (cap 30%)' }
 	],
 	getTalentLevel: function(id) { return $SM.get('character.infinityTalents["' + id + '"]', true) || 0; },
 	setTalentLevel: function(id, lvl) {
+		var talent = Space.TALENTS.find(function(t) { return t.id === id; });
+		if (!talent) return;
+		lvl = Math.max(0, Math.min(talent.maxLevel, lvl));
+		var gainedHp = id === 'hardBody' ? Math.max(0, lvl - Space.getTalentLevel(id)) * talent.per : 0;
 		$SM.set('character.infinityTalents["' + id + '"]', lvl, true);
+		if (gainedHp > 0 && Engine.activeModule === Space) {
+			World.setHp(Math.min(World.getMaxHealth(), World.health + gainedHp));
+		}
 		// 记录跨 run 最高等级（元进程），用于下次入城起始等级授予
 		var meta = $SM.get('game.castleMeta.peakTalent') || {};
 		if ((meta[id] || 0) < lvl) { meta[id] = lvl; $SM.set('game.castleMeta.peakTalent', meta, true); }
@@ -487,6 +494,7 @@ var Space = {
 	//   3→+1, 6→+2, 10→+3, 15→+5, 20→+8
 	_grantStartingTalents: function() {
 		var meta = $SM.get('game.castleMeta.peakTalent') || {};
+		Space.clearTalents();
 		Space.TALENTS.forEach(function(t) {
 			var peak = meta[t.id] || 0;
 			var grant = 0;
@@ -521,12 +529,13 @@ var Space = {
 	},
 	getDamageMult: function() {
 		// 快刀术（本 run） × 累计层数永久增伤（跨 run）
-		return (1 + Space.getTalentLevel('sharpEdge') * 0.02) * (1 + Space.getPermanentDmgMult());
+		return (1 + Space.getTalentLevel('sharpEdge') * 0.04) * (1 + Space.getPermanentDmgMult());
 	},
 	getDamageReduction: function() {
 		// 铁壁（本 run，上限 30%）+ 累计层数永久减伤（跨 run），合计硬上限在 damage() 里 50%
-		return Math.min(0.30, Space.getTalentLevel('ironWall') * 0.01);
+		return Math.min(0.30, Space.getTalentLevel('ironWall') * 0.015);
 	},
+	getCooldownMult: function() { return 1 - Math.min(0.30, Space.getTalentLevel('swiftBlade') * 0.015); },
 	getLifestealPct: function() {
 		var base = Space.getTalentLevel('bloodDrink') * 0.01;
 		// 呼吸法加成：水/炎/雷各 +5%，累计
@@ -544,6 +553,7 @@ var Space = {
 		options = options || {};
 		var batchLeft = (typeof options.batchLeft === 'number') ? Math.max(0, options.batchLeft) : 1;
 		var onComplete = typeof options.onComplete === 'function' ? options.onComplete : function() { Space.afterNode(); };
+		if (Space.done || batchLeft === 0) { if (!Space.done) onComplete(); return; }
 		var pool = Space.TALENTS.filter(function(t) { return Space.getTalentLevel(t.id) < t.maxLevel; });
 		if (pool.length === 0) { onComplete(); return; }
 		pool.sort(function() { return Math.random() - 0.5; });
@@ -552,9 +562,7 @@ var Space = {
 		var buttons = {};
 		var continueBatch = function() {
 			if (batchLeft > 1) {
-				setTimeout(function() {
-					Space._offerTalent({ batchLeft: batchLeft - 1, onComplete: onComplete });
-				}, 200);
+				Space._offerTalent({ batchLeft: batchLeft - 1, onComplete: onComplete });
 			} else {
 				onComplete();
 			}
@@ -564,13 +572,14 @@ var Space = {
 			var label = _(t.nameKey) + ' Lv.' + (curLvl + 1) + '/' + t.maxLevel;
 			buttons['talent_' + i] = {
 				text: label,
-				onChoose: (function(tid) { return function() { Space._takeTalent(tid, continueBatch); }; })(t.id),
+				onChoose: (function(tid) { return function() { Space._takeTalent(tid, function() {}); }; })(t.id),
+				onEnd: continueBatch,
 				nextScene: 'end'
 			};
 		});
 		buttons['skip'] = {
 			text: _('skip'),
-			onChoose: function() { continueBatch(); },
+			onEnd: continueBatch,
 			nextScene: 'end'
 		};
 
@@ -580,7 +589,7 @@ var Space = {
 		}
 		picks.forEach(function(t) {
 			var curLvl = Space.getTalentLevel(t.id);
-			var val = (t.per < 1) ? Math.round(t.per * 100) : t.per;
+			var val = (t.per < 1) ? Math.round(t.per * 1000) / 10 : t.per;
 			text.push('• ' + _(t.nameKey) + ' Lv.' + (curLvl + 1) + ': ' + _(t.descKey, val));
 		});
 		Events.startEvent({
@@ -858,11 +867,12 @@ var Space = {
 						},
 						'recraft': {
 							text: _('recraft supplies'),
-							onChoose: Space.triggerBossRecraft,
-							nextScene: 'end'
+							onChoose: Space._collectRemainingLoot,
+							nextScene: 'recraft'
 						}
 					}
-				}
+				},
+				'recraft': Space._bossRecraftScene()
 			}
 		});
 	},
@@ -908,7 +918,7 @@ var Space = {
 		return true;
 	},
 
-	triggerBossRecraft: function() {
+	_bossRecraftScene: function() {
 		var options = Space._bossRecraftOptions();
 		var buttons = {};
 		options.forEach(function(o, idx) {
@@ -916,9 +926,8 @@ var Space = {
 				text: _('{0} ({1})', _(o.item), Space._formatCost(o.cost)),
 				onChoose: function() {
 					Space._recraftToBackpack(o.item, o.cost);
-					Space.afterNode();
 				},
-				nextScene: 'end'
+				nextScene: 'recraft'
 			};
 		});
 		buttons['leave'] = {
@@ -926,18 +935,14 @@ var Space = {
 			onChoose: function() { Space.afterNode(); },
 			nextScene: 'end'
 		};
-		Events.startEvent({
-			title: _('the merchant rebuilds supplies'),
-			scenes: {
-				'start': {
-					text: [
-						_('the floor boss falls. on a nearby crate, a merchant grins and offers to rebuild your kit.'),
-						_('use the materials from your estate to make fresh consumables and tools for this descent.')
-					],
-					buttons: buttons
-				}
-			}
-		});
+		// 在 Boss 事件内切换场景，避免新事件被原按钮的 end 逻辑关闭。
+		return {
+			text: [
+				_('the floor boss falls. on a nearby crate, a merchant grins and offers to rebuild your kit.'),
+				_('use the materials from your estate to make fresh consumables and tools for this descent.')
+			],
+			buttons: buttons
+		};
 	},
 
 	_formatCost: function(cost) {

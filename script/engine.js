@@ -323,25 +323,13 @@
       $('body').off('keydown').keydown(Engine.keyDown);
       $('body').off('keyup').keyup(Engine.keyUp);
 
-      // 热键（QWERTY / 1..6）——绑在 document 上并用 keydown 触发，响应更快也不受焦点影响
-      $(document).off('keydown.hotkey').on('keydown.hotkey', function(e) {
-        var key = Engine._resolveHotkey(e);
-        if (!key) return;
-        // 长按去重：重复触发时直接返回，但**不 preventDefault**——否则会破坏 WASD 走路等其它按键流程
-        if (Engine._hotkeyDown[key]) return;
-        Engine._hotkeyDown[key] = true;
-        if (Engine._tryHotkey(e)) {
-          // 仅在命中热键按钮时阻断事件冒泡（避免继续走到 body → activeModule.keyDown）
-          e.preventDefault();
-          e.stopPropagation();
-          return false;
-        }
-        // 未命中：让事件正常冒泡，World.keyDown 等仍可响应（WASD 走路）
-      });
-      $(document).off('keyup.hotkey').on('keyup.hotkey', function(e) {
-        var key = Engine._resolveHotkey(e);
-        if (key) Engine._hotkeyDown[key] = false;
-      });
+      // 捕获阶段处理热键：先于 body 的移动处理，并保证松键不会被其拦截。
+      document.removeEventListener('keydown', Engine._hotkeyKeyDown, true);
+      document.addEventListener('keydown', Engine._hotkeyKeyDown, true);
+      document.removeEventListener('keyup', Engine._hotkeyKeyUp, true);
+      document.addEventListener('keyup', Engine._hotkeyKeyUp, true);
+      window.removeEventListener('blur', Engine._resetHotkeys);
+      window.addEventListener('blur', Engine._resetHotkeys);
 
       // Register swipe handlers
       swipeElement = $('#outerSlider');
@@ -941,6 +929,26 @@
     },
     _HOTKEY_ALL: 'qwerty123456',
     _hotkeyDown: {}, // 记录已按下的键，避免长按重复触发
+    _hotkeyKeyDown: function(e) {
+      var key = Engine._resolveHotkey(e);
+      if (!key) return;
+      if (Engine._hotkeyDown[key] || Engine._tryHotkey(e)) {
+        Engine._hotkeyDown[key] = true;
+        e.preventDefault();
+        e.stopPropagation();
+      }
+    },
+    _hotkeyKeyUp: function(e) {
+      var key = Engine._resolveHotkey(e);
+      if (key && Engine._hotkeyDown[key]) {
+        delete Engine._hotkeyDown[key];
+        e.preventDefault();
+        e.stopPropagation();
+      }
+    },
+    _resetHotkeys: function() {
+      Engine._hotkeyDown = {};
+    },
     _resolveHotkey: function(e) {
       // 优先用现代 e.key（如 'q'、'1'、'Enter'），兜底用 e.which/keyCode
       var k = null;
@@ -954,6 +962,7 @@
       return k;
     },
     _tryHotkey: function(e) {
+      if (e.ctrlKey || e.altKey || e.metaKey || e.isComposing) return false;
       var key = Engine._resolveHotkey(e);
       if (!key) return false;
       // 若焦点在输入框，热键让给输入
@@ -962,9 +971,9 @@
 
       // 收集候选：事件面板内的按钮优先（战斗中的攻击/医疗按钮）
       // 选择器用 [data-hotkey]，不限定 .button class——兼容 .floorActionBtn 等非 Button.Button 元素
-      var $inEvent = $('.eventPanel [data-hotkey="' + key + '"]:visible');
-      var $rest = $('[data-hotkey="' + key + '"]:visible').not('.eventPanel [data-hotkey]');
-      var candidates = $.merge($inEvent.get(), $rest.get());
+      var $panel = $('.eventPanel:visible').first();
+      var selector = '[data-hotkey="' + key + '"]:visible';
+      var candidates = ($panel.length ? $panel.find(selector) : $(selector)).get();
       for (var i = 0; i < candidates.length; i++) {
         var $b = $(candidates[i]);
         if ($b.hasClass('disabled')) continue;
@@ -978,9 +987,7 @@
 
     keyUp: function(e) {
       Engine.pressed = false;
-      // 热键已在 document.keydown.hotkey 中处理，这里不再重复分发；
-      // 若该键是一个热键且当前有匹配按钮，直接吞掉，防止落入下方 tab 导航默认逻辑
-      if (Engine._resolveHotkey(e)) return false;
+      // 已命中的热键由捕获阶段处理，其余按键保留模块原有行为。
       if(Engine.activeModule.keyUp) {
         Engine.activeModule.keyUp(e);
       } else {
