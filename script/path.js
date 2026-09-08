@@ -402,6 +402,14 @@ var Path = {
 		if(!Path.outfit) {
 			Path.outfit = {};
 		}
+		// Preparation quantities must follow actual stores (including items now at zero).
+		for (var selectedKey in Path.outfit) {
+			var selected = Math.min(Path.loadoutCount(Path.outfit[selectedKey]), Path.loadoutCount($SM.get('stores["' + selectedKey + '"]', true)));
+			if (Path.outfit[selectedKey] !== selected) {
+				Path.outfit[selectedKey] = selected;
+				$SM.set('outfit["' + selectedKey + '"]', selected, true);
+			}
+		}
 		
 		// Add the armour row
 		// 护甲/水已移到装备栏（equipDoll）；仍需一个错点导致后面 outfit 行插入位置——直接用 outfit 容器顶部
@@ -460,7 +468,8 @@ var Path = {
 			num = typeof num == 'number' ? num : 0;
 			if (have !== undefined) {
 				if (have < num) { num = have; }
-				$SM.set(k, num, true);
+				Path.outfit[k] = num;
+				$SM.set('outfit["' + k + '"]', num, true);
 			}
 
 			var row = $('div#outfit_row_' + k.replace(/ /g, '-'), outfit);

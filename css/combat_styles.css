@@ -1,0 +1,40 @@
+.castleStylePicker {
+	max-width: 620px;
+	margin: 16px 0;
+	padding: 12px;
+	border: 1px solid #888;
+	box-sizing: border-box;
+}
+.castleStyleHeading { font-size: 15px; font-weight: bold; }
+.castleStyleHint { margin: 6px 0 12px; font-size: 12px; line-height: 1.5; }
+.castleStyleOptions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.castleStyleOption {
+	appearance: none;
+	font: inherit;
+	color: inherit;
+	background: transparent;
+	border: 1px solid #888;
+	border-left: 4px solid var(--form-color, #777);
+	border-radius: 0;
+	padding: 10px;
+	text-align: left;
+	cursor: pointer;
+	line-height: 1.5;
+}
+.castleStyleOption.selected { outline: 2px solid currentColor; outline-offset: -2px; }
+.castleStyleOption:focus-visible { outline: 2px dashed currentColor; outline-offset: 2px; }
+.castleStyleOption:disabled { cursor: default; opacity: 0.65; }
+.castleStyleName { display: block; font-weight: bold; margin-bottom: 4px; }
+.castleStyleDescription, .castleStyleLock, .castleStyleChoice { display: block; font-size: 12px; }
+.castleStyleLock, .castleStyleChoice { margin-top: 6px; }
+.castleStyleChoice { font-weight: bold; }
+.style-technique { --form-color: #888; }
+.style-water { --form-color: #4c9fbd; }
+.style-flame { --form-color: #c26e49; }
+.style-thunder { --form-color: #b99b32; }
+.castleStyleStatus { border-left: 3px solid var(--form-color, #888); padding: 6px 8px; margin: 8px 0; line-height: 1.5; font-size: 12px; }
+.castleStyleStatusName { font-weight: bold; margin-right: 10px; }
+@media (max-width: 520px) {
+	.castleStyleOptions { grid-template-columns: minmax(0, 1fr); }
+	.castleStyleStatusName { display: block; }
+}

@@ -15,6 +15,8 @@
     "format:check": "prettier --check \"script/**/*.js\" \"dev-server.js\" \"*.html\" \"css/**/*.css\"",
     "check": "node --check dev-server.js",
     "test:migrate": "node tools/test_migrate.cjs",
+    "test:castle": "node tools/test_castle.cjs && node tools/test_hotkeys.cjs && node tools/test_combat_styles.cjs && node tools/test_loadouts.cjs && node tools/test_castle_report.cjs",
+    "test:browser": "node tools/test_browser.cjs",
     "update_pot": "pybabel extract -F lang/babel.cfg -c \"TRANSLATORS\" script -o lang/adarkroom.pot"
   },
   "dependencies": {

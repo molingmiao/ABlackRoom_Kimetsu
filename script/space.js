@@ -204,6 +204,7 @@ var Space = {
 			.text(_('hotkeys: QWERTY attack · 1-6 heal / potion'))
 			.appendTo(hdr);
 		var statusBar = $('<div>').addClass('floorStatus').appendTo(hdr);
+		if (window.CombatStyles) $('<span>').addClass('metaChip').text(CombatStyles.getName()).appendTo(statusBar);
 		$('<span>').addClass('floorHp')
 			.text(_('hp: {0}/{1}', World.health, World.getMaxHealth()))
 			.appendTo(statusBar);
@@ -246,6 +247,7 @@ var Space = {
 		var actionBar = $('<div>').addClass('floorActionBar').appendTo(panel);
 		$('<div>').addClass('floorSubTitle').text(_('prepare:')).appendTo(actionBar);
 		var actionRow = $('<div>').addClass('floorActionRow').appendTo(actionBar);
+		if (Space._sharpenedNext) $('<div>').addClass('metaChip').text(_('next battle: sharpened blade (+1 damage per hit)')).appendTo(actionBar);
 
 		['cured meat', 'medicine', 'wisteria oil'].forEach(function(item) {
 			var heal = Math.min(Events.getHealingAmount(item), Math.max(0, World.getMaxHealth() - World.health));
@@ -307,7 +309,7 @@ var Space = {
 					buttons: {
 						'leave': {
 							text: _('leave'),
-							onChoose: function() {
+							onEnd: function() {
 								Space.done = true;
 								Space.clearPillarTimers();
 								Space.returnToShip();
@@ -408,8 +410,7 @@ var Space = {
 		}
 	},
 
-	// 战斗结束推进：先把未拾取掉落送回仓库，再触发天赋选择（或直接进入下一层）
-	// 延后一帧：让按钮的 nextScene:'end' 先把战斗事件淡出关闭，再打开天赋事件，避免被 endEvent 立即关掉
+	// 由按钮 onEnd 调用：战利品已收集、战斗事件已关闭，再发放天赋。
 	afterBattle: function() {
 		if (!Space.done) Space._offerTalent();
 	},
@@ -496,17 +497,15 @@ var Space = {
 		var meta = $SM.get('game.castleMeta.peakTalent') || {};
 		Space.clearTalents();
 		Space.TALENTS.forEach(function(t) {
-			var peak = meta[t.id] || 0;
-			var grant = 0;
-			if (peak >= 20) grant = 8;
-			else if (peak >= 15) grant = 5;
-			else if (peak >= 10) grant = 3;
-			else if (peak >= 6)  grant = 2;
-			else if (peak >= 3)  grant = 1;
+			var grant = Space.getStartingTalentLevel(t.id, meta[t.id] || 0);
 			if (grant > 0) {
 				$SM.set('character.infinityTalents["' + t.id + '"]', Math.min(t.maxLevel, grant), true);
 			}
 		});
+	},
+	getStartingTalentLevel: function(id, peak) {
+		if (typeof peak !== 'number') peak = ($SM.get('game.castleMeta.peakTalent') || {})[id] || 0;
+		return peak >= 20 ? 8 : peak >= 15 ? 5 : peak >= 10 ? 3 : peak >= 6 ? 2 : peak >= 3 ? 1 : 0;
 	},
 	// 探索者赐福：所有地标类型探索过 → 入城 +15% max HP（原 5%，杯水车薪）
 	hasExplorerBoon: function() {
@@ -522,8 +521,8 @@ var Space = {
 		var bonus = Space.getTalentLevel('hardBody') * 5;
 		bonus += Space.getPermanentHpBonus();
 		if (Space.hasExplorerBoon()) {
-			var base = 85; // 顶级护甲上限，用作参考基数
-			bonus += Math.floor(base * 0.15); // 5%→15%
+			var base = World.getBaseMaxHealth();
+			bonus += Math.floor((base + bonus) * 0.15);
 		}
 		return bonus;
 	},
@@ -618,21 +617,20 @@ var Space = {
 	// ---- 节点：战斗 ----
 
 	_pickEnemy: function(floor, isElite) {
-		// 2026-08-14：把前 20 层显著压低，保证“最强装配也能轻松过前 20 层”，
-		// 但后期仍可逐层上升，避免 100 层在中后期完全失速。
+		// 分段生命成长；伤害缓慢增加，普攻间隔不低于一秒。
 		var hp, dmg;
 		if (floor <= 10) {
-			hp  = Math.floor(24 + floor * 5);   // F1=32, F5=64, F10=104
-			dmg = Math.floor(2 + floor * 0.3);  // F1=3, F5=6, F10=10
+			hp  = Math.floor(24 + floor * 5);
+			dmg = Math.floor(2 + floor * 0.3);
 		} else if (floor <= 20) {
-			hp  = Math.floor(74 + (floor-10) * 7);  // F15=182, F20=232
-			dmg = Math.floor(5 + (floor-10) * 0.5);  // F15=19, F20=24
+			hp  = Math.floor(74 + (floor-10) * 7);
+			dmg = Math.floor(5 + (floor-10) * 0.25);
 		} else {
-			hp  = Math.floor(144 + (floor-20) * 10);  // F30=435, F50=695
-			dmg = Math.floor(10 + (floor-20) * 0.7); // F30=40, F50=63
+			hp  = Math.floor(144 + (floor-20) * 6);
+			dmg = Math.floor(7 + (floor-20) * 0.14);
 		}
-		var hit = 0.82 + Math.min(0.12, floor * 0.0035);
-		var delay = Math.max(0.72, 1.15 - floor * 0.0075);
+		var hit = 0.82 + Math.min(0.10, floor * 0.002);
+		var delay = Math.max(1.0, 1.4 - floor * 0.004);
 
 		var enemyNames = [
 			'forest demon', 'claw demon', 'blood mist demon',
@@ -643,8 +641,8 @@ var Space = {
 		var enemy = enemyNames[Math.min(enemyNames.length - 1, Math.floor(floor / 4))];
 
 		if (isElite) {
-			hp = Math.floor(hp * 1.3);   // 精英倍率降回 1.6（原 1.8）
-			dmg = Math.floor(dmg * 1.15); // 1.5→1.35
+			hp = Math.floor(hp * 1.3);
+			dmg = Math.floor(dmg * 1.15);
 			enemy = 'elite ' + enemy;
 		}
 		return { enemy: enemy, hp: hp, dmg: dmg, hit: hit, delay: delay, isElite: !!isElite };
@@ -767,7 +765,8 @@ var Space = {
 				'continue': {
 					text: _('continue down'),
 					cooldown: Events._LEAVE_COOLDOWN,
-					onChoose: Space.afterBattle,
+					onChoose: Space._collectRemainingLoot,
+					onEnd: Space.afterBattle,
 					nextScene: 'end'
 				}
 			}
@@ -783,15 +782,15 @@ var Space = {
 		// 楼层 boss 数值重平衡（2026-07-27）：
 		//   原血量太厚，玩家 8~15 DPS 需 100+ 秒才能击杀，导致靠药回血硬耗。
 		//   新数值目标：Boss 战 30~90 秒，配合 3 选 1 天赋累积。
-		if (floor === 10) return { enemy: 'lower moon six',              hp: 200,   dmg: 14,  hit: 0.85, delay: 1.0 };
-		if (floor === 20) return { enemy: 'lower moon three',            hp: 400,   dmg: 18,  hit: 0.88, delay: 0.9 };
-		if (floor === 30) return { enemy: 'upper moon four (the dome)',  hp: 600,  dmg: 24,  hit: 0.90, delay: 0.85 };
-		if (floor === 40) return { enemy: 'upper moon five (the trickster)',  hp: 800,  dmg: 32,  hit: 0.90, delay: 0.8 };
-		if (floor === 50) return { enemy: 'upper moon four (the puppeteer)', hp: 1000, dmg: 42,  hit: 0.90, delay: 0.75 };
-		if (floor === 60) return { enemy: 'upper moon three (the spearman)', hp: 1400, dmg: 54,  hit: 0.92, delay: 0.75 };
-		if (floor === 70) return { enemy: 'upper moon two (the wisteria one)', hp: 1800, dmg: 68, hit: 0.92, delay: 0.7 };
-		if (floor === 80) return { enemy: 'upper moon one (the sorrowful)',   hp: 2200, dmg: 83, hit: 0.94, delay: 0.7 };
-		if (floor === 90) return { enemy: 'kokushibou reborn',                hp: 13000, dmg: 100, hit: 0.95, delay: 0.65 };
+		if (floor === 10) return { enemy: 'lower moon six', hp: 180, dmg: 8, hit: 0.85, delay: 1.35 };
+		if (floor === 20) return { enemy: 'lower moon three', hp: 340, dmg: 10, hit: 0.88, delay: 1.30 };
+		if (floor === 30) return { enemy: 'upper moon four (the dome)', hp: 520, dmg: 12, hit: 0.90, delay: 1.25 };
+		if (floor === 40) return { enemy: 'upper moon five (the trickster)', hp: 740, dmg: 14, hit: 0.90, delay: 1.20 };
+		if (floor === 50) return { enemy: 'upper moon four (the puppeteer)', hp: 1000, dmg: 16, hit: 0.90, delay: 1.20 };
+		if (floor === 60) return { enemy: 'upper moon three (the spearman)', hp: 1400, dmg: 18, hit: 0.92, delay: 1.15 };
+		if (floor === 70) return { enemy: 'upper moon two (the wisteria one)', hp: 1800, dmg: 20, hit: 0.92, delay: 1.15 };
+		if (floor === 80) return { enemy: 'upper moon one (the sorrowful)', hp: 2200, dmg: 22, hit: 0.94, delay: 1.10 };
+		if (floor === 90) return { enemy: 'kokushibou reborn', hp: 3200, dmg: 24, hit: 0.95, delay: 1.10 };
 		return null;
 	},
 
@@ -847,6 +846,7 @@ var Space = {
 			scenes: {
 				'start': {
 					combat: true,
+					castleBoss: true,
 					enemy: b.enemy,
 					enemyName: _(b.enemy),
 					chara: '弦',
@@ -862,7 +862,8 @@ var Space = {
 						'continue': {
 							text: _('continue down'),
 							cooldown: Events._LEAVE_COOLDOWN,
-							onChoose: Space.afterBattle,
+							onChoose: Space._collectRemainingLoot,
+							onEnd: Space._afterBossBattle,
 							nextScene: 'end'
 						},
 						'recraft': {
@@ -932,7 +933,7 @@ var Space = {
 		});
 		buttons['leave'] = {
 			text: _('leave'),
-			onChoose: function() { Space.afterNode(); },
+			onEnd: Space._afterBossBattle,
 			nextScene: 'end'
 		};
 		// 在 Boss 事件内切换场景，避免新事件被原按钮的 end 逻辑关闭。
@@ -1069,13 +1070,13 @@ var Space = {
 							text: _('rest and recover (+40% hp)'),
 							onChoose: function() {
 								var heal = Math.floor(World.getMaxHealth() * 0.4);
-								World.setHp(Math.min(World.getMaxHealth(), World.health + heal));
+								Events.restoreHealth(heal, 'rest');
 								Notifications.notify(null, _('the moment of stillness passes. you breathe again.'));
 							},
 							nextScene: { 1: 'after' }
 						},
 						'sharpen': {
-							text: _('sharpen your blade (loses 30 wood, +1 to next damage)'),
+							text: _('sharpen your blade (30 wood, +1 damage for the next battle)'),
 							cost: { 'wood': 30 },
 							onChoose: function() {
 								Space._sharpenedNext = true;
@@ -1187,13 +1188,11 @@ var Space = {
 				'next': {
 					text: (Space._ambushRemaining > 0) ? _('brace for the next') : _('finish the ambush'),
 					cooldown: Events._LEAVE_COOLDOWN,
-					onChoose: function() {
-						Space._collectRemainingLoot();
-						// 延后打开下一场事件，让本场先淡出关闭
-						setTimeout(function() {
-							if (Space._ambushRemaining > 0) Space._ambushNext();
-							else Space._ambushEnd();
-						}, 400);
+					onChoose: Space._collectRemainingLoot,
+					onEnd: function() {
+						if (Space.done) return;
+						if (Space._ambushRemaining > 0) Space._ambushNext();
+						else Space._ambushEnd();
 					},
 					nextScene: 'end'
 				}
@@ -1230,7 +1229,7 @@ var Space = {
 					buttons: {
 						'continue': {
 							text: _('continue down'),
-							onChoose: function() {
+							onEnd: function() {
 								if (Space._pendingAmbushTalentChoices > 0) {
 									var count = Space._pendingAmbushTalentChoices;
 									Space._pendingAmbushTalentChoices = 0;
@@ -1337,7 +1336,7 @@ var Space = {
 	// ---- MUZAN BOSS FIGHT ----
 
 	triggerMuzan: function() {
-World.setHp(Math.max(30, Space.playerHp));
+World.setHp(Math.min(World.getMaxHealth(), Math.max(30, World.health || 30)));
 Space._pillarIndex = 0;
 Space._pillarTimers = [];
 Space._muzanPhase = 1;
@@ -1549,7 +1548,7 @@ try { Notifications.notify(null, _('斩出 ') + move + '！'); } catch(_) {}
 $SM.add('stores.medicine', 3);
 $SM.add('stores["fleet beacon"]', 1);
 var maxHp = World.getMaxHealth();
-World.setHp(maxHp);
+Events.restoreHealth(maxHp - World.health, 'pillar assist');
 var wanderer = $('#wanderer');
 wanderer.data('hp', maxHp);
 Events.updateFighterDiv(wanderer);
@@ -1648,6 +1647,8 @@ Space._triggerGameOver(true);
 },
 
 returnToShip: function() {
+if (window.CastleReport) CastleReport.finish('retreat');
+if (window.CombatStyles) CombatStyles.endFight();
 // 与远征一致：把剩余背包归还到家里库存
 try { World.returnOutfit(); } catch (e) { /* ignore */ }
 // 天赋只在本次 run 内有效：出无限城即清空
@@ -1657,7 +1658,9 @@ Space._potionCharges = 0;
 $('body').stop().removeClass('noMask').css(
 'background-color', Engine.isLightsOff() ? '#272823' : '#FFFFFF');
 $('#spacePanel').empty().attr('style', '');
-$('#outerSlider').animate({ top: '0px' }, 300, 'linear');
+$('#outerSlider').animate({ top: '0px' }, 300, 'linear', function() {
+if (window.CastleReport) CastleReport.show();
+});
 Engine.activeModule = Ship;
 Ship.onArrival();
 Button.cooldown($('#liftoffButton'));
@@ -1666,6 +1669,7 @@ Button.cooldown($('#liftoffButton'));
 // ---- GOOD END ----
 
 triggerGoodEnd: function() {
+if (window.CastleReport) CastleReport.finish('victory');
 Space.done = true;
 Space.clearPillarTimers();
 Space._triggerGameOver(false);

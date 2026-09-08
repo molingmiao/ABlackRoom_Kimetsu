@@ -18,6 +18,8 @@
 当前版本：**v1.6.0** —— 详见 [CHANGELOG.md](./CHANGELOG.md)。
 在线体验：[GitHub Pages](https://molingmiao.github.io/ABlackRoom_Kimetsu/)（推送到 `main` 时由 GitHub Actions 自动部署）。
 
+本地最新调整：修复无限城成长与奖励、放缓后期敌人成长，并加入战斗流派、自定义补给配置和失败战报。见 [调整说明](doc/CASTLE_UPDATE.md)。无限城不提供暂停或续关；撤离与死亡都会结束本次探索。
+
 ---
 
 ## 主要特色

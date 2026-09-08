@@ -948,14 +948,23 @@ var World = {
 
   die: function() {
     if(!World.dead) {
+      var castleDeath = typeof Space !== 'undefined' && Engine.activeModule === Space;
       World.dead = true;
       Engine.log('player death');
       Engine.event('game event', 'death');
       // 跨周目累计死亡次数
       var dn = $SM.get('previous.legacy.deaths', true) || 0;
       $SM.set('previous.legacy.deaths', dn + 1, true);
-      // 远征结算（死亡版）：在清空 outfit 之前记下
-      try { World._reportExpeditionSummary(true); } catch (e) { /* ignore */ }
+      // Finish before supplies and temporary talents are cleared. Castle reports
+      // are independent of event windows and appear after the return animation.
+      try {
+        if (castleDeath && typeof CastleReport !== 'undefined') {
+          CastleReport.finish('death');
+          $SM.set('previous.embarkSnapshot', null, true);
+        } else {
+          World._reportExpeditionSummary(true);
+        }
+      } catch (e) { /* ignore */ }
       Engine.keyLock = true;
       // Dead! Discard any world changes and go home
       Notifications.notify(World, _('the world fades'));
@@ -986,7 +995,9 @@ var World = {
         Room.tab.addClass('selected');
         Engine.setTimeout(function(){
           Room.onArrival();
-          $('#outerSlider').animate({opacity:'1'}, 600, 'linear');
+          $('#outerSlider').animate({opacity:'1'}, 600, 'linear', function() {
+            if (castleDeath && typeof CastleReport !== 'undefined') CastleReport.show();
+          });
           Button.cooldown($('#embarkButton'));
           Engine.keyLock = false;
           Engine.tabNavigation = true;
@@ -1121,7 +1132,7 @@ var World = {
       typeof World.Weapons[thing] == 'undefined' && typeof Room.Craftables[thing] == 'undefined';
   },
 
-  getMaxHealth: function() {
+  getBaseMaxHealth: function() {
     var base;
     if($SM.get('stores["wind armour"]', true) > 0) {
       base = World.BASE_HEALTH + 75;
@@ -1134,6 +1145,11 @@ var World = {
     } else {
       base = World.BASE_HEALTH;
     }
+    return base;
+  },
+
+  getMaxHealth: function() {
+    var base = World.getBaseMaxHealth();
     // 无限城天赋加成：仅在无限城中生效
     try {
       if (window.Space && Engine.activeModule === Space && Space.getMaxHpBonus) {
@@ -1151,7 +1167,7 @@ var World = {
         base += Space.getAccuracyBonus();
       }
     } catch (e) { /* ignore */ }
-    return base;
+    return Math.min(1, base);
   },
 
   getMaxWater: function() {

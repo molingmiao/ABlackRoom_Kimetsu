@@ -55,6 +55,11 @@ cooldown: Ship.DESCEND_COOLDOWN
 if($SM.get('game.spaceShip.crows') <= 0) {
 Button.setDisabled(b, true);
 }
+new Button.Button({
+id: 'castleReportButton',
+text: _('view last castle report'),
+click: function() { if (window.CastleReport) CastleReport.show(); }
+}).appendTo(Ship.panel).hide();
 
 // Init Space
 Space.init();
@@ -66,6 +71,8 @@ options: {},
 
 onArrival: function(transition_diff) {
 Ship.setTitle();
+if (window.CombatStyles) CombatStyles.renderPicker(Ship.panel);
+if (window.CastleReport) $('#castleReportButton').toggle(!!CastleReport.getLastReport());
 if(!$SM.get('game.spaceShip.seenShip')) {
 Notifications.notify(Ship, _('the entrance to the Infinity Castle yawns before you. Muzan hides somewhere far below.'));
 $SM.set('game.spaceShip.seenShip', true);

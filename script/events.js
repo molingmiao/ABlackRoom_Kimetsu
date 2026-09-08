@@ -109,6 +109,13 @@ var Events = {
 		Events.fought = false;
 		Events.won = false;
 		Events._deathRecoveryUsed = false;
+		Events._castleDamageCarry = {};
+		if (window.Space && Engine.activeModule === Space) {
+			Space._sharpenedBattle = !!Space._sharpenedNext;
+			Space._sharpenedNext = false;
+			if (window.CombatStyles) CombatStyles.startFight(scene);
+			if (window.CastleReport) CastleReport.startFight(scene);
+		}
 		var desc = $('#description', Events.eventPanel());
 
 		$('<div>').text(scene.notification).appendTo(desc);
@@ -133,6 +140,7 @@ var Events = {
 		Events.createFighterDiv('@', World.health, World.getMaxHealth()).attr('id', 'wanderer').appendTo(fightBox);
 		// Draw the enemy
 		Events.createFighterDiv(scene.chara, scene.health, scene.health).attr('id', 'enemy').appendTo(fightBox);
+		if (window.CombatStyles && window.Space && Engine.activeModule === Space) CombatStyles.renderStatus(desc);
 
 		// Draw the action buttons
 		var btns = $('#buttons', Events.eventPanel());
@@ -258,7 +266,7 @@ var Events = {
 							}
 						}
 						var attackFn = t.ranged ? Events.animateRanged : Events.animateMelee;
-						attackFn(enemy, dmg, Events.checkPlayerDeath);
+						attackFn(enemy, dmg, Events.checkPlayerDeath, { source: 'blood art' });
 						// 出血 DoT：命中后附加持续伤害
 						if (t.bleedSec && t.bleedPerSec) {
 							var w2 = $('#wanderer');
@@ -266,7 +274,7 @@ var Events = {
 							var ticks = t.bleedSec;
 							var bid = Engine.combatSetInterval(function() {
 								if (--ticks < 0 || Events.won || Events.fought) { clearInterval(bid); return; }
-								Events.dotDamage(w2, t.bleedPerSec);
+								Events.dotDamage(w2, t.bleedPerSec, 'bleeding');
 							}, 1000);
 							Events._telegraphIntervalTimers.push(bid);
 						}
@@ -485,9 +493,11 @@ var Events = {
 	useBeacon: function(btn) {
 		var have = $SM.get('stores["fleet beacon"]', true) || 0;
 		if (have <= 0) { if (btn) Button.setDisabled(btn, true); return; }
+		if (World.health >= World.getMaxHealth()) return;
 		$SM.add('stores["fleet beacon"]', -1);
+		if (window.CastleReport && window.Space && Engine.activeModule === Space) CastleReport.recordConsumption('fleet beacon', 1);
 		var maxHp = World.getMaxHealth();
-		World.setHp(maxHp);
+		Events.restoreHealth(maxHp - World.health, 'fleet beacon');
 		Events.setHeal();
 		if (Events.activeEvent()) {
 			var w = $('#wanderer');
@@ -592,48 +602,61 @@ var Events = {
 		var canHeal = (World.health < World.getMaxHealth());
 		healBtns.each(function(i){
 			const btn = $(this);
-			Button.setDisabled(btn, !canHeal && btn.attr('id') !== 'shld');
+			var id = btn.attr('id');
+			var items = { eat: 'cured meat', meds: 'medicine', hypo: 'wisteria oil', 'use-stim': 'concentration pill' };
+			var available = canHeal;
+			if (id === 'shld') available = true;
+			else if (id === 'beacon') available = canHeal && ($SM.get('stores["fleet beacon"]', true) || 0) > 0;
+			else if (items[id]) available = (Path.outfit[items[id]] || 0) > 0 && (id === 'use-stim' ? World.health > Events.BOOST_DAMAGE : canHeal);
+			Button.setDisabled(btn, !available);
 		});
 		return canHeal;
 	},
 
+	getBaseHealingAmount: function(item) {
+		return item === 'cured meat' ? World.meatHeal() : item === 'medicine' ? World.medsHeal() : item === 'wisteria oil' ? World.hypoHeal() : 0;
+	},
+	getHealingAmount: function(item, base) {
+		var amount = typeof base === 'number' ? base : Events.getBaseHealingAmount(item);
+		if (window.Space && Engine.activeModule === Space) amount = Math.floor(amount * Space.getHealMult());
+		return amount;
+	},
+	restoreHealth: function(amount, item) {
+		var oldHp = World.health;
+		var hp = Math.min(World.getMaxHealth(), oldHp + Math.max(0, amount));
+		World.setHp(hp);
+		if (window.Space && Engine.activeModule === Space) {
+			Space.addMetaHealed(Math.max(0, hp - oldHp));
+			if (window.CastleReport) CastleReport.recordHealing(hp - oldHp, item);
+		}
+		var w = $('#wanderer');
+		if (w.length) {
+			w.data('hp', hp);
+			Events.updateFighterDiv(w);
+			if (hp > oldHp) Events.drawFloatText('+' + (hp - oldHp), '#wanderer .hp');
+		}
+		Events.setHeal();
+		return hp - oldHp;
+	},
 	doHeal: function(healing, cured, btn) {
+		if (World.health >= World.getMaxHealth()) return 0;
 		if(Path.outfit[healing] > 0) {
 			Path.outfit[healing]--;
+			$SM.set('outfit["' + healing + '"]', Path.outfit[healing]);
+			if (window.CastleReport && window.Space && Engine.activeModule === Space) CastleReport.recordConsumption(healing, 1);
 			World.updateSupplies();
 			if(Path.outfit[healing] === 0) {
 				Button.setDisabled(btn, true);
 			}
 
-			// 无限城中：治疗加成（元进程累计回复解锁）
-			try {
-				if (window.Space && Engine.activeModule === Space && Space.getHealMult) {
-					var mult = Space.getHealMult();
-					if (mult !== 1) cured = Math.floor(cured * mult);
-				}
-			} catch (e) { /* ignore */ }
-
-			var oldHp = World.health;
-			var hp = World.health + cured;
-			hp = Math.min(World.getMaxHealth(),hp);
-			World.setHp(hp);
-			// 无限城中：累计实际回复量到元进程
-			try {
-				if (window.Space && Engine.activeModule === Space && Space.addMetaHealed) {
-					Space.addMetaHealed(Math.max(0, hp - oldHp));
-				}
-			} catch (e) { /* ignore */ }
-			Events.setHeal();
-
-			if(Events.activeEvent()) {
-				var w = $('#wanderer');
-				w.data('hp', hp);
-				Events.updateFighterDiv(w);
-				Events.drawFloatText('+' + cured, '#wanderer .hp');
+			var healed = Events.restoreHealth(Events.getHealingAmount(healing, cured), healing);
+			if(Events.activeEvent() && $('#wanderer').length) {
 				var takeETbutton = Events.setTakeAll();
 				Events.canLeave(takeETbutton);
 			}
+			return healed;
 		}
+		return 0;
 	},
 
 	eatMeat: function(btn) {
@@ -658,13 +681,19 @@ var Events = {
 	},
 
 	useStim: btn => {
+		if ((Path.outfit['concentration pill'] || 0) <= 0 || World.health <= Events.BOOST_DAMAGE) return;
+		Path.outfit['concentration pill']--;
+		$SM.set('outfit["concentration pill"]', Path.outfit['concentration pill']);
+		World.updateSupplies();
+		if (window.CastleReport && window.Space && Engine.activeModule === Space) CastleReport.recordConsumption('concentration pill', 1);
 		const player = $('#wanderer');
 		player.data('status', 'boost');
-		Events.dotDamage(player, Events.BOOST_DAMAGE);
+		Events.dotDamage(player, Events.BOOST_DAMAGE, 'boost cost');
 		Events.updateFighterDiv(player);
 	},
 
 	useWeapon: function(btn) {
+		if (Events.won || Events.fought) return;
 		if(Events.activeEvent()) {
 			var weaponName = btn.attr('id').substring(7).replace(/-/g, ' ');
 			var weapon = World.Weapons[weaponName];
@@ -725,6 +754,7 @@ var Events = {
 				if (!Engine.options.testerMode) {
 					for(var m in mod) {
 						Path.outfit[m] += mod[m];
+						if (window.CastleReport && window.Space && Engine.activeModule === Space) CastleReport.recordConsumption(m, -mod[m]);
 					}
 				}
 				if(out) {
@@ -805,23 +835,7 @@ var Events = {
 			
 			var attackFn = weapon.type == 'ranged' ? Events.animateRanged : Events.animateMelee;
 			
-			// 无限城天赋：伤害倍率 + 吸血（仅在无限城战斗中，Engine.activeModule === Space）
-			try {
-				if (typeof dmg === 'number' && dmg > 0 && window.Space && Engine.activeModule === Space) {
-					var _mult = Space.getDamageMult ? Space.getDamageMult() : 1;
-					if (_mult !== 1) dmg = Math.max(1, Math.floor(dmg * _mult));
-					var _lifesteal = Space.getLifestealPct ? Space.getLifestealPct() : 0;
-					if (_lifesteal > 0) {
-						var _heal = Math.max(1, Math.floor(dmg * _lifesteal));
-						var _oldHp = World.health;
-						var _newHp = Math.min(World.getMaxHealth(), World.health + _heal);
-						World.setHp(_newHp);
-						var _w = $('#wanderer');
-						if (_w.length) { _w.data('hp', _newHp); Events.updateFighterDiv(_w); Events.drawFloatText('+' + _heal, $('.hp', _w)); }
-						if (Space.addMetaHealed) Space.addMetaHealed(_newHp - _oldHp);
-					}
-				}
-			} catch (e) { /* ignore */ }
+			// 天赋、流派及吸血在实际命中时结算，避免护盾/空挥也能回血。
 			
 			// play variation audio for weapon type
 			var r = Math.floor(Math.random() * 2) + 1;
@@ -861,7 +875,7 @@ var Events = {
 						Events.winFight();
 					}
 				}
-			});
+			}, { weaponName: weaponName });
 		}
 	},
 
@@ -879,10 +893,12 @@ var Events = {
 		}, Events.EXPLOSION_DURATION);
 	},
 
-	dotDamage: (target, dmg) => {
-		const hp = Math.max(0, target.data('hp') - dmg);
+	dotDamage: (target, dmg, source) => {
+		const before = target.data('hp');
+		const hp = Math.max(0, before - dmg);
 		target.data('hp', hp);
 		if(target.attr('id') == 'wanderer') {
+			if (window.CastleReport && window.Space && Engine.activeModule === Space) CastleReport.recordDamage(before - hp, source || 'bleeding');
 			World.setHp(hp);
 			Events.setHeal();
 			Events.checkPlayerDeath();
@@ -895,8 +911,12 @@ var Events = {
 		Events.drawFloatText(`-${dmg}`, $('.hp', target));
 	},
 
-	damage: function(fighter, enemy, dmg, type, cb) {
+	damage: function(fighter, enemy, dmg, type, cb, attackInfo) {
+		attackInfo = attackInfo || {};
 		var enemyHp = enemy.data('hp');
+		var beforeHp = enemyHp;
+		var inCastle = window.Space && Engine.activeModule === Space;
+		var playerAttack = fighter.attr('id') === 'wanderer' && enemy.attr('id') === 'enemy';
 		const maxHp = enemy.data('maxHp');
 		var msg = "";
 		const shielded = enemy.data('status') === 'shield';
@@ -917,11 +937,22 @@ var Events = {
 						if (Space.getPermanentDR)        _dr += Space.getPermanentDR();
 						_dr = Math.min(0.5, _dr); // 全局硬上限 50%，避免过强
 						if (_dr > 0) dmg = Math.max(1, Math.floor(dmg * (1 - _dr)));
+						if (window.CombatStyles) dmg = CombatStyles.modifyIncoming(dmg);
 					}
 				} catch (e) { /* ignore */ }
 
 				if (energised) {
 					dmg *= this.ENERGISE_MULTIPLIER;
+				}
+				if (inCastle && playerAttack && dmg > 0 && !shielded && !meditating) {
+					var weaponName = attackInfo.weaponName || 'fists';
+					dmg = dmg * Space.getDamageMult() + (Space._sharpenedBattle ? 1 : 0);
+					if (window.CombatStyles) dmg = CombatStyles.modifyAttack(weaponName, dmg);
+					// 累积小数伤害，让低伤武器也能实际获得每一级百分比加成。
+					Events._castleDamageCarry = Events._castleDamageCarry || {};
+					var totalDamage = dmg + (Events._castleDamageCarry[weaponName] || 0);
+					dmg = Math.floor(totalDamage + 1e-9);
+					Events._castleDamageCarry[weaponName] = Math.max(0, totalDamage - dmg);
 				}
 
 				if (meditating) {
@@ -934,7 +965,14 @@ var Events = {
 					enemy.data('hp', enemyHp);
 					if(fighter.attr('id') == 'enemy') {
 						World.setHp(enemyHp);
+						if (inCastle && window.CastleReport && beforeHp > enemyHp) CastleReport.recordDamage(beforeHp - enemyHp, attackInfo.source || 'normal attack');
 						Events.setHeal();
+					}
+					if (inCastle && playerAttack && beforeHp > enemyHp) {
+						var actualDamage = beforeHp - enemyHp;
+						var lifesteal = Space.getLifestealPct();
+						if (lifesteal > 0) Events.restoreHealth(Math.max(1, Math.floor(actualDamage * lifesteal)), 'lifesteal');
+						if (window.CombatStyles) CombatStyles.afterHit(attackInfo.weaponName || 'fists', actualDamage, enemy);
 					}
 				}
 
@@ -970,6 +1008,7 @@ var Events = {
 			if(dmg == 'stun') {
 				msg = _('stunned');
 				enemy.data('stunned', true);
+				if (inCastle && playerAttack && window.CombatStyles) CombatStyles.afterControl(attackInfo.weaponName, enemy);
 				setTimeout(() => enemy.data('stunned', false), Events.STUN_DURATION);
 			}
 		}
@@ -983,7 +1022,7 @@ var Events = {
 		Events.drawFloatText(msg, $('.hp', enemy), cb);
 	},
 
-	animateMelee: function(fighter, dmg, callback) {
+	animateMelee: function(fighter, dmg, callback, attackInfo) {
 		var start, end, enemy;
 		if(fighter.attr('id') == 'wanderer') {
 			start = {'left': '50%'};
@@ -997,13 +1036,13 @@ var Events = {
 
 		fighter.stop(true, true).animate(start, Events._FIGHT_SPEED, function() {
 
-			Events.damage(fighter, enemy, dmg, 'melee');
+			Events.damage(fighter, enemy, dmg, 'melee', null, attackInfo);
 
 			$(this).animate(end, Events._FIGHT_SPEED, callback);
 		});
 	},
 
-	animateRanged: function(fighter, dmg, callback) {
+	animateRanged: function(fighter, dmg, callback, attackInfo) {
 		var start, end, enemy;
 		if(fighter.attr('id') == 'wanderer') {
 			start = {'left': '25%'};
@@ -1018,7 +1057,7 @@ var Events = {
 		$('<div>').css(start).addClass('bullet').text('o').appendTo('#description')
 			.animate(end, Events._FIGHT_SPEED * 2, 'linear', function() {
 
-			Events.damage(fighter, enemy, dmg, 'ranged');
+				Events.damage(fighter, enemy, dmg, 'ranged', null, attackInfo);
 
 			$(this).remove();
 			if(typeof callback == 'function') {
@@ -1049,7 +1088,7 @@ var Events = {
 
 			var attackFn = scene.ranged ? Events.animateRanged : Events.animateMelee;
 
-			attackFn($('#enemy'), dmg, Events.checkPlayerDeath);
+			attackFn($('#enemy'), dmg, Events.checkPlayerDeath, { source: 'normal attack' });
 		}
 	},
 
@@ -1075,8 +1114,9 @@ var Events = {
 	},
 
 	clearTimeouts: () => {
+		if (window.CombatStyles) CombatStyles.endFight();
 		clearInterval(Events._enemyAttackTimer);
-		Events._specialTimers.forEach(clearInterval);
+		(Events._specialTimers || []).forEach(clearInterval);
 		clearInterval(Events._dotTimer);
 		(Events._telegraphIntervalTimers || []).forEach(clearInterval);
 		(Events._telegraphTimeoutTimers || []).forEach(clearTimeout);
@@ -1096,6 +1136,11 @@ var Events = {
 				return;
 			}
 			Events.endFight();
+			if (window.Space && Engine.activeModule === Space) {
+				if (window.CastleReport) CastleReport.recordKill();
+				var wonScene = Events.activeEvent().scenes[Events.activeScene];
+				if (wonScene.castleBoss) Space.incMetaBossKilled();
+			}
 			// AudioEngine.playSound(AudioLibrary.WIN_FIGHT);
 			// 血脉传承：累计一次跨周目击杀
 			try { Prestige.recordKill(); } catch (e) { /* prestige 未准备好时忑默 */ }

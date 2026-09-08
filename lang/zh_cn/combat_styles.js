@@ -1,0 +1,23 @@
+_.addTranslation({
+	'battle technique': '技巧 · 破绽',
+	'water form': '水之呼吸 · 流转',
+	'flame form': '炎之呼吸 · 斩痕',
+	'thunder form': '雷之呼吸 · 蓄势',
+	'castle battle form': '无限城 · 作战流派',
+	'choose before entering. the form stays fixed until you return and only affects castle battles.': '入城前选择本次作战流派，返回地表后才能更换。流派效果仅在无限城战斗中生效。',
+	'control weapons recover 20% faster. a successful bind opens a 4-second window for 35% more damage.': '控制武器冷却缩短 20%。束缚命中后，获得 4 秒破绽窗口，所有武器伤害提高 35%。',
+	'land 3 melee hits, each within 6 seconds, to recover 4% max health and take 15% less damage for 4 seconds.': '近战连续命中 3 次（每次间隔不超过 6 秒），回复最大生命的 4%，并获得持续 4 秒的 15% 减伤。',
+	'nichirin katana, nichirin spear and flame blade hits leave a deep cut: 18% of actual damage each second for 3 seconds. new cuts refresh, not stack.': '日轮刀、日轮枪或炎刃命中后留下深切斩痕：每秒造成此次实际伤害的 18%，持续 3 秒；再次命中刷新斩痕，不叠层。',
+	'begin combat ready to strike. after 4 seconds without a damaging melee hit, the next melee hit deals 60% more damage. ranged attacks do not spend the charge.': '开战时蓄势完成。近战命中后等待 4 秒，下次近战伤害提高 60%；等待中再次近战命中会重新计时，远程攻击不消耗蓄势。',
+	'unlock {0}: use {1} {2} times ({3}/{2}).': '解锁条件：习得{0}，使用{1} {2} 次（{3}/{2}）。',
+	'form selected': '已选择',
+	'select this form': '选择此流派',
+	'flow: {0}/3 melee hits': '流转：近战连击 {0}/3',
+	'flow guard: {0}s remaining': '流转守势：剩余 {0} 秒',
+	'deep cut: {0} damage, {1} ticks remaining': '斩痕：每次 {0} 伤害，剩余 {1} 次',
+	'land a nichirin weapon hit to open a deep cut.': '日轮刀、日轮枪或炎刃命中后留下斩痕。',
+	'charged: next melee hit +60%': '蓄势完成：下次近战伤害 +60%',
+	'gathering breath: {0}s': '调整呼吸：还需 {0} 秒',
+	'opening: +35% damage for {0}s': '破绽窗口：伤害 +35%，剩余 {0} 秒',
+	'bind the enemy to create an opening.': '使用束缚武器命中敌人，制造破绽。'
+});

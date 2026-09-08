@@ -1,0 +1,21 @@
+_.addTranslation({
+  'refill my loadout': '补齐我的配置',
+  'expedition loadout': '远征配置',
+  'infinity castle loadout': '无限城配置',
+  'my loadouts': '出征配置',
+  'save current loadout': '保存当前配置',
+  'create suggested targets': '生成建议配置',
+  'apply saved equipment': '采用配置装备',
+  'saved {0}; equipped weapons and target quantities recorded.': '已保存{0}，包含当前装备和目标携带量。',
+  'suggested targets saved; refill, adjust supplies, then save to customize.': '已按当前装备生成建议目标，预留治疗物资并匹配弹药。补齐后可调整携带量，再保存为自己的配置。',
+  'no saved loadout; save current supplies or create suggested targets first.': '尚未保存配置。可先调整装备和携带量后保存，或生成建议配置。',
+  'refilled {0} items; existing equipment and extra supplies kept.': '已补入 {0} 件物品，保留当前装备与已携带的超额物资。',
+  'stock changed; unavailable selections adjusted: {0}': '库存已变化，以下预装物品已按实际库存调整：{0}',
+  'stock short by {0}': '库存缺 {0}',
+  'bag space short by {0} items': '背包放不下 {0} 件',
+  '{0}: still need {1} ({2})': '{0}：还缺 {1}（{2}）',
+  'loadout equipped; unavailable weapons: {0}': '已采用配置装备，以下武器因库存不足暂未装备：{0}',
+  'loadout equipment applied; refill supplies before departure.': '已采用配置装备，出发前请补齐物资。',
+  'refill only adds missing supplies; use apply saved equipment to change weapon slots.': '补齐只补目标数量，不丢弃现有物资；点击“采用配置装备”才会切换武器槽。',
+  'target supplies: {0}': '目标携带：{0}'
+});

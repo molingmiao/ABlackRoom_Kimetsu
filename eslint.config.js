@@ -14,6 +14,8 @@ const gameGlobals = {
 	World: 'writable',
 	Ship: 'writable',
 	Space: 'writable',
+	CombatStyles: 'writable',
+	CastleReport: 'writable',
 	Fabricator: 'writable',
 	Events: 'writable',
 	Notifications: 'writable',

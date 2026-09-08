@@ -69,14 +69,17 @@ var Button = {
 
 	cooldown: function(btn, option) {
 		var cd = btn.data("cooldown");
+		if (typeof option === 'number') cd = option;
 		if (btn.data('boosted')()) {
 			cd /= 2;
 		}
+		var weaponId = btn.attr('id') || '';
+		if (window.Space && Engine.activeModule === Space && weaponId.indexOf('attack_') === 0) {
+			cd *= Space.getCooldownMult();
+			if (window.CombatStyles) cd *= CombatStyles.cooldownMultiplier(weaponId.substring(7).replace(/-/g, ' '));
+		}
 		var id = 'cooldown.'+ btn.attr('id');
 		if(cd > 0) {
-			if(typeof option == 'number') {
-				cd = option;
-			}
 			// param "start" takes value from cooldown time if not specified
 			var start, left;
 			switch(option){
