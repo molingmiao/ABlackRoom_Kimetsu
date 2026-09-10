@@ -51,6 +51,18 @@ function fixture() {
   return { ctx, state, sm, click, flush, element, duration: () => lastDuration };
 }
 
+// Reusable event definitions must be clickable on every visit.
+{
+  const { ctx: c, click, flush } = fixture();
+  const event = { title: 'repeat', scenes: { start: { buttons: { leave: { nextScene: 'end' } } } } };
+  for (let i = 0; i < 2; i++) {
+    c.Events.startEvent(event);
+    assert.equal(event.ending, false);
+    click('leave'); flush();
+    assert.equal(c.Events.eventStack.length, 0);
+  }
+}
+
 // Reward transitions use the real event stack and button dispatcher, including the fade callback.
 for (const floor of [10, 20, 30, 40, 50, 60, 70, 80, 90]) {
   for (const shop of [false, true]) {

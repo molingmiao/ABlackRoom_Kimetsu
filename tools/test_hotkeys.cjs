@@ -20,7 +20,7 @@ function selection(items) {
 }
 const context = {
   _: s => s,
-  window: {}, document: { activeElement: null },
+  window: {}, document: { activeElement: null, getElementById() { return null; } },
   $: arg => {
     if (typeof arg === 'function') return; // Do not initialize the whole game.
     if (typeof arg !== 'string') return selection([arg]);

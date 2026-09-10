@@ -526,8 +526,10 @@ var Events = {
 
 	_bindCombatHotkeys: function() {
 		// 攻击按钮：优先按 #attackButtons 内顺序绑定；兜底捕获 #attack_fists（它有时被直接 prepend 到 #buttons）
-		var $attackBtns = $('#attackButtons > .button');
-		var $strayFists = $('#buttons > #attack_fists');
+		// 首次构建战斗时面板尚未挂载到 document，必须在当前面板内查找。
+		var panel = Events.eventPanel();
+		var $attackBtns = panel.find('#attackButtons > .button');
+		var $strayFists = panel.find('#buttons > #attack_fists');
 		var attackList = $attackBtns.get();
 		$strayFists.each(function() {
 			if (attackList.indexOf(this) < 0) attackList.unshift(this); // 拳脚放最前，占用 Q
@@ -537,7 +539,7 @@ var Events = {
 				Events._tagHotkey($(el), Events.HOTKEYS_ATTACK[i]);
 			}
 		});
-		$('#healButtons > .button').each(function(i) {
+		panel.find('#healButtons > .button').each(function(i) {
 			if (i < Events.HOTKEYS_HEAL.length) {
 				Events._tagHotkey($(this), Events.HOTKEYS_HEAL[i]);
 			}
@@ -1776,6 +1778,7 @@ var Events = {
 		Engine.keyLock = true;
 		Engine.tabNavigation = false;
 		Button.saveCooldown = false;
+		event.ending = false;
 		Events.eventStack.unshift(event);
 		event.eventPanel = $('<div>').attr('id', 'event').addClass('eventPanel').css('opacity', '0');
 		if(options != null && options.width != null) {

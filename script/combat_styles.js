@@ -184,6 +184,7 @@ var CombatStyles = {
 		}
 		Events.setHeal();
 		if (Space.addMetaHealed) Space.addMetaHealed(hp - before);
+		if (typeof CastleReport !== 'undefined') CastleReport.recordHealing(hp - before, 'water style');
 	},
 	_openWound: function(enemy, damage) {
 		var fight = CombatStyles._fight;

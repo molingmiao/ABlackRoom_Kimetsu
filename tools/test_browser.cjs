@@ -33,7 +33,7 @@ async function port() {
   await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
   const profile = fs.mkdtempSync(path.join(os.tmpdir(), 'kimetsu-browser-test-'));
   const debugPort = await port();
-  const browser = spawn(edge, ['--headless=new', '--disable-gpu', '--no-first-run', '--no-default-browser-check',
+  const browser = spawn(edge, ['--headless=new', '--no-sandbox', '--disable-gpu', '--no-first-run', '--no-default-browser-check',
     '--disable-background-networking', '--remote-debugging-port=' + debugPort, '--user-data-dir=' + profile,
     '--window-size=1280,1000', 'about:blank'], { windowsHide: true, stdio: 'ignore' });
   let socket;
@@ -77,6 +77,7 @@ async function port() {
     await page('Network.enable');
     await page('Network.setBlockedURLs', { urls: ['https://*'] });
     await page('Page.enable');
+    await page('Page.addScriptToEvaluateOnNewDocument', { source: "if (!localStorage.getItem('gameState')) localStorage.setItem('gameState', JSON.stringify({version:1.4,game:{prologue:{done:true}},playStats:{audioAlertShown:true}}));" });
     await page('Page.navigate', { url: 'http://127.0.0.1:' + server.address().port + '/index.html?lang=zh_cn' });
     let ready = false;
     for (let i = 0; i < 100; i++) {
@@ -87,8 +88,26 @@ async function port() {
     assert.ok(ready, 'game modules did not initialize');
     const checks = await evaluate(`(async function() {
       const checks = [];
-      const check = (condition, name) => { if (!condition) throw Error(name); checks.push(name); };
-      const settle = () => new Promise(resolve => setTimeout(resolve, 350));
+      const check = (condition, name) => {
+        if (!condition) throw Error(name + ': ' + JSON.stringify({floor: Space.currentFloor, scene: Events.activeScene, stack: Events.eventStack.map(e => ({title:e.title,ending:e.ending})), done:Space.done}));
+        checks.push(name);
+      };
+      const finishClick = async selector => {
+        const before = Events.activeEvent();
+        $(selector).trigger('click');
+        for (let i = 0; i < 100; i++) {
+          if (Events.activeEvent() !== before) return;
+          await new Promise(resolve => setTimeout(resolve, 30));
+        }
+        throw Error('event did not finish: ' + selector);
+      };
+      const until = async predicate => {
+        for (let i = 0; i < 160; i++) {
+          if (predicate()) return;
+          await new Promise(resolve => setTimeout(resolve, 30));
+        }
+        throw Error('browser state did not settle: ' + JSON.stringify({checks,focus:document.activeElement.tagName,key:$('#attack_nichirin-katana').attr('data-hotkey'),visible:$('#attack_nichirin-katana').is(':visible'),classes:$('#attack_nichirin-katana').attr('class'),cooldown:$('#attack_nichirin-katana').data('onCooldown'),hp:$('#enemy').data('hp')}));
+      };
       AudioEngine.playSound = AudioEngine.playBackgroundMusic = AudioEngine.playEventMusic = function() {};
       Engine.options.testerMode = false;
       $SM.set('playStats.audioAlertShown', true);
@@ -96,8 +115,20 @@ async function port() {
       if (!Path.panel) Path.init();
       if (!World.panel) World.init();
       if (!Ship.panel) Ship.init();
+      Path.outfit = { medicine:3, 'cured meat':2 };
+      $SM.set('outfit', Path.outfit);
+      $('#loadoutSelect').val('castle').trigger('change');
+      $('#saveLoadoutBtn').trigger('click');
+      check($SM.get('character.loadouts.castle').targets.medicine === 3, 'save loadout button records targets');
+      Path.outfit.medicine = 1;
+      const storedMedicine = $SM.get('stores.medicine');
+      $('#autoFillBtn').trigger('click');
+      check(Path.outfit.medicine === 3 && $SM.get('stores.medicine') === storedMedicine, 'refill button tops up without charging inventory twice');
       Engine.activeModule = Ship;
+      $SM.addPerk('water breath I'); $SM.addPerk('flame breath I'); $SM.addPerk('thunder breath I');
       Ship.onArrival();
+      $('[data-style="water"]').trigger('click');
+      check(CombatStyles.getSelected() === 'water', 'form picker selects an unlocked style');
       check(!!document.querySelector('#shipPanel'), 'castle entrance renders');
       check(_('view last castle report') === '查看上次无限城战报', 'new and old translations coexist');
       check(_('medicine') !== 'medicine', 'original translations preserved');
@@ -113,6 +144,63 @@ async function port() {
       const medCount = Path.outfit.medicine;
       $('#spacePanel [data-hotkey="2"]').trigger('click');
       check(World.health > beforeHeal && Path.outfit.medicine === medCount - 1, 'preparation medicine uses real shared healing');
+      const fight = () => {
+        Space.triggerBattle(false);
+        clearInterval(Events._enemyAttackTimer);
+        (Events._specialTimers || []).forEach(clearInterval);
+        $('#enemy').data('hp',1000).data('maxHp',1000);
+      };
+      const endFight = async () => {
+        Events.clearTimeouts();
+        await new Promise(resolve => Events.endEvent(resolve));
+      };
+      const selectForm = id => {
+        Engine.activeModule = Ship;
+        Ship.onArrival();
+        $('[data-style="' + id + '"]').trigger('click');
+        Engine.activeModule = Space;
+      };
+      fight();
+      World.setHp(World.getMaxHealth() - 30);
+      $('#wanderer').data('hp',World.health);
+      const waterHealing = CastleReport._run.healingReceived;
+      for(let i=0;i<3;i++) Events.damage($('#wanderer'),$('#enemy'),10,'melee',null,{weaponName:'nichirin katana'});
+      check(CombatStyles._fight.combo === 0 && CombatStyles._fight.guardUntil > Date.now(), 'actual water hits activate flow guard');
+      check(CastleReport._run.healingReceived > waterHealing + 3, 'water healing is included in the report');
+      const attackButton = $('#attack_nichirin-katana');
+      check(attackButton.length === 1, 'equipped melee attack has a real button');
+      const key = attackButton.attr('data-hotkey');
+      Space.setTalentLevel('steadyHand',20);
+      const enemyHp = $('#enemy').data('hp');
+      document.body.dispatchEvent(new KeyboardEvent('keydown',{key,bubbles:true}));
+      document.body.dispatchEvent(new KeyboardEvent('keyup',{key,bubbles:true}));
+      await until(() => $('#enemy').data('hp') < enemyHp);
+      check(!Engine._hotkeyDown[key], 'native keyup releases combat shortcut');
+      const combatMedicine = Path.outfit.medicine;
+      const combatHp = World.health;
+      const healKey = $('#meds').attr('data-hotkey');
+      document.body.dispatchEvent(new KeyboardEvent('keydown',{key:healKey,bubbles:true}));
+      document.body.dispatchEvent(new KeyboardEvent('keyup',{key:healKey,bubbles:true}));
+      check(Path.outfit.medicine === combatMedicine - 1 && World.health > combatHp, 'native medicine shortcut heals and consumes exactly once');
+      await endFight();
+      selectForm('flame'); fight();
+      Events.damage($('#wanderer'),$('#enemy'),10,'melee',null,{weaponName:'nichirin katana'});
+      const cutHp = $('#enemy').data('hp');
+      await until(() => $('#enemy').data('hp') < cutHp);
+      check(!!CombatStyles._fight.wound, 'flame cut deals timed damage through the combat engine');
+      await endFight();
+      check(CombatStyles._woundTimer === null, 'leaving combat cancels cut timers');
+      selectForm('thunder'); fight();
+      Events.damage($('#wanderer'),$('#enemy'),10,'melee',null,{weaponName:'nichirin katana'});
+      check($('#enemy').data('hp') === 984, 'charged thunder hit deals 60% extra damage');
+      Events.damage($('#wanderer'),$('#enemy'),10,'melee',null,{weaponName:'nichirin katana'});
+      check($('#enemy').data('hp') === 974, 'immediate thunder follow-up spends no second charge');
+      await endFight();
+      selectForm('technique'); fight();
+      Events.damage($('#wanderer'),$('#enemy'),'stun','ranged',null,{weaponName:'bind kunai'});
+      Events.damage($('#wanderer'),$('#enemy'),10,'melee',null,{weaponName:'nichirin katana'});
+      check($('#enemy').data('hp') === 986, 'control hit opens the technique damage window');
+      await endFight();
       Space.currentFloor = 10;
       Space.triggerBossFight();
       Events.clearTimeouts();
@@ -126,18 +214,29 @@ async function port() {
       const beforePurchase = Path.outfit.medicine;
       $('#recraft_0').trigger('click'); $('#recraft_0').trigger('click');
       check(Path.outfit.medicine === beforePurchase + 2, 'repeat purchases stay in supply scene');
-      $('#leave').trigger('click'); await settle();
+      await finishClick('#leave');
       check(Events.activeEvent().title === _('slayer talent'), 'first boss reward opens after supply closes');
-      $('#talent_0').trigger('click'); await settle();
+      await finishClick('#talent_0');
       check(Events.activeEvent().title === _('slayer talent'), 'second boss reward opens');
-      $('#talent_0').trigger('click'); await settle();
+      await finishClick('#talent_0');
       check(Space.currentFloor === 11 && !Events.activeEvent(), 'boss rewards advance once');
-      CastleReport.recordDamage(18, 'blood art');
-      CastleReport.recordConsumption('medicine', 2);
-      const report = CastleReport.finish('death');
+      fight();
+      Events.damage($('#enemy'),$('#wanderer'),999,'melee',null,{source:'blood art'});
+      Events.checkPlayerDeath();
+      await until(() => !!document.querySelector('#castleReportOverlay'));
+      const report = CastleReport.getLastReport();
       check(!!report && !!$SM.get('game.castleLastReport'), 'read-only result saved');
-      CastleReport.show();
+      check(Engine.activeModule === Room && World.dead && !Events.activeEvent(), 'real death returns to camp before showing the report');
       check(document.querySelector('[role="dialog"]') !== null, 'result dialog renders');
+      check(document.querySelector('.castle-report-stats dd').textContent === String(report.highestFloor), 'report displays the numeric floor');
+      check(CastleReport._run === null && !('floorNodes' in report), 'finished report cannot resume a descent');
+      const savedFood = $SM.get('stores["cured meat"]');
+      document.body.dispatchEvent(new KeyboardEvent('keydown',{key:'1',bubbles:true}));
+      document.body.dispatchEvent(new KeyboardEvent('keyup',{key:'1',bubbles:true}));
+      check($SM.get('stores["cured meat"]') === savedFood, 'report shortcuts do not consume background supplies');
+      document.body.dispatchEvent(new KeyboardEvent('keydown',{key:'Escape',bubbles:true}));
+      check(!document.querySelector('#castleReportOverlay') && !Engine.keyLock, 'Escape closes report and restores controls');
+      CastleReport.show();
       return checks;
     })()`);
     console.log(checks.map(name => 'PASS: ' + name).join('\n'));

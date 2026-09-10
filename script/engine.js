@@ -962,12 +962,13 @@
       return k;
     },
     _tryHotkey: function(e) {
+      if (document.getElementById('castleReportOverlay')) return false;
       if (e.ctrlKey || e.altKey || e.metaKey || e.isComposing) return false;
       var key = Engine._resolveHotkey(e);
       if (!key) return false;
       // 若焦点在输入框，热键让给输入
       var t = document.activeElement;
-      if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return false;
+      if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT' || t.isContentEditable)) return false;
 
       // 收集候选：事件面板内的按钮优先（战斗中的攻击/医疗按钮）
       // 选择器用 [data-hotkey]，不限定 .button class——兼容 .floorActionBtn 等非 Button.Button 元素

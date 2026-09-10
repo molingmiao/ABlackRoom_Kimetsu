@@ -141,6 +141,7 @@ var CastleReport = {
     return advice.slice(0, 2);
   },
   _styleName: function(id) {
+    if (typeof CombatStyles !== 'undefined' && CombatStyles.definition(id)) return CombatStyles.getName(id);
     var names = { water: 'water style', thunder: 'thunder style', flame: 'flame style', control: 'control style', none: 'no style selected' };
     return _(names[id] || id);
   },
@@ -148,6 +149,7 @@ var CastleReport = {
     var report = CastleReport.getLastReport();
     if (!report || typeof document === 'undefined' || !document.body) return false;
     CastleReport.close();
+    if (Engine._resetHotkeys) Engine._resetHotkeys();
     var previousFocus = document.activeElement;
     var previousKeyLock = Engine.keyLock;
     Engine.keyLock = true;
