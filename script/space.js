@@ -668,7 +668,8 @@ var Space = {
 
 	_drinkPotion: function(potion) {
 		if (!potion) return;
-		Space._potionEffect = potion.effect;
+		// 每瓶药水拥有独立效果，不能让一次性消耗改写静态配方。
+		Space._potionEffect = Object.assign({}, potion.effect);
 		// 增益/混合类持续 3 场，诅咒 1 场（避免玩家被反复扣血）
 		Space._potionCharges = (potion.kind === 'curse') ? 1 : 3;
 		var tag = potion.kind === 'curse' ? _('(curse)') : (potion.kind === 'mixed' ? _('(mixed)') : _('(boon)'));
@@ -684,7 +685,10 @@ var Space = {
 		if (pot.enemyHpMult)  e.hp  = Math.max(1, Math.floor(e.hp  * pot.enemyHpMult));
 		if (pot.enemyDmgMult) e.dmg = Math.max(1, Math.floor(e.dmg * pot.enemyDmgMult));
 		if (pot.healFull) {
+			var hpBeforePotion = World.health;
 			World.setHp(World.getMaxHealth());
+			// 战报记录实际回复；保留此免费回满原有的不累计治疗传承规则。
+			if (window.CastleReport) CastleReport.recordHealing(Math.max(0, World.health - hpBeforePotion), 'vigor potion');
 			pot.healFull = false; // 只回满一次，避免多场都回满
 		}
 		Space._potionCharges = Math.max(0, (Space._potionCharges || 1) - 1);

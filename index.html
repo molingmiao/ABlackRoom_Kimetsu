@@ -53,7 +53,7 @@
 			document.write('<link rel="stylesheet" type="text/css" href="lang/'+lang+'/main.css" \/>');
 		}
 		if (lang === 'zh_cn') {
-			['castle_updates', 'combat_styles', 'loadouts', 'castle_report'].forEach(function(name) {
+			['castle_updates', 'combat_styles', 'loadouts', 'castle_report', 'combat_telegraphs'].forEach(function(name) {
 				document.write('<script src="lang/zh_cn/' + name + '.js"><\/script>');
 			});
 		}
@@ -75,6 +75,7 @@
 	<script src="script/ship.js"></script>
   <script src="script/space.js"></script>
 	<script src="script/combat_styles.js"></script>
+	<script src="script/combat_telegraphs.js"></script>
 	<script src="script/castle_report.js"></script>
   <script src="script/fabricator.js"></script>
 	<script src="script/prestige.js"></script>
@@ -101,6 +102,7 @@
 	<link rel="stylesheet" type="text/css" href="css/outside.css" />
 	<link rel="stylesheet" type="text/css" href="css/path.css" />
 	<link rel="stylesheet" type="text/css" href="css/combat_styles.css" />
+	<link rel="stylesheet" type="text/css" href="css/combat_telegraphs.css" />
 	<link rel="stylesheet" type="text/css" href="css/castle_report.css" />
 	<link rel="stylesheet" type="text/css" href="css/world.css" />
 	<link rel="stylesheet" type="text/css" href="css/ship.css" />

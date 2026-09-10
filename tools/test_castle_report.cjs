@@ -90,4 +90,39 @@ assert.equal(second.growth.floors, 0);
 assert.equal(second.growth.talents.length, 0);
 assert.equal(second.styles[0], 'technique');
 assert.equal(writes.length, 2);
-console.log('PASS: report damage, healing, consumption, kill deduplication, inheritance deltas, advice, immutable summaries and no resumable run state.');
+
+// Do not describe an empty starting loadout or a voluntary retreat as exhausted supplies.
+const adviceReport = { outcome: 'death', damageSources: [], damageTaken: 90, healingReceived: 20,
+  healingRemaining: 0, consumed: {}, growth: { totalFloors: 0 } };
+assert.equal(r.suggestions(adviceReport).some(line => line.includes('ran out')), false);
+adviceReport.consumed.medicine = 2;
+assert.equal(r.suggestions(adviceReport).some(line => line.includes('ran out')), true);
+adviceReport.outcome = 'retreat';
+assert.equal(r.suggestions(adviceReport).some(line => line.includes('ran out')), false);
+
+// A used vigor potion must not mutate the recipe for the next bottle.
+vm.runInContext(fs.readFileSync(path.join(__dirname, '../script/space.js'), 'utf8'), c);
+c.window = c;
+c.Notifications = { notify() {} };
+c.World = { health: 35, getMaxHealth: () => 100, setHp(hp) { this.health = hp; } };
+c.Space.addMetaHealed = () => { throw Error('report accounting must not change free-potion legacy growth'); };
+const potion = c.Space.POTIONS.find(item => item.id === 'vigor');
+r.begin();
+c.Space._drinkPotion(potion);
+c.Space._applyPotion({ hp: 50, dmg: 5 });
+assert.equal(c.World.health, 100);
+assert.equal(r._run.healingReceived, 65);
+assert.equal(potion.effect.healFull, true, 'the shared vigor recipe remains usable');
+c.World.health = 70;
+c.Space._applyPotion({ hp: 50, dmg: 5 });
+assert.equal(c.World.health, 70, 'one bottle only heals at the first battle');
+assert.equal(r._run.healingReceived, 65);
+c.Space._drinkPotion(potion);
+c.Space._applyPotion({ hp: 50, dmg: 5 });
+assert.equal(c.World.health, 100, 'a fresh bottle restores health again');
+assert.equal(r._run.healingReceived, 95);
+c.Space._drinkPotion(potion);
+c.Space._applyPotion({ hp: 50, dmg: 5 });
+assert.equal(r._run.healingReceived, 95, 'full-health preparation is not counted as healing');
+r.finish('retreat');
+console.log('PASS: report damage, healing, consumption, kill deduplication, inheritance deltas, accurate advice, reusable vigor potions, immutable summaries and no resumable run state.');

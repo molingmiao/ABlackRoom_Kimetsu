@@ -147,6 +147,35 @@ for (const count of [3, 4, 5]) {
   assert.equal(c.World.health, hp, 'shielded attacks cannot grant lifesteal');
 }
 {
+  const { ctx: c, element, sm } = fixture();
+  c.Events.updateFighterDiv = c.Events.drawFloatText = () => {};
+  const player = element('wanderer', {hp: 40, maxHp: 85});
+  const enemy = element('enemy', {hp: 100, maxHp: 100});
+  let recordedHealing = 0, onHit = 0;
+  c.CastleReport = { recordHealing: amount => { recordedHealing += amount; }, recordDamage() {} };
+  c.Engine.NichirinColors = { blue: {healOnHit: 2} };
+  c.Engine.getNichirinColor = () => 'blue';
+  const metaBefore = sm.get('game.castleMeta.totalHealed', true);
+  c.Events.damage(player, enemy, 5, 'melee', null, {weaponName: 'nichirin katana'});
+  assert.equal(c.World.health, 42);
+  assert.equal(recordedHealing, 2);
+  assert.equal(sm.get('game.castleMeta.totalHealed', true), metaBefore, 'color healing preserves the existing legacy rule');
+  enemy.data('status', 'shield');
+  c.Events.damage(player, enemy, 5, 'melee', null, {weaponName: 'nichirin katana'});
+  c.Events.damage(player, enemy, -1, 'melee', null, {weaponName: 'nichirin katana'});
+  assert.equal(recordedHealing, 2, 'shielded hits and misses never grant color healing');
+  player.data('status', 'shield');
+  c.Events.damage(enemy, player, 5, 'melee', null, {onDamage() {onHit++;}});
+  assert.equal(onHit, 0, 'shield absorption must not trigger on-damage effects');
+  player.data('status', 'none');
+  c.Events.damage(enemy, player, 5, 'melee', null, {onDamage() {onHit++;}});
+  assert.equal(onHit, 1);
+  const before = c.World.health;
+  c.Events.damage(enemy, player, 5, 'melee', null, {isValid: () => false, onDamage() {onHit++;}});
+  assert.equal(c.World.health, before, 'a stale animation cannot deal damage');
+  assert.equal(onHit, 1);
+}
+{
   const { ctx: c } = fixture();
   const math = Object.create(Math);
   c.Math = math;

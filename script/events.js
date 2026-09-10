@@ -226,66 +226,7 @@ var Events = {
 			s.delay * 1000
 		));
 
-		// Telegraph attacks: 预警招式——周期性调起，出折前先发出信号，给玩家反应窗口
-		Events._telegraphIntervalTimers = [];
-		Events._telegraphTimeoutTimers = [];
-		(scene.telegraphAttacks ?? []).forEach(function(t) {
-			var intervalMs = (t.interval || 12) * 1000;
-			var tid = Engine.combatSetInterval(function() {
-				if (Events.won || Events.fought) return;
-				var enemy = $('#enemy');
-				if (!enemy.length) return;
-				// 誓动阶段：添加闪烁状态，推送预警提示
-				enemy.addClass('charging');
-				if (t.telegraph) {
-					Notifications.notify(null, t.telegraph);
-				}
-				// 发招阶段：在 telegraphSec 后执行伤害
-				var timeoutMs = ((t.telegraphSec ?? 1.5) * 1000) / (Engine.options.combatTimeScale || 1);
-				var toid = window.setTimeout(function() {
-					enemy.removeClass('charging');
-					if (Events.won || Events.fought) return;
-					if (!enemy.length) return;
-					// 鬼如果被 stun 或 冷静/冬累状态则路过
-					if (enemy.data('stunned')) {
-						if (t.interruptedText) Notifications.notify(null, t.interruptedText);
-						return;
-					}
-					// 执行预警招式的伤害
-					var dmg = t.dmg || 0;
-					var hit = (typeof t.hit === 'number') ? t.hit : 1;
-					if (Math.random() <= hit && dmg > 0) {
-						// 破盾攻击：先卸掉玩家的护盾状态；有盾则不吃伤害，无盾则全额受创
-						if (t.shieldBreaker) {
-							var w = $('#wanderer');
-							if (w.data('status') === 'shield') {
-								w.data('status', '');
-								Events.updateFighterDiv(w);
-								Notifications.notify(null, _('the shield shatters against the blow.'));
-								return;
-							}
-						}
-						var attackFn = t.ranged ? Events.animateRanged : Events.animateMelee;
-						attackFn(enemy, dmg, Events.checkPlayerDeath, { source: 'blood art' });
-						// 出血 DoT：命中后附加持续伤害
-						if (t.bleedSec && t.bleedPerSec) {
-							var w2 = $('#wanderer');
-							Notifications.notify(null, _('you are bleeding \u2014 {0} damage per second for {1} seconds', t.bleedPerSec, t.bleedSec));
-							var ticks = t.bleedSec;
-							var bid = Engine.combatSetInterval(function() {
-								if (--ticks < 0 || Events.won || Events.fought) { clearInterval(bid); return; }
-								Events.dotDamage(w2, t.bleedPerSec, 'bleeding');
-							}, 1000);
-							Events._telegraphIntervalTimers.push(bid);
-						}
-					} else if (t.missText) {
-						Notifications.notify(null, t.missText);
-					}
-				}, timeoutMs);
-				Events._telegraphTimeoutTimers.push(toid);
-			}, intervalMs);
-			Events._telegraphIntervalTimers.push(tid);
-		});
+		if (window.CombatTelegraphs) CombatTelegraphs.start(scene, desc);
 	},
 
 	startEnemyAttacks: (delay) => {
@@ -623,12 +564,12 @@ var Events = {
 		if (window.Space && Engine.activeModule === Space) amount = Math.floor(amount * Space.getHealMult());
 		return amount;
 	},
-	restoreHealth: function(amount, item) {
+	restoreHealth: function(amount, item, options) {
 		var oldHp = World.health;
 		var hp = Math.min(World.getMaxHealth(), oldHp + Math.max(0, amount));
 		World.setHp(hp);
 		if (window.Space && Engine.activeModule === Space) {
-			Space.addMetaHealed(Math.max(0, hp - oldHp));
+			if (!options || options.legacy !== false) Space.addMetaHealed(Math.max(0, hp - oldHp));
 			if (window.CastleReport) CastleReport.recordHealing(hp - oldHp, item);
 		}
 		var w = $('#wanderer');
@@ -820,16 +761,6 @@ var Events = {
 							if(typeof spec.mult === 'number' && spec.mult !== 1) {
 								dmg = Math.floor(dmg * spec.mult);
 							}
-							if(typeof spec.healOnHit === 'number' && spec.healOnHit > 0) {
-								var newHp = Math.min(World.getMaxHealth(), World.health + spec.healOnHit);
-								World.setHp(newHp);
-								var wandererEl = $('#wanderer');
-								if(wandererEl.length) {
-									wandererEl.data('hp', newHp);
-									Events.updateFighterDiv(wandererEl);
-									Events.drawFloatText('+' + spec.healOnHit, $('.hp', wandererEl));
-								}
-							}
 						}
 					}
 				}
@@ -915,6 +846,7 @@ var Events = {
 
 	damage: function(fighter, enemy, dmg, type, cb, attackInfo) {
 		attackInfo = attackInfo || {};
+		if (attackInfo.isValid && !attackInfo.isValid()) return;
 		var enemyHp = enemy.data('hp');
 		var beforeHp = enemyHp;
 		var inCastle = window.Space && Engine.activeModule === Space;
@@ -970,6 +902,10 @@ var Events = {
 						if (inCastle && window.CastleReport && beforeHp > enemyHp) CastleReport.recordDamage(beforeHp - enemyHp, attackInfo.source || 'normal attack');
 						Events.setHeal();
 					}
+					if (playerAttack && beforeHp > enemyHp && attackInfo.weaponName === 'nichirin katana' && Engine.NichirinColors) {
+						var colorSpec = Engine.NichirinColors[Engine.getNichirinColor()];
+						if (colorSpec && colorSpec.healOnHit > 0) Events.restoreHealth(colorSpec.healOnHit, 'nichirin color', { legacy: false });
+					}
 					if (inCastle && playerAttack && beforeHp > enemyHp) {
 						var actualDamage = beforeHp - enemyHp;
 						var lifesteal = Space.getLifestealPct();
@@ -991,6 +927,7 @@ var Events = {
 				}
 				
 				Events.updateFighterDiv(enemy);
+				if (beforeHp > enemyHp && attackInfo.onDamage) attackInfo.onDamage(beforeHp - enemyHp);
 
 				// play variation audio for weapon type
 				var r = Math.floor(Math.random() * 2) + 1;
@@ -1010,6 +947,7 @@ var Events = {
 			if(dmg == 'stun') {
 				msg = _('stunned');
 				enemy.data('stunned', true);
+				if (playerAttack && window.CombatTelegraphs) CombatTelegraphs.interrupt(enemy);
 				if (inCastle && playerAttack && window.CombatStyles) CombatStyles.afterControl(attackInfo.weaponName, enemy);
 				setTimeout(() => enemy.data('stunned', false), Events.STUN_DURATION);
 			}
@@ -1103,6 +1041,8 @@ var Events = {
 				const recoveredHp = Math.ceil(maxHp * 0.3);
 				$('#wanderer').data('hp', recoveredHp);
 				World.setHp(recoveredHp);
+				if (window.Space && Engine.activeModule === Space && window.CastleReport) CastleReport.recordHealing(recoveredHp, 'second wind');
+				Events.setHeal();
 				Events.updateFighterDiv($('#wanderer'));
 				Events.drawFloatText(_('second wind!'), $('.hp', $('#wanderer')));
 				return false;
@@ -1117,13 +1057,10 @@ var Events = {
 
 	clearTimeouts: () => {
 		if (window.CombatStyles) CombatStyles.endFight();
+		if (window.CombatTelegraphs) CombatTelegraphs.stop();
 		clearInterval(Events._enemyAttackTimer);
 		(Events._specialTimers || []).forEach(clearInterval);
 		clearInterval(Events._dotTimer);
-		(Events._telegraphIntervalTimers || []).forEach(clearInterval);
-		(Events._telegraphTimeoutTimers || []).forEach(clearTimeout);
-		Events._telegraphIntervalTimers = [];
-		Events._telegraphTimeoutTimers = [];
 	},
 
 	endFight: function() {

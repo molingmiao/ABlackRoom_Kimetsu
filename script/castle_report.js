@@ -127,7 +127,10 @@ var CastleReport = {
       advice.push(_('blood arts caused much of your damage. keep a control tool ready to interrupt the next warning.'));
     } else if (report.outcome === 'death' && report.healingRemaining > 0) {
       advice.push(_('you still carried {0} healing items. heal before the next heavy attack, and use the numbered shortcuts.', report.healingRemaining));
-    } else if (report.damageTaken > report.healingReceived && report.healingRemaining === 0) {
+    } else if (report.outcome === 'death' && report.damageTaken > report.healingReceived && report.healingRemaining === 0 &&
+      ['cured meat', 'medicine', 'wisteria oil'].some(function(item) {
+        return CastleReport._number((report.consumed || {})[item]) > 0;
+      })) {
       advice.push(_('your healing supplies ran out. add medicine to your saved loadout and refill before the next descent.'));
     }
     var thresholds = [

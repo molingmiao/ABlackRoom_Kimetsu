@@ -1,0 +1,20 @@
+_.addTranslation({
+  'invalid backpack quantity: {0}. adjust your backpack before departure.': '背包中的{0}数量异常，请先调整背包再出发。',
+  'not enough stock for {0}: packed {1}, available {2}.': '{0}库存不足：预装 {1}，目前只有 {2}。',
+  'a guide crow is required before descending.': '至少需要一只引路鸦才能入城。',
+  'equipped but not packed: {0}.': '{0}已选入装备槽，但没有装入背包，战斗中无法使用。',
+  'no ammunition for {0}: pack {1}.': '{0}无法使用，请携带{1}作为弹药。',
+  'battle technique needs a usable control weapon to create openings.': '技巧流派需要可用的控制武器，才能制造增伤破绽。',
+  'this form needs an equipped melee weapon; fists and ranged attacks do not activate it.': '当前流派需要装备并携带近战武器；空手和远程攻击不会触发流派效果。',
+  'flame form needs a nichirin katana, nichirin spear or flame blade to leave deep cuts.': '炎之流派需要装备并携带日轮刀、日轮枪或炎刃，才能留下深创。',
+  'no healing supplies packed. bring food, medicine or wisteria oil.': '背包中没有治疗物资，建议携带肉干、药品或紫藤油。',
+  '{0} ({1} uses)': '{0}（可用 {1} 次）',
+  'chosen form: {0}': '本次流派：{0}',
+  'usable equipped weapons: {0}': '已携带的上阵武器：{0}',
+  'fists only': '仅能徒手攻击',
+  'packed healing supplies: {0}': '有效治疗补给：{0}',
+  'ammunition counts are per weapon; weapons using the same ammunition share the supply.': '可用次数按单把武器计算；使用同种弹药的武器共用库存。',
+  'departure blocked: {0}': '暂时无法出发：{0}',
+  'preparation note: {0}': '整备提醒：{0}',
+  'preparation notes are advisory; you may still descend with this setup.': '整备提醒仅供参考，你仍可按当前搭配出发。'
+});

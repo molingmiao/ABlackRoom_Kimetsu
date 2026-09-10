@@ -1,0 +1,8 @@
+.combatTelegraphs { clear: both; margin: 12px 0; font-size: 13px; }
+.combatTelegraphHint { opacity: .8; }
+.combatTelegraph { margin-top: 8px; padding: 8px 10px; border-left: 3px solid #963a32; background: rgba(150, 58, 50, .07); }
+.combatTelegraphTitle { font-weight: bold; }
+.combatTelegraphDetails { margin: 4px 0; }
+.combatTelegraphCountdown { font-weight: bold; font-variant-numeric: tabular-nums; }
+.combatTelegraph progress { display: block; width: 100%; height: 8px; margin-top: 6px; accent-color: #963a32; }
+body.dark .combatTelegraph { border-color: #db8078; }
