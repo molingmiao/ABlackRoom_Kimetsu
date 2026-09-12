@@ -4,11 +4,13 @@ var CombatTelegraphs = {
   _scale: function() {
     return Engine.options.testerMode ? Math.max(1, Engine.options.combatTimeScale || 1) : 1;
   },
-  _isActive: function(fight) {
+  _isCurrent: function(fight) {
     var event = Events.activeEvent();
     return !!fight && CombatTelegraphs._fight === fight && !Events.won && !Events.fought
-      && World.health > 0 && !!event && event.scenes[Events.activeScene] === fight.scene
-      && fight.enemy.data('hp') > 0;
+      && !!event && !event.ending && event.scenes[Events.activeScene] === fight.scene;
+  },
+  _isActive: function(fight) {
+    return CombatTelegraphs._isCurrent(fight) && World.health > 0 && fight.enemy.data('hp') > 0;
   },
   start: function(scene, parent) {
     CombatTelegraphs.stop();
@@ -27,7 +29,9 @@ var CombatTelegraphs = {
     });
     fight.intervals.push(Engine.combatSetInterval(function() {
       if (!CombatTelegraphs._isActive(fight)) {
-        if (CombatTelegraphs._fight === fight) CombatTelegraphs.stop();
+        // Ordinary attacks settle second wind at animation completion. A brief
+        // zero-HP frame must not permanently disable this fight's blood arts.
+        if (!CombatTelegraphs._isCurrent(fight) && CombatTelegraphs._fight === fight) CombatTelegraphs.stop();
         return;
       }
       fight.charges.forEach(function(charge) { CombatTelegraphs._update(charge); });
@@ -94,13 +98,13 @@ var CombatTelegraphs = {
       return;
     }
     var attackFn = attack.ranged ? Events.animateRanged : Events.animateMelee;
-    attackFn(fight.enemy, attack.dmg, function() {
-      if (CombatTelegraphs._isActive(fight)) Events.checkPlayerDeath();
-      else if (CombatTelegraphs._fight === fight && World.health <= 0) Events.checkPlayerDeath();
-    }, {
+    attackFn(fight.enemy, attack.dmg, null, {
       source: 'blood art',
       isValid: function() { return CombatTelegraphs._isActive(fight); },
-      onDamage: function() { CombatTelegraphs._bleed(attack, fight); }
+      onDamage: function() {
+        // Resolve fatal hits before the UI timer can clean up this fight.
+        if (!Events.checkPlayerDeath()) CombatTelegraphs._bleed(attack, fight);
+      }
     });
   },
   _bleed: function(attack, fight) {

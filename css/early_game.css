@@ -1,0 +1,6 @@
+.earlyGameTask { border-left: 3px solid #738567; padding: 8px 12px; margin: 0 0 20px; max-width: 440px; box-sizing: border-box; font-size: 13px; line-height: 1.6; }
+.earlyGameTask summary { cursor: pointer; font-weight: bold; }
+.earlyGameTask p { margin: 6px 0 0; }
+.earlyGameTaskCost { font-variant-numeric: tabular-nums; }
+#roomPanel #buildBtns, #roomPanel #craftBtns, #roomPanel #buyBtns { top: calc(50px + var(--early-guide-height, 0px)); }
+#outsidePanel #workers { top: calc(-4px + var(--early-guide-height, 0px)); }

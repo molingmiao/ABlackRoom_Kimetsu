@@ -9,6 +9,8 @@ const gameGlobals = {
 	// 游戏模块（全局赋值）
 	Engine: 'writable',
 	Room: 'writable',
+	EarlyGame: 'writable',
+	CampGuide: 'writable',
 	Outside: 'writable',
 	Path: 'writable',
 	World: 'writable',

@@ -1,0 +1,4 @@
+.productionOverview #description { max-height: 55vh; overflow-y: auto; padding-right: 10px; }
+#productionOverviewButton { width: 100px; }
+.weaponCompareHint { padding: 8px 10px; font-size: 12px; line-height: 1.5; border-bottom: 1px solid #999; }
+.weaponCompareDetails { white-space: pre-line; font-size: 12px; line-height: 1.5; margin-top: 5px; font-weight: normal; }

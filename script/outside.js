@@ -172,6 +172,7 @@ var Outside = {
 		}).appendTo('div#outsidePanel');
 
 		Outside.updateTrapButton();
+		new Button.Button({id:'productionOverviewButton', text:_('production overview'), click:function() { CampGuide.showProduction(); }}).appendTo('div#outsidePanel');
 
 		// 一旦历史上解锁过就在 init 时把自动化按钮补出来，位置稳定
 		if ($SM.get('features.location.autoActions')) {
@@ -261,6 +262,8 @@ var Outside = {
 		var space = Outside.getMaxPopulation() - $SM.get('game.population');
 		if(space > 0) {
 			var num = Math.floor(Math.random()*(space/2) + space/2);
+			if (window.EarlyGame && EarlyGame.firstResidentsPending()) num = Math.min(2, space);
+			$SM.set('game.earlyResidentsArrived', true);
 			if(num === 0) num = 1;
 			if(num == 1) {
 				Notifications.notify(null, _('a stranger arrives in the night'));
@@ -332,6 +335,7 @@ var Outside = {
 	
 	schedulePopIncrease: function() {
 		var nextIncrease = Math.floor(Math.random()*(Outside._POP_DELAY[1] - Outside._POP_DELAY[0])) + Outside._POP_DELAY[0];
+		if (window.EarlyGame && EarlyGame.firstResidentsPending()) nextIncrease = 0.5;
 		Engine.log('next population increase scheduled in ' + nextIncrease + ' minutes');
 		Outside._popTimeout = Engine.setTimeout(Outside.increasePopulation, nextIncrease * 60 * 1000);
 	},
@@ -659,6 +663,7 @@ var Outside = {
 	},
 	
 	onArrival: function(transition_diff) {
+		if (window.EarlyGame) EarlyGame.render();
 		Outside.setTitle();
 		if(!$SM.get('game.outside.seenForest')) {
 			Notifications.notify(Outside, _("the sky is grey and the wind blows relentlessly"));

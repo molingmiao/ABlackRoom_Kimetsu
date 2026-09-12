@@ -627,6 +627,7 @@ var Room = {
 			.appendTo('div#locationSlider');
 
 		Engine.updateSlider();
+		if (window.EarlyGame) EarlyGame.init();
 
 		// Create the light button
 		new Button.Button({

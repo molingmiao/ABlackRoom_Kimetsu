@@ -61,6 +61,8 @@ var Path = {
 		}
 	},
 	setEquipSlot: function(category, slotIndex, weaponKey) {
+		// A manual choice must not be overwritten by first-time automatic outfitting.
+		$SM.set('character.equippedInit', true, true);
 		var eq = Path.getEquippedSlots(category);
 		eq[slotIndex] = weaponKey || null;
 		if (weaponKey) {
@@ -193,6 +195,7 @@ var Path = {
 		var close = function() { backdrop.remove(); picker.remove(); };
 		backdrop.on('mousedown', function(e) { e.stopPropagation(); close(); });
 		var currentKey = Path.getEquippedSlots(category)[slotIndex];
+		$('<div>').addClass('weaponCompareHint').text(_('weapon comparison uses base values; perks, forms, hit chance and combat buffs are not included. home ammunition must still be packed.')).appendTo(picker);
 		if (currentKey) {
 			$('<div>').addClass('pickerOption unequip').text(_('— unequip —')).on('click', function(e) {
 				e.stopPropagation();
@@ -204,7 +207,7 @@ var Path = {
 			var have = $SM.get('stores["'+k+'"]', true) || 0;
 			if (have <= 0) return;
 			if (k === currentKey) return;
-			var opt = $('<div>').addClass('pickerOption').text(_(k)).on('click', function(e) {
+			var opt = $('<div>').addClass('pickerOption').attr('data-weapon', k).text(_(k)).on('click', function(e) {
 				e.stopPropagation();
 				Path.setEquipSlot(category, slotIndex, k);
 				close();
@@ -222,17 +225,20 @@ var Path = {
 				opt.addClass('weapon-tier-' + tier);
 			}
 			opt.appendTo(picker);
+			$('<div>').addClass('weaponCompareDetails').text(CampGuide.weaponOptionText(k, category, slotIndex)).appendTo(opt);
 		});
-		if (picker.children().length === 0) {
+		if (!picker.children('.pickerOption').length) {
 			$('<div>').addClass('pickerOption disabled').text(_('nothing to equip')).appendTo(picker);
 		}
 		var rect = slotEl[0].getBoundingClientRect();
+		var pickerTop = Math.max(10, Math.min(rect.bottom + 2, window.innerHeight - 200));
 		picker.css({
 			position: 'fixed',
-			top: rect.bottom + 2,
-			left: rect.left,
+			top: pickerTop,
 			right: 'auto',
-			width: Math.max(120, rect.width)
+			width: Math.min(360, window.innerWidth - 20),
+			maxHeight: window.innerHeight - pickerTop - 10,
+			left: Math.max(10, Math.min(rect.left, window.innerWidth - 370))
 		});
 		$('body').append(picker);
 	},
@@ -283,7 +289,7 @@ var Path = {
 		new Button.Button({
 			id: 'embarkButton',
 			text: _("embark"),
-			click: Path.embark,
+			click: Path.checkEmbark,
 			width: '80px',
 			cooldown: World.DEATH_COOLDOWN
 		}).appendTo(buttonsRow);
@@ -918,7 +924,33 @@ var Path = {
 		document.title = _('A Dusty Path');
 	},
 	
+	checkEmbark: function() {
+		if (Engine.activeModule !== Path || Events.activeEvent()) return false;
+		var info = CampGuide.expeditionInfo();
+		if (info.errors.length) {
+			Notifications.notify(Path, info.errors.join(' '));
+			Button.clearCooldown($('#embarkButton'));
+			return false;
+		}
+		if ($SM.get('game.embarks', true) > 0 && !info.warnings.length) return Path.embark();
+		var text = [];
+		if (!$SM.get('game.embarks', true)) text.push(_('first journey: explore near the estate, watch food and water, and return before supplies run low. combat continues in real time; use the displayed attack and healing shortcuts.'));
+		text = text.concat(info.warnings);
+		text.push(_('warnings are advisory. your equipment will not be changed automatically.'));
+		Events.startEvent({title:_('expedition preparation'), scenes:{start:{text:text, buttons:{
+			depart:{text:_('continue expedition'), nextScene:'end', onEnd:Path.embark},
+			wait:{text:_('adjust backpack'), nextScene:'end', onChoose:function() {Button.clearCooldown($('#embarkButton'));}}
+		}}}});
+		return true;
+	},
 	embark: function() {
+		if (Engine.activeModule !== Path || Events.activeEvent()) return false;
+		var info = CampGuide.expeditionInfo();
+		if (info.errors.length) {
+			Notifications.notify(Path, info.errors.join(' '));
+			Button.clearCooldown($('#embarkButton'));
+			return false;
+		}
 		// 远征快照：记录出发时的 outfit 与 stores 快照，供回到村里时对比出结算
 		$SM.set('previous.embarkSnapshot', {
 			outfit: JSON.parse(JSON.stringify(Path.outfit || {})),
@@ -926,17 +958,20 @@ var Path = {
 		}, true);
 		if (!Engine.options.testerMode) {
 			for(var k in Path.outfit) {
-				$SM.add('stores["'+k+'"]', -Path.outfit[k]);
+				$SM.add('stores["'+k+'"]', -Path.outfit[k], true);
 			}
 		}
 		// 记录出征次数
+		Engine.activeModule = World;
 		$SM.add('game.embarks', 1);
 		World.onArrival();
+		$SM.fireUpdate('stores');
 		// 进入地图（远征）：隐藏左侧的天赋/物品/装备栏，只留地图
 		$('body').addClass('world-active');
 		$('#outerSlider').animate({left: '-910px'}, 300);
 		Engine.activeModule = World;
 		AudioEngine.playSound(AudioLibrary.EMBARK);
+		return true;
 	},
 	
 	handleStateUpdates: function(e){

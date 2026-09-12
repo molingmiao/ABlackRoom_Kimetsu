@@ -69,6 +69,7 @@ var Button = {
 
 	cooldown: function(btn, option) {
 		var cd = btn.data("cooldown");
+		if (btn.attr('id') === 'gatherButton' && window.EarlyGame && option !== 'state') cd = EarlyGame.gatherCooldown(cd);
 		if (typeof option === 'number') cd = option;
 		if (btn.data('boosted')()) {
 			cd /= 2;

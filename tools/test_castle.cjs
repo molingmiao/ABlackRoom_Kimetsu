@@ -14,7 +14,7 @@ function fixture() {
       addClass(c) { node._classes.add(c); return node; },
       removeClass(c) { node._classes.delete(c); return node; },
       hasClass(c) { return node._classes.has(c); },
-      animate(props, duration, easing, cb) { lastDuration = duration; if (typeof cb === 'function') animations.push(cb); return node; },
+      animate(props, duration, easing, cb) { lastDuration = duration; const callback = typeof easing === 'function' ? easing : cb; if (typeof callback === 'function') animations.push(() => callback.call(node)); return node; },
       each() { return node; }, get() { return []; },
       children() { return element('', {}, 0); }, find() { return element('', {}, 0); }
     };
@@ -52,6 +52,25 @@ function fixture() {
 }
 
 // Reusable event definitions must be clickable on every visit.
+for (const type of ['animateMelee', 'animateRanged']) {
+  for (const who of ['enemy', 'wanderer']) {
+    for (const stale of ['event', 'scene', 'ended', 'won']) {
+      const { ctx: c, element, flush } = fixture();
+      const event = {scenes: {start: {combat:true}}};
+      c.Events.eventStack = [event]; c.Events.activeScene = 'start';
+      let damageCalls = 0, callbackCalls = 0;
+      c.Events.damage = () => { damageCalls++; };
+      c.Events[type](element(who), 10, () => { callbackCalls++; });
+      if (stale === 'event') c.Events.eventStack = [{scenes: {start: {combat:true}}}];
+      if (stale === 'scene') c.Events.activeScene = 'other';
+      if (stale === 'ended') event.ending = true;
+      if (stale === 'won') c.Events.won = true;
+      flush();
+      assert.equal(damageCalls, 0, type + ' ignores stale ' + who + ' damage after ' + stale);
+      assert.equal(callbackCalls, 0, 'old attacks cannot finish a new battle');
+    }
+  }
+}
 {
   const { ctx: c, click, flush } = fixture();
   const event = { title: 'repeat', scenes: { start: { buttons: { leave: { nextScene: 'end' } } } } };

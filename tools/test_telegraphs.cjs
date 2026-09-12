@@ -42,7 +42,7 @@ function fixture(options = {}) {
       animateMelee(enemy, dmg, cb, info) {
         attacks++;
         if (info.isValid() && player.data('status') !== 'shield') { ctx.World.health -= dmg; info.onDamage(dmg); }
-        cb();
+        if (cb) cb();
       },
       dotDamage() { bleeds++; }
     }
@@ -120,6 +120,40 @@ for (const testerMode of [false, true]) {
   f.api.queue({telegraphSec: 4, dmg: 10});
   f.tick(1000);
   assert.equal(f.attacks(), testerMode ? 1 : 0, 'normal games ignore stale tester speed settings');
+  f.api.stop();
+}
+for (const revive of [false, true]) {
+  const f = fixture();
+  let deaths = 0;
+  f.ctx.Events.checkPlayerDeath = () => {
+    if (f.ctx.World.health <= 0) {
+      deaths++;
+      if (revive) f.ctx.World.health = 30;
+      else { f.ctx.Events.fought = true; f.api.stop(); return true; }
+    }
+    return false;
+  };
+  // No animation completion callback: fatal hits must settle inside onDamage.
+  f.ctx.Events.animateMelee = (enemy, damage, cb, info) => {
+    f.ctx.World.health = 0;
+    info.onDamage(damage);
+    assert.equal(deaths, 1, 'lethal damage settles before the animation ends');
+  };
+  f.api.queue({telegraphSec: 1, dmg: 200, bleedSec: 3, bleedPerSec: 2});
+  f.tick(1100);
+  assert.equal(f.ctx.World.health, revive ? 30 : 0);
+  assert.equal(!!f.api._fight, revive, 'a second wind keeps the active fight alive');
+  f.api.stop();
+}
+{
+  const f = fixture();
+  f.ctx.World.health = 0;
+  f.tick(200);
+  assert.ok(f.api._fight, 'a pending ordinary-hit recovery keeps blood-art scheduling');
+  f.ctx.World.health = 30;
+  f.api.queue({telegraphSec: 1, dmg: 5});
+  f.tick(1000);
+  assert.equal(f.attacks(), 1, 'blood arts remain active after ordinary-hit recovery');
   f.api.stop();
 }
 console.log('PASS: warning countdown, permanent cast interruption, overlapping casts, shield/bleed resolution, cleanup and tester speed.');

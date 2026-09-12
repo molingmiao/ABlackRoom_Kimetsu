@@ -962,7 +962,11 @@ var Events = {
 		Events.drawFloatText(msg, $('.hp', enemy), cb);
 	},
 
+	_ownsCombat: function(event, sceneName) {
+		return !!event && !event.ending && Events.activeEvent() === event && Events.activeScene === sceneName && !Events.won && !Events.fought;
+	},
 	animateMelee: function(fighter, dmg, callback, attackInfo) {
+		var event = Events.activeEvent(), sceneName = Events.activeScene;
 		var start, end, enemy;
 		if(fighter.attr('id') == 'wanderer') {
 			start = {'left': '50%'};
@@ -975,14 +979,15 @@ var Events = {
 		}
 
 		fighter.stop(true, true).animate(start, Events._FIGHT_SPEED, function() {
-
-			Events.damage(fighter, enemy, dmg, 'melee', null, attackInfo);
-
-			$(this).animate(end, Events._FIGHT_SPEED, callback);
+			if (Events._ownsCombat(event, sceneName) && World.health > 0) Events.damage(fighter, enemy, dmg, 'melee', null, attackInfo);
+			$(this).animate(end, Events._FIGHT_SPEED, function() {
+				if (Events._ownsCombat(event, sceneName) && typeof callback === 'function') callback();
+			});
 		});
 	},
 
 	animateRanged: function(fighter, dmg, callback, attackInfo) {
+		var event = Events.activeEvent(), sceneName = Events.activeScene;
 		var start, end, enemy;
 		if(fighter.attr('id') == 'wanderer') {
 			start = {'left': '25%'};
@@ -994,13 +999,13 @@ var Events = {
 			enemy = $('#wanderer');
 		}
 
-		$('<div>').css(start).addClass('bullet').text('o').appendTo('#description')
+		$('<div>').css(start).addClass('bullet').text('o').appendTo('#fight')
 			.animate(end, Events._FIGHT_SPEED * 2, 'linear', function() {
 
-				Events.damage(fighter, enemy, dmg, 'ranged', null, attackInfo);
+				if (Events._ownsCombat(event, sceneName) && World.health > 0) Events.damage(fighter, enemy, dmg, 'ranged', null, attackInfo);
 
 			$(this).remove();
-			if(typeof callback == 'function') {
+			if(Events._ownsCombat(event, sceneName) && typeof callback == 'function') {
 				callback();
 			}
 		});
