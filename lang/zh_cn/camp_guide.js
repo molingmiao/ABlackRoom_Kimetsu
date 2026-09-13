@@ -1,4 +1,7 @@
 _.addTranslation({
+  'these assigned jobs consume materials faster than they produce them at full operation; current stock only buffers the gap.': '持续供需缺口：按当前分工满负荷运转，以下材料消耗快于产出，现有库存只能暂时填补缺口。',
+  '{0}: supply {1}/min, demand {2}/min, shortfall {3}/min. assigned sources: {4}; consumers: {5}.': '{0}：每分钟产出 {1}，消耗 {2}，缺口 {3}。当前生产方：{4}；消耗方：{5}。',
+  'increase available upstream jobs or reduce consumers. manual gathering and trading can also cover the gap; these figures are not a depletion countdown.': '可增加已解锁的上游工种人数，或减少消耗方人数；手动采集、交易也能补缺。这是供需估算，不是库存耗尽倒计时。',
   'control, not direct damage': '控制（无直接伤害）',
   'base damage: {0} → {1}': '基础伤害：{0} → {1}',
   'base cooldown: {0}s → {1}s': '自身基础冷却：{0}秒 → {1}秒',

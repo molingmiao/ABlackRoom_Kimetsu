@@ -290,3 +290,6 @@ div.outfitRow .scrapBtn:hover {
 .loadoutHint { opacity: 0.75; }
 #loadoutResult { white-space: pre-line; }
 #loadoutResult:empty { display: none; }
+#loadoutPreview { margin-top: 7px; line-height: 1.5; }
+#loadoutPreview summary { cursor: pointer; }
+.loadoutPreviewDetails { white-space: pre-line; max-height: 180px; overflow-y: auto; margin-top: 6px; }

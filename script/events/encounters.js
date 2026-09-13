@@ -292,9 +292,9 @@ Events.Encounters = [
 				health: 20,
 				loot: {
 					'scales': {
-						min: 5,
-						max: 10,
-						chance: 0.8
+						min: 6,
+						max: 13,
+						chance: 1
 					},
 					'teeth': {
 						min: 5,
@@ -329,9 +329,9 @@ Events.Encounters = [
 				health: 22,
 				loot: {
 					'scales': {
-						min: 3,
-						max: 8,
-						chance: 0.9
+						min: 5,
+						max: 11,
+						chance: 1
 					},
 					'cloth': {
 						min: 2,
@@ -591,8 +591,8 @@ Events.Encounters = [
 				health: 35,
 				loot: {
 					'scales': {
-						min: 5,
-						max: 12,
+						min: 10,
+						max: 19,
 						chance: 1
 					},
 					'iron': {

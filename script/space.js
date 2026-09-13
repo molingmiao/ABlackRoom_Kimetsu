@@ -401,6 +401,7 @@ var Space = {
 			var take = $(this).children('.lootTake').first();
 			var numLeft = take.data('numLeft') || 0;
 			if (name && numLeft > 0) {
+				take.data('numLeft', 0); // A repeated completion callback must not duplicate warehouse rewards.
 				$SM.add('stores["' + name + '"]', numLeft);
 				collected.push(_(name) + '+' + numLeft);
 			}
@@ -798,10 +799,11 @@ var Space = {
 		return null;
 	},
 
-	// 分层掉落：楼层越深，材料越高级；同时保证每场战斗至少有固定的恢复/辅助道具掉落。
+	// 鳞片保底支撑补给循环；恢复道具仍按概率掉落。drawLoot 的 max 为不包含的上界。
 	_battleLoot: function(floor, isElite) {
-		var t = Math.floor(floor / 10); // 0..9 tier
+		var t = Math.max(0, Math.min(9, Math.floor(floor / 10)));
 		var loot = {
+			'scales':      { min: 3 + t, max: 7 + t*2, chance: 1 },
 			'medicine':    { min: 1, max: 2, chance: 0.85 },
 			'wisteria oil':{ min: 1, max: 2, chance: 0.60 },
 			'cured meat': { min: 1, max: 2 + Math.floor(t / 2), chance: 0.75 },
@@ -809,6 +811,7 @@ var Space = {
 			'teeth':      { min: 1 + t, max: 4 + t*2, chance: 0.7 }
 		};
 		if (t >= 1) loot['iron']    = { min: 1, max: 3 + t, chance: 0.55 };
+		if (t >= 1) loot['cloth']   = { min: 1, max: 3 + Math.floor(t/3), chance: 0.55 };
 		if (t >= 2) loot['steel']   = { min: 1, max: 2 + t, chance: 0.45 };
 		if (t >= 3) loot['sulphur'] = { min: 1, max: 2 + t, chance: 0.40 };
 		if (t >= 4) loot['leather'] = { min: 1, max: 3 + t, chance: 0.40 };
@@ -818,6 +821,9 @@ var Space = {
 		if (t >= 8) loot['wisteria oil'] = { min: 1, max: 3, chance: 0.70 };
 		if (t >= 9) loot['demon stone'] = { min: 1, max: 1, chance: 0.25 };
 		if (isElite) {
+			loot['scales'] = { min: 6 + t*2, max: 13 + t*3, chance: 1 };
+			loot['teeth'] = { min: 3 + t, max: 7 + t*2, chance: 1 };
+			loot['cloth'] = { min: 2, max: 5 + Math.floor(t/3), chance: 1 };
 			loot['medicine'] = { min: 2, max: 4, chance: 0.95 };
 			loot['wisteria oil'] = { min: 1, max: 3, chance: 0.80 };
 			loot['demon stone'] = { min: 1, max: 1, chance: 0.35 };
@@ -829,6 +835,9 @@ var Space = {
 	_bossLoot: function(floor) {
 		var t = Math.floor(floor / 10);
 		var loot = {
+			'scales':         { min: 15 + t*5, max: 26 + t*5, chance: 1 },
+			'teeth':          { min: 8 + t*2, max: 13 + t*3, chance: 1 },
+			'cloth':          { min: 3 + t, max: 6 + t, chance: 1 },
 			'demon stone':    { min: 1 + Math.floor(t/2), max: 2 + Math.floor(t/2), chance: 1.0 },
 			'medicine':       { min: 3, max: 5 + t, chance: 1.0 },
 			'solar crystal':  { min: 2, max: 3 + t, chance: 0.85 },
@@ -1122,7 +1131,9 @@ var Space = {
 		if (floor >= 25) pool.push({ key: 'demon stone', min: 1, max: 2 });
 		// 随机抽 1-2 件
 		var n = 1 + (Math.random() < 0.4 ? 1 : 0);
-		var loot = {};
+		var tier = Math.max(0, Math.min(9, Math.floor(floor / 10)));
+		// Extra guaranteed materials do not dilute the existing rare-item pool.
+		var loot = {scales: 5 + tier + Math.floor(Math.random() * (6 + tier))};
 		for (var i = 0; i < n; i++) {
 			var p = pool[Math.floor(Math.random() * pool.length)];
 			var amt = p.min + Math.floor(Math.random() * (p.max - p.min + 1));

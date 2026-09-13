@@ -18,7 +18,7 @@ var Room = {
 		'meat': _('生肉，可腐坏；不能直接骨出征心充体力'),
 		'cured meat': _('熏肉，远征口粮。食用可恢复生命'),
 		'bait': _('授诱猟物，配合陷阱使用'),
-		'scales': _('鲗鳞——可与商人交换冶炼金属'),
+		'scales': _('鬼鳞——探索鬼族与无限城战斗可得，用于交易和补给'),
 		'teeth': _('兽齿——可与商人交换炼炭'),
 		'cloth': _('布料，用于缝装与制作某些装备'),
 		'leather': _('鞄皮后的兽革，用于护具、背包、装备组件'),
@@ -495,7 +495,7 @@ var Room = {
 			type: 'good',
 			cost: function () {
 				return {
-					'scales': 50, 'teeth': 30
+					'scales': 20, 'teeth': 12
 				};
 			},
 			audio: AudioLibrary.BUY_MEDICINE
@@ -504,7 +504,7 @@ var Room = {
 			type: 'good',
 			cost: function () {
 				return {
-					'scales': 10
+					'scales': 4
 				};
 			},
 			audio: AudioLibrary.BUY_BULLETS
@@ -513,8 +513,8 @@ var Room = {
 			type: 'good',
 			cost: function () {
 				return {
-					'scales': 10,
-					'teeth': 10
+					'scales': 6,
+					'teeth': 6
 				};
 			},
 			audio: AudioLibrary.BUY_ENERGY_CELL
@@ -532,8 +532,8 @@ var Room = {
 			type: 'weapon',
 			cost: function () {
 				return {
-					'scales': 100,
-					'teeth': 50
+					'scales': 40,
+					'teeth': 20
 				};
 			},
 			audio: AudioLibrary.BUY_GRENADES
@@ -542,8 +542,8 @@ var Room = {
 			type: 'weapon',
 			cost: function () {
 				return {
-					'scales': 500,
-					'teeth': 250
+					'scales': 200,
+					'teeth': 100
 				};
 			},
 			audio: AudioLibrary.BUY_BAYONET
@@ -553,8 +553,8 @@ var Room = {
 			cost: function () {
 				return {
 					'fur': 1500,
-					'scales': 750,
-					'teeth': 300
+					'scales': 250,
+					'teeth': 100
 				};
 			},
 			audio: AudioLibrary.BUY_ALIEN_ALLOY

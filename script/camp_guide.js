@@ -33,7 +33,7 @@ var CampGuide = {
     return text.join('\n');
   },
   production: function(incomes, stores) {
-    var rows = [], net = {};
+    var rows = [], net = {}, flow = {};
     Object.keys(incomes || {}).forEach(function(key) {
       var income = incomes[key];
       if (!income || !(income.delay > 0)) return;
@@ -42,13 +42,19 @@ var CampGuide = {
         var amount = income.stores[item];
         if (!Number.isFinite(amount) || !amount) return;
         net[item] = (net[item] || 0) + amount * 60 / income.delay;
+        if (!flow[item]) flow[item] = {item:item, supply:0, demand:0, producers:[], consumers:[]};
+        var rate = Math.abs(amount) * 60 / income.delay;
+        if (amount > 0) { flow[item].supply += rate; flow[item].producers.push(key); }
+        else { flow[item].demand += rate; flow[item].consumers.push(key); }
         if (amount < 0) inputs.push({item:item, amount:-amount, have:Math.max(0, stores[item] || 0)});
         else outputs.push({item:item, amount:amount});
       });
       if (inputs.length || outputs.length) rows.push({key:key, delay:income.delay, inputs:inputs, outputs:outputs,
         missing:inputs.filter(function(input) { return input.have < input.amount; })});
     });
-    return {rows:rows, net:net};
+    return {rows:rows, net:net, deficits:Object.keys(flow).map(function(item) {return flow[item];}).filter(function(row) {
+      return row.demand - row.supply > 0.001;
+    })};
   },
   productionText: function() {
     var incomes = $SM.get('income') || {}, selected = {};
@@ -57,6 +63,15 @@ var CampGuide = {
     });
     var report = CampGuide.production(selected, $SM.get('stores') || {});
     var text = [_('production snapshot: recipes below are for the entire assigned group, not one worker.')];
+    var jobName = function(key) {return key === 'builder' ? _('Shinobu') : _(key);};
+    var rateText = function(value) {return String(Math.round(value * 100) / 100);};
+    if (report.deficits.length) {
+      text.push(_('these assigned jobs consume materials faster than they produce them at full operation; current stock only buffers the gap.'));
+      report.deficits.forEach(function(row) {
+        text.push(_('{0}: supply {1}/min, demand {2}/min, shortfall {3}/min. assigned sources: {4}; consumers: {5}.', _(row.item), rateText(row.supply), rateText(row.demand), rateText(row.demand - row.supply), row.producers.map(jobName).join(' / ') || _('none'), row.consumers.map(jobName).join(' / ')));
+      });
+      text.push(_('increase available upstream jobs or reduce consumers. manual gathering and trading can also cover the gap; these figures are not a depletion countdown.'));
+    }
     var format = function(items) { return items.map(function(item) {return _(item.item) + ' ×' + item.amount;}).join(' / ') || _('none'); };
     report.rows.forEach(function(row) {
       text.push(_('{0}: every {1}s, consume {2}; produce {3}.', row.key === 'builder' ? _('Shinobu') : _(row.key), row.delay, format(row.inputs), format(row.outputs)));

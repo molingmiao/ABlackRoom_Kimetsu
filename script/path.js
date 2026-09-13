@@ -553,6 +553,7 @@ var Path = {
 		}
 
 		Path.updateBagSpace(currentBagCapacity);
+		Path.updateLoadoutPanel();
 
 	},
 
@@ -842,6 +843,23 @@ var Path = {
 		});
 		return result;
 	},
+	loadoutPreview: function(profile, current, stores, capacity) {
+		var plan = Path.planLoadout(profile, current, stores, capacity);
+		var lines = [];
+		Object.keys(profile.targets).forEach(function(key) {
+			var target = Path.loadoutCount(profile.targets[key]);
+			if (!target) return;
+			var packed = Math.min(Path.loadoutCount(current[key]), Path.loadoutCount(stores[key]));
+			lines.push(_('{0}: packed {1}/{2}; after refill {3}.', _(key), packed, target, plan.outfit[key] || 0));
+		});
+		plan.shortages.forEach(function(shortage) {
+			var reasons = [];
+			if (shortage.stock) reasons.push(_('stock short by {0}', shortage.stock));
+			if (shortage.space) reasons.push(_('bag space short by {0} items', shortage.space));
+			lines.push(_('{0}: still need {1} ({2})', _(shortage.key), shortage.missing, reasons.join(', ')));
+		});
+		return {added:plan.added, lines:lines};
+	},
 	autoFillSupplies: function() {
 		var profile = Path.getLoadout(Path.getLoadoutId());
 		if (!profile) {
@@ -892,6 +910,9 @@ var Path = {
 		$('<button>').attr({ id: 'suggestLoadoutBtn', type: 'button' }).text(_('create suggested targets')).on('click', Path.createSuggestedLoadout).appendTo(row);
 		$('<button>').attr({ id: 'equipLoadoutBtn', type: 'button' }).text(_('apply saved equipment')).on('click', Path.applyLoadoutEquipment).appendTo(row);
 		$('<div>').attr('id', 'loadoutSummary').appendTo(panel);
+		var preview = $('<details>').attr('id', 'loadoutPreview').appendTo(panel);
+		$('<summary>').appendTo(preview);
+		$('<div>').addClass('loadoutPreviewDetails').appendTo(preview);
 		$('<div>').addClass('loadoutHint').text(_('refill only adds missing supplies; use apply saved equipment to change weapon slots.')).appendTo(panel);
 		$('<div>').attr({ id: 'loadoutResult', role: 'status', 'aria-live': 'polite' }).appendTo(panel);
 	},
@@ -905,6 +926,12 @@ var Path = {
 			if (count) parts.push(_(key) + ' × ' + count);
 		});
 		$('#loadoutSummary').text(profile ? _('target supplies: {0}', parts.join(', ') || _('none')) : _('no saved loadout; save current supplies or create suggested targets first.'));
+		$('#loadoutPreview').toggle(!!profile);
+		if (profile) {
+			var preview = Path.loadoutPreview(profile, Path.outfit || {}, $SM.get('stores') || {}, Path.getCapacity());
+			$('#loadoutPreview summary').text(_('refill preview: can add {0} items (expand for shortages)', preview.added));
+			$('#loadoutPreview .loadoutPreviewDetails').text(preview.lines.join('\n') + '\n' + _('preview only; keeps extra supplies and current weapon slots. quantities may change with stock.'));
+		}
 	},
 	showLoadoutResult: function(message) {
 		$('#loadoutResult').text(message);
@@ -979,6 +1006,8 @@ var Path = {
 			Path.updatePerks();
 		} else if(e.category == 'income' && Engine.activeModule == Path){
 			Path.updateOutfitting();
+		} else if(Engine.activeModule == Path && (e.category == 'stores' || e.category == 'outfit' || e.category == 'character')) {
+			Path.updateLoadoutPanel();
 		}
 	}
 };

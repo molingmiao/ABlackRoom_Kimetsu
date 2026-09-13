@@ -1,4 +1,7 @@
 _.addTranslation({
+  '{0}: packed {1}/{2}; after refill {3}.': '{0}：已装 {1}／目标 {2}；补齐后预计 {3}。',
+  'refill preview: can add {0} items (expand for shortages)': '补齐预览：当前可补入 {0} 件（展开查看明细与缺口）',
+  'preview only; keeps extra supplies and current weapon slots. quantities may change with stock.': '仅预览，不改背包或装备；保留超额物资。库存变化后，预计数量会随之更新。',
   'refill my loadout': '补齐我的配置',
   'expedition loadout': '远征配置',
   'infinity castle loadout': '无限城配置',

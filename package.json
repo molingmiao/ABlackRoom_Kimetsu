@@ -19,6 +19,7 @@
     "test:browser": "node tools/test_browser.cjs",
     "test:early": "node tools/test_early_game.cjs",
     "test:camp": "node tools/test_camp_guide.cjs",
+    "test:economy": "node tools/test_economy.cjs",
     "update_pot": "pybabel extract -F lang/babel.cfg -c \"TRANSLATORS\" script -o lang/adarkroom.pot"
   },
   "dependencies": {

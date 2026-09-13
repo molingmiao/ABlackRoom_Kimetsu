@@ -146,10 +146,12 @@ async function port() {
       $SM.setM('stores', {wood:5,meat:0});
       $('#productionOverviewButton').trigger('click');
       check(Events.eventPanel().text().includes('原料不够整组'), 'production overview identifies whole-group material shortages');
+      check(Events.eventPanel().text().includes('持续供需缺口') && Events.eventPanel().text().includes('当前生产方'), 'production overview explains sustained deficits and assigned sources');
       const workerCount = $SM.get('game.workers.charcutier');
       $SM.setM('stores', {wood:100,meat:100});
       $('#refresh').trigger('click');
       check(!Events.eventPanel().text().includes('原料不够整组') && $SM.get('game.workers.charcutier') === workerCount, 'production refresh reflects new stock without reassigning workers');
+      check(Events.eventPanel().text().includes('持续供需缺口'), 'restocking removes immediate shortage but not the sustained supply deficit');
       await finishClick('#close');
       $SM.set('game.workers.charcutier', 0);
       $SM.setM('stores', {'wind armour':1,'nichirin katana':1,'bind kunai':1,'medicine':30,'cured meat':30,'wisteria oil':20,'teeth':100,'scales':100,'wood':100,'demon stone':5});
@@ -192,8 +194,18 @@ async function port() {
       check($SM.get('character.loadouts.castle').targets.medicine === 3, 'save loadout button records targets');
       Path.outfit.medicine = 1;
       const storedMedicine = $SM.get('stores.medicine');
+      $('#loadoutPreview').prop('open', true);
+      Path.updateOutfitting();
+      const previewSnapshot = JSON.stringify({bag:Path.outfit, stores:$SM.get('stores'), equipment:$SM.get('character.equipped')});
+      Path.updateLoadoutPanel();
+      check($('#loadoutPreview').text().includes('已装 1／目标 3；补齐后预计 3'), 'loadout preview shows packed, target and planned quantities');
+      check(JSON.stringify({bag:Path.outfit, stores:$SM.get('stores'), equipment:$SM.get('character.equipped')}) === previewSnapshot, 'loadout preview never mutates inventory or equipment');
+      $SM.set('stores.medicine', 2);
+      check($('#loadoutPreview').text().includes('库存缺 1') && $('#loadoutPreview').prop('open'), 'stock changes refresh shortages without collapsing the preview');
+      $SM.set('stores.medicine', storedMedicine);
       $('#autoFillBtn').trigger('click');
       check(Path.outfit.medicine === 3 && $SM.get('stores.medicine') === storedMedicine, 'refill button tops up without charging inventory twice');
+      check($('#loadoutPreview').text().includes('已装 3／目标 3；补齐后预计 3'), 'refill updates the live preview');
       Engine.activeModule = Ship;
       $SM.addPerk('water breath I'); $SM.addPerk('flame breath I'); $SM.addPerk('thunder breath I');
       Ship.onArrival();
@@ -313,13 +325,22 @@ async function port() {
       Events.won = true;
       Events.fought = true;
       $('#buttons').empty();
+      Events.drawLoot(Events.activeEvent().scenes.start.loot);
+      const earnedScales = $('#lootButtons .lootRow').filter(function() {return $(this).data('item') === 'scales';}).find('.lootTake').data('numLeft');
+      check(earnedScales >= 20 && earnedScales <= 30, 'real boss loot renders guaranteed scales');
+      const scalesBeforeLoot = $SM.get('stores.scales', true);
+      Space._collectRemainingLoot();
+      Space._collectRemainingLoot();
+      check($SM.get('stores.scales') === scalesBeforeLoot + earnedScales, 'support corps transfers scales to warehouse exactly once');
       $('<div id="exitButtons">').appendTo('#buttons');
       Events.drawButtons(Events.activeEvent().scenes.start);
       $('#recraft').trigger('click');
       check(Events.activeScene === 'recraft' && $('#recraft_0').length === 1, 'boss supply scene visible');
       const beforePurchase = Path.outfit.medicine;
+      const scalesBeforePurchase = $SM.get('stores.scales');
       $('#recraft_0').trigger('click'); $('#recraft_0').trigger('click');
       check(Path.outfit.medicine === beforePurchase + 2, 'repeat purchases stay in supply scene');
+      check($SM.get('stores.scales') === scalesBeforePurchase - 16, 'boss medicine purchases consume warehouse scales at the displayed recipe');
       await finishClick('#leave');
       check(Events.activeEvent().title === _('slayer talent'), 'first boss reward opens after supply closes');
       await finishClick('#talent_0');
@@ -410,7 +431,12 @@ async function port() {
     console.log('SCREENSHOT: ' + productionOutput);
     await evaluate(`(async function() {
       await new Promise(resolve => Events.endEvent(resolve));
+      Space.done = true;
+      Space.returnToShip();
+      await new Promise(resolve => $('#outerSlider').promise().done(resolve));
+      CastleReport.close();
       Engine.travelTo(Path);
+      await new Promise(resolve => $('#locationSlider').promise().done(resolve));
       $SM.set('character.equipped.secondary', ['wisteria bomb','wisteria gun']);
       $SM.setM('stores', {'wisteria gun':1,'wisteria bomb':1});
       Path.updateEquipDoll();
@@ -423,6 +449,16 @@ async function port() {
     const equipmentOutput = path.join(profile, 'weapon-comparison.png');
     fs.writeFileSync(equipmentOutput, Buffer.from(equipmentImage.data, 'base64'));
     console.log('SCREENSHOT: ' + equipmentOutput);
+    await evaluate(`(async function() {
+      $('.equipPicker').remove();
+      $('#loadoutPreview').prop('open', true);
+      document.querySelector('#loadoutPanel').scrollIntoView({block:'center'});
+      await new Promise(resolve => setTimeout(resolve, 250));
+    })()`);
+    const loadoutImage = await page('Page.captureScreenshot', {format:'png'});
+    const loadoutOutput = path.join(profile, 'loadout-preview.png');
+    fs.writeFileSync(loadoutOutput, Buffer.from(loadoutImage.data, 'base64'));
+    console.log('SCREENSHOT: ' + loadoutOutput);
     assert.deepEqual(errors, [], 'uncaught browser exceptions');
   } finally {
     if (call && socket?.readyState === WebSocket.OPEN) {
