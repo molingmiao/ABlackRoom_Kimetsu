@@ -2,6 +2,22 @@
 var CastleReport = {
   _run: null,
   _dialog: null,
+  materials: ['scales', 'teeth', 'cloth'],
+  recordMaterial: function(kind, item, amount) {
+    var run = CastleReport._run;
+    if (!run || CastleReport.materials.indexOf(item) < 0 || !run.materials[kind]) return;
+    amount = CastleReport._number(amount);
+    run.materials[kind][item] = (run.materials[kind][item] || 0) + amount;
+  },
+  materialSummary: function(run, outcome) {
+    return CastleReport.materials.map(function(item) {
+      var m = run.materials, start = m.start[item] || 0;
+      var returned = outcome === 'death' || outcome === 'retreat' ? CastleReport._number((Path.outfit || {})[item]) : 0;
+      var battle = m.battle[item] || 0, treasure = m.treasure[item] || 0, banked = m.banked[item] || 0, spent = m.spent[item] || 0;
+      return {item:item, battle:battle, treasure:treasure, spent:spent, banked:banked, returned:returned,
+        unreturned:Math.max(0, start + battle + treasure - banked - returned), net:banked + returned - start - spent};
+    });
+  },
   _number: function(value) {
     return typeof value === 'number' && isFinite(value) ? Math.max(0, value) : 0;
   },
@@ -34,7 +50,8 @@ var CastleReport = {
     CastleReport._run = {
       startedAt: Date.now(), highestFloor: 1, fights: 0, kills: 0,
       damageTaken: 0, healingReceived: 0, damageSources: Object.create(null),
-      consumed: Object.create(null), styles: [], before: CastleReport._meta(), fight: null
+      consumed: Object.create(null), styles: [], before: CastleReport._meta(), fight: null,
+      materials: {start:CastleReport._copy(Path.outfit || {}), battle:{}, treasure:{}, banked:{}, spent:{}}
     };
     CastleReport._touch();
   },
@@ -96,6 +113,7 @@ var CastleReport = {
         return { source: source, amount: run.damageSources[source] };
       }).sort(function(a, b) { return b.amount - a.amount; }),
       consumed: CastleReport._copy(run.consumed),
+      materials: CastleReport.materialSummary(run, outcome || 'death'),
       healingRemaining: ['cured meat', 'medicine', 'wisteria oil'].reduce(function(sum, item) {
         return sum + CastleReport._number((Path.outfit || {})[item]);
       }, 0),
@@ -191,6 +209,13 @@ var CastleReport = {
     add('h3', _('supplies consumed'));
     var consumables = Object.keys(report.consumed).map(function(item) { return _(item) + ' ×' + report.consumed[item]; });
     add('p', consumables.length ? consumables.join(' / ') : _('no supplies consumed'));
+    if (report.materials) {
+      add('h3', '本次材料账本');
+      add('p', '仅统计鳞片、牙齿、布料；不含家中生产。净收支＝送回仓库＋归还背包－出发携带－商店花费。当前规则下死亡和撤退归还背包；终局不把未归还物资计为收入。未带回包括放弃拾取或丢弃的材料。');
+      report.materials.forEach(function(row) {
+        add('p', _(row.item) + '：战斗掉落 ' + row.battle + '，宝箱 ' + row.treasure + '，商店花费 ' + row.spent + '；已送回 ' + row.banked + '，结算背包 ' + row.returned + '，未带回 ' + row.unreturned + '；净收支 ' + (row.net > 0 ? '+' : '') + row.net);
+      });
+    }
     add('h3', _('permanent progress from this descent'));
     var growth = add('ul', '');
     add('li', _('floors cleared: +{0} (total {1})', report.growth.floors, report.growth.totalFloors), growth);

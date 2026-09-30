@@ -1,0 +1,36 @@
+const assert=require('node:assert/strict');
+const fs=require('node:fs');
+const vm=require('node:vm');
+const path=require('node:path');
+const c={State:{},_:s=>s,AudioLibrary:{},Engine:{activeModule:{},log(){},saveGame(){},setTimeout(){return 1;}},Space:{},$:{Dispatch:()=>({publish(){}})}};
+vm.createContext(c);
+for(const file of ['state_manager.js','outside.js','camp_guide.js']) vm.runInContext(fs.readFileSync(path.join(__dirname,'../script',file),'utf8'),c);
+const sm=c.$SM, plain=value=>JSON.parse(JSON.stringify(value));
+function reset(stock,reserves,jobs) {c.State={stores:stock,game:{productionReserves:reserves},income:jobs};}
+const miners=()=>({'iron miner':{delay:10,timeLeft:0,stores:{'cured meat':-2,iron:2}}});
+reset({'cured meat':21,iron:0},{'cured meat':20},miners());
+sm.collectIncome();
+assert.equal(c.State.stores['cured meat'],21);
+assert.equal(c.State.stores.iron,0,'whole batch waits without partial output');
+assert.equal(c.State.income['iron miner'].timeLeft,10,'blocked production keeps its normal schedule');
+c.State.stores['cured meat']=22;c.State.income['iron miner'].timeLeft=0;
+sm.collectIncome();
+assert.equal(c.State.stores['cured meat'],20,'exact boundary runs');
+assert.equal(c.State.stores.iron,2);
+c.State.game.productionReserves={};c.State.income['iron miner'].timeLeft=0;
+sm.collectIncome();assert.equal(c.State.stores['cured meat'],18,'zero or missing reserves preserve old behavior');
+reset({wood:10,meat:10,'cured meat':0},{wood:9},{charcutier:{delay:10,stores:{wood:-5,meat:-5,'cured meat':1}}});
+sm.collectIncome();assert.deepEqual(plain(c.State.stores),{wood:10,meat:10,'cured meat':0},'one protected input blocks all deductions');
+reset({'cured meat':22,iron:0,coal:0},{'cured meat':20},{...miners(),'coal miner':{delay:10,stores:{'cured meat':-2,coal:2}}});
+sm.collectIncome();assert.equal(c.State.stores['cured meat'],20);assert.equal(c.State.stores.coal,0,'competing jobs share one real remaining balance');
+reset({wood:10},{wood:100},{gatherer:{delay:10,stores:{wood:1}},thieves:{delay:10,stores:{wood:-3}}});
+sm.collectIncome();assert.equal(c.State.stores.wood,8,'reserves neither block gains nor protect against thieves');
+for(const invalid of [-1,1.5,NaN,Infinity,'20',1e16]) {c.State.game.productionReserves={wood:invalid};assert.equal(sm.getProductionReserve('wood'),0);}
+reset({'cured meat':22},{'cured meat':20},miners());
+c.State=plain(c.State);assert.equal(sm.getProductionReserve('cured meat'),20,'saved reserve survives JSON reload');
+c.Engine.activeModule=c.Space;sm.collectIncome();assert.equal(c.State.stores['cured meat'],22,'castle production suspension unchanged');
+const info=c.CampGuide.production(miners(),{'cured meat':21},{'cured meat':20});
+assert.equal(info.rows[0].missing.length,0);
+assert.equal(info.rows[0].reserved.length,1,'diagnostics distinguish reserve protection from ordinary shortage');
+assert.equal(c.CampGuide.production(miners(),{'cured meat':1},{'cured meat':20}).rows[0].missing.length,1);
+console.log('PASS: default-off reserves, atomic batches, exact boundaries, automatic recovery, shared inputs, thieves, save reload and production diagnostics.');

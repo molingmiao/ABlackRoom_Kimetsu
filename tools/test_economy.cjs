@@ -68,6 +68,17 @@ stores={scales:40,teeth:11,medicine:2};
 const beforeBuy=JSON.stringify(stores);
 assert.equal(c.Room.buy({attr:()=> 'medicine'}),false);
 assert.equal(JSON.stringify(stores),beforeBuy,'missing second ingredient does not partially charge the first');
+// Revisiting the same treasure scene cannot mint a second reward.
+c.$SM.addM=(key,values)=>Object.keys(values).forEach(item=>{stores[item]=(stores[item]||0)+values[item];});
+let treasureEvent;
+c.Events.startEvent=event=>{treasureEvent=event;};
+c.Space.currentFloor=25;
+c.Math.random=()=>0.999999;
+c.Space.triggerTreasure();
+treasureEvent.scenes.start.onLoad();
+const afterTreasure=JSON.stringify(stores);
+treasureEvent.scenes.start.onLoad();
+assert.equal(JSON.stringify(stores),afterTreasure,'treasure scene grants once');
 // A ten-floor illustrative route, not a promise of encounter frequency or player win rate.
 for (const floor of [10,30,60,90]) {
   const normal=c.Space._battleLoot(floor-1,false),elite=c.Space._battleLoot(floor-1,true),boss=c.Space._bossLoot(floor);

@@ -105,6 +105,7 @@ var Events = {
 	},
 
 	startCombat: function(scene) {
+		if (window.CampGuide && scene.enemy) CampGuide.discoverEnemy(scene.enemy);
 		Engine.event('game event', 'combat');
 		Events.fought = false;
 		Events.won = false;
@@ -1232,6 +1233,8 @@ var Events = {
 	},
 
 	drawLoot: function(lootList) {
+		var currentEvent = Events.activeEvent(), currentScene = currentEvent && currentEvent.scenes[Events.activeScene];
+		if (Engine.activeModule === Space && currentScene && currentScene.configuredPickup) Events.eventPanel().addClass('castleLootSummary');
 		var desc = $('#description', Events.eventPanel());
 		var lootButtons = $('<div>').attr({'id': 'lootButtons', 'data-legend': _('take:')});
 		// 跨周目 buff：事件 loot 倍率
@@ -1242,6 +1245,7 @@ var Events = {
 			if(Math.random() < loot.chance) {
 				var num = Math.floor(Math.random() * (loot.max - loot.min)) + loot.min;
 				if (lootMult > 1) num = Math.max(1, Math.floor(num * lootMult));
+				if (window.CastleReport && Engine.activeModule === Space) CastleReport.recordMaterial('battle', k, num);
 				var lootRow = Events.drawLootRow(k, num);
 				lootRow.appendTo(lootButtons);
 			}
@@ -1370,9 +1374,7 @@ var Events = {
 				curNum = typeof curNum == 'number' ? curNum : 0;
 				curNum++;
 				Path.outfit[name] = curNum;
-				if (Engine.activeModule === Space) {
-					$SM.add('stores["' + name + '"]', 1);
-				}
+				// Picked loot belongs to the backpack; it is banked only on return.
 				World.updateSupplies();
 
 				if(!skipButtonSet){

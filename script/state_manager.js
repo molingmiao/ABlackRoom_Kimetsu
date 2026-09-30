@@ -464,6 +464,11 @@ var StateManager = {
 		return {};
 	},
 
+	getProductionReserve: function(item) {
+		var values = $SM.get('game.productionReserves') || {};
+		var value = values[item];
+		return Number.isSafeInteger(value) && value >= 0 && value <= $SM.MAX_STORE ? value : 0;
+	},
 	collectIncome: function() {
 		var changed = false;
 		if(typeof $SM.get('income') != 'undefined' && Engine.activeModule != Space) {
@@ -484,7 +489,8 @@ var StateManager = {
 					if (source != 'thieves') {
 						for (var k in cost) {
 							var have = $SM.get('stores["' + k + '"]', true);
-							if (have + cost[k] < 0) {
+							var reserve = cost[k] < 0 && typeof Outside !== 'undefined' && Object.prototype.hasOwnProperty.call(Outside._INCOME, source) ? $SM.getProductionReserve(k) : 0;
+							if (have + cost[k] < reserve) {
 								ok = false;
 								break;
 							}

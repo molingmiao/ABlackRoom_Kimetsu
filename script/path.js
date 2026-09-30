@@ -277,6 +277,7 @@ var Path = {
 		$('<div>').attr({'id': 'equipDoll', 'data-legend': _('equipment')}).appendTo(suppliesRow);
 
 		Path.createLoadoutPanel();
+		$('<button>').attr({id:'materialSourcesButton',type:'button'}).text('材料获取途径').on('click', CampGuide.showMaterialSources).appendTo(Path.scroller);
 
 		// 补齐配置与出发并排；补齐不会替换玩家选择的装备。
 		var buttonsRow = $('<div>').attr('id', 'pathButtonsRow').appendTo(this.scroller);

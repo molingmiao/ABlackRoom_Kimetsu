@@ -152,6 +152,24 @@ async function port() {
       $('#refresh').trigger('click');
       check(!Events.eventPanel().text().includes('原料不够整组') && $SM.get('game.workers.charcutier') === workerCount, 'production refresh reflects new stock without reassigning workers');
       check(Events.eventPanel().text().includes('持续供需缺口'), 'restocking removes immediate shortage but not the sustained supply deficit');
+      $('#reserves').trigger('click');
+      const reserveSnapshot=JSON.stringify($SM.get('stores'));
+      $('[data-material="wood"]').val('95');
+      $('[data-material="meat"]').val('-1');
+      $('#saveProductionReserves').trigger('click');
+      check($('#productionReserveStatus').text().includes('本次未保存') && !$SM.get('game.productionReserves'), 'invalid reserve form never partially saves');
+      $('[data-material="meat"]').val('0');
+      $('#saveProductionReserves').trigger('click');
+      check($SM.getProductionReserve('wood') === 95 && Events.eventPanel().text().includes('为保留库存暂停'), 'saved reserves explain why an affordable batch is held');
+      check(JSON.stringify($SM.get('stores')) === reserveSnapshot, 'saving reserves never consumes inventory');
+      $('#reserves').trigger('click');
+      $('[data-material="wood"]').val('0');
+      $('#cancelProductionReserves').trigger('click');
+      check($SM.getProductionReserve('wood') === 95, 'cancel leaves reserve settings untouched');
+      $('#reserves').trigger('click');
+      $('[data-material="wood"]').val('0');
+      $('#saveProductionReserves').trigger('click');
+      check($SM.getProductionReserve('wood') === 0 && !Events.eventPanel().text().includes('为保留库存暂停'), 'zero disables reserve protection');
       await finishClick('#close');
       $SM.set('game.workers.charcutier', 0);
       $SM.setM('stores', {'wind armour':1,'nichirin katana':1,'bind kunai':1,'medicine':30,'cured meat':30,'wisteria oil':20,'teeth':100,'scales':100,'wood':100,'demon stone':5});
@@ -319,6 +337,29 @@ async function port() {
       await until(() => CastleReport._run.damageTaken > damageBefore);
       check(CombatTelegraphs._fight.intervals.length === intervalCount + 1, 'a damaging blood-art hit starts bleeding');
       await endFight();
+      fight();
+      Path.outfit.medicine = 1;
+      const homeBeforePickup = $SM.get('stores.medicine');
+      const gearBeforePickup = JSON.stringify($SM.get('character.equipped'));
+      Space.collectConfiguredLoot();
+      check(Path.outfit.medicine === 1, 'configured pickup cannot run during combat');
+      Events.clearTimeouts();
+      Events.won = true;
+      Events.fought = true;
+      $('#description').empty(); $('#buttons').empty();
+      Events.drawLoot({medicine:{min:4,max:4,chance:1},scales:{min:5,max:5,chance:1}});
+      $('<div id="exitButtons">').appendTo('#buttons');
+      Events.drawButtons(Events.activeEvent().scenes.start);
+      const homeScalesBeforePickup=$SM.get('stores.scales');
+      Button.clearCooldown($('#collectConfigured'));
+      await finishClick('#collectConfigured');
+      check(Path.outfit.medicine === 3 && $SM.get('stores.medicine') === homeBeforePickup + 2, 'one-click pickup fills saved medicine target and banks only the remainder');
+      check($SM.get('stores.scales') === homeScalesBeforePickup + 5 && JSON.stringify($SM.get('character.equipped')) === gearBeforePickup, 'one-click pickup banks materials without changing equipment');
+      check(Events.activeEvent().title === _('slayer talent'), 'one-click collection still requires a manual talent choice');
+      const afterPickupStock=$SM.get('stores.medicine');
+      Space.collectConfiguredLoot();
+      check($SM.get('stores.medicine') === afterPickupStock, 'a late pickup callback cannot duplicate rewards');
+      await finishClick('#talent_0');
       Space.currentFloor = 10;
       Space.triggerBossFight();
       Events.clearTimeouts();
@@ -329,9 +370,13 @@ async function port() {
       const earnedScales = $('#lootButtons .lootRow').filter(function() {return $(this).data('item') === 'scales';}).find('.lootTake').data('numLeft');
       check(earnedScales >= 20 && earnedScales <= 30, 'real boss loot renders guaranteed scales');
       const scalesBeforeLoot = $SM.get('stores.scales', true);
+      $SM.set('stores.convoy',1);
+      const packedScalesBefore = Path.outfit.scales || 0;
+      Events.getLoot($('#lootButtons .lootRow').filter(function() {return $(this).data('item') === 'scales';}).find('.lootTake'));
+      check(Path.outfit.scales === packedScalesBefore + 1 && $SM.get('stores.scales') === scalesBeforeLoot, 'manual loot is packed without a duplicate warehouse credit');
       Space._collectRemainingLoot();
       Space._collectRemainingLoot();
-      check($SM.get('stores.scales') === scalesBeforeLoot + earnedScales, 'support corps transfers scales to warehouse exactly once');
+      check($SM.get('stores.scales') === scalesBeforeLoot + earnedScales - 1, 'support corps transfers scales to warehouse exactly once');
       $('<div id="exitButtons">').appendTo('#buttons');
       Events.drawButtons(Events.activeEvent().scenes.start);
       $('#recraft').trigger('click');
@@ -364,6 +409,7 @@ async function port() {
       check(!!report && !!$SM.get('game.castleLastReport'), 'read-only result saved');
       check(Engine.activeModule === Room && World.dead && !Events.activeEvent(), 'real death returns to camp before showing the report');
       check(document.querySelector('[role="dialog"]') !== null, 'result dialog renders');
+      check(document.querySelector('[role="dialog"]').textContent.includes('本次材料账本') && report.materials.find(row=>row.item==='scales').spent === 16, 'completed report displays actual material spending');
       check(document.querySelector('.castle-report-stats dd').textContent === String(report.highestFloor), 'report displays the numeric floor');
       check(CastleReport._run === null && !('floorNodes' in report), 'finished report cannot resume a descent');
       const savedFood = $SM.get('stores["cured meat"]');
@@ -430,6 +476,16 @@ async function port() {
     fs.writeFileSync(productionOutput, Buffer.from(productionImage.data, 'base64'));
     console.log('SCREENSHOT: ' + productionOutput);
     await evaluate(`(async function() {
+      $('#reserves').trigger('click');
+      await new Promise(resolve => setTimeout(resolve, 350));
+      const save = document.querySelector('#saveProductionReserves').getBoundingClientRect();
+      if (save.bottom > innerHeight || save.top < 0) throw Error('production reserve save button outside viewport');
+    })()`);
+    const reserveImage = await page('Page.captureScreenshot', {format:'png'});
+    const reserveOutput = path.join(profile, 'production-reserves.png');
+    fs.writeFileSync(reserveOutput, Buffer.from(reserveImage.data, 'base64'));
+    console.log('SCREENSHOT: ' + reserveOutput);
+    await evaluate(`(async function() {
       await new Promise(resolve => Events.endEvent(resolve));
       Space.done = true;
       Space.returnToShip();
@@ -452,6 +508,7 @@ async function port() {
     await evaluate(`(async function() {
       $('.equipPicker').remove();
       $('#loadoutPreview').prop('open', true);
+      if (!document.querySelector('#materialSourcesButton')) throw Error('material sources entry missing');
       document.querySelector('#loadoutPanel').scrollIntoView({block:'center'});
       await new Promise(resolve => setTimeout(resolve, 250));
     })()`);
@@ -459,6 +516,38 @@ async function port() {
     const loadoutOutput = path.join(profile, 'loadout-preview.png');
     fs.writeFileSync(loadoutOutput, Buffer.from(loadoutImage.data, 'base64'));
     console.log('SCREENSHOT: ' + loadoutOutput);
+    await evaluate(`(async function() {
+      CampGuide.discoverEnemy('water demon');
+      CampGuide.showMaterialSources();
+      await new Promise(resolve => setTimeout(resolve, 250));
+      if (!Events.eventPanel().text().includes('距庄园 11～20 格的森林')) throw Error('discovered source location missing');
+      if (Events.eventPanel().text().includes('距庄园超过 20 格的森林')) throw Error('unseen thunder demon leaked');
+      if (!CampGuide.routeMaterials('battle', 1).includes('必掉')) throw Error('known material route reward missing');
+    })()`);
+    const sourceImage = await page('Page.captureScreenshot', {format:'png'});
+    const sourceOutput = path.join(profile, 'material-sources.png');
+    fs.writeFileSync(sourceOutput, Buffer.from(sourceImage.data, 'base64'));
+    console.log('SCREENSHOT: ' + sourceOutput);
+    await evaluate(`(async function() {
+      await new Promise(resolve => Events.endEvent(resolve));
+      Engine.activeModule = Space;
+      Space.done = false;
+      Space.currentFloor = 1;
+      Space.triggerBattle(false);
+      Events.clearTimeouts();
+      Events.won = true;
+      Events.fought = true;
+      const scene = Events.activeEvent().scenes.start;
+      $('#description').empty(); $('#buttons').empty();
+      Events.startStory(Object.assign({}, scene, {text:[scene.deathMessage]}));
+      await new Promise(resolve => setTimeout(resolve, 350));
+      const button = document.querySelector('#collectConfigured').getBoundingClientRect();
+      if (button.bottom > innerHeight || button.top < 0) throw Error('configured pickup button outside viewport');
+    })()`);
+    const pickupImage = await page('Page.captureScreenshot', {format:'png'});
+    const pickupOutput = path.join(profile, 'configured-pickup.png');
+    fs.writeFileSync(pickupOutput, Buffer.from(pickupImage.data, 'base64'));
+    console.log('SCREENSHOT: ' + pickupOutput);
     assert.deepEqual(errors, [], 'uncaught browser exceptions');
   } finally {
     if (call && socket?.readyState === WebSocket.OPEN) {

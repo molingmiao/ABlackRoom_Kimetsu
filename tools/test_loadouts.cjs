@@ -11,7 +11,7 @@ const context = {
   $: { Dispatch: () => ({ publish() {} }) },
 };
 vm.createContext(context);
-for (const file of ['state_manager.js', 'world.js', 'path.js']) {
+for (const file of ['state_manager.js', 'world.js', 'path.js', 'space.js']) {
   vm.runInContext(fs.readFileSync(path.join(__dirname, '../script', file), 'utf8'), context);
 }
 const P = context.Path, SM = context.$SM = context.StateManager;
@@ -132,4 +132,17 @@ for (let seed = 0; seed < 120; seed++) {
     assert.ok((outcome.outfit[key] || 0) <= stores[key]);
   }
 }
-console.log('loadout tests passed: profile persistence, inventory accounting, refill limits, equipment and suggestions');
+const battleProfile={targets:{medicine:3,'cured meat':5}}, battleBag={medicine:1,torch:2}, battleLoot={medicine:4,scales:10};
+const originalBattle=JSON.stringify([battleProfile,battleBag,battleLoot]);
+let pickup=plain(context.Space.planBattlePickup(battleProfile,battleBag,battleLoot,20));
+assert.equal(pickup.outfit.medicine,3,'only refill to saved targets');
+assert.equal(pickup.outfit.torch,2,'preserve extra carried supplies');
+assert.equal(pickup.outfit.scales,undefined,'untargeted materials go home');
+assert.equal(pickup.outfit['cured meat'],undefined,'home stock cannot fill missing battle loot');
+assert.equal(JSON.stringify([battleProfile,battleBag,battleLoot]),originalBattle);
+pickup=plain(context.Space.planBattlePickup(battleProfile,battleBag,battleLoot,3));
+assert.equal(pickup.added,0,'full bags pick up nothing');
+pickup=plain(context.Space.planBattlePickup(battleProfile,{medicine:6},battleLoot,20));
+assert.equal(pickup.outfit.medicine,6,'never discard extras to meet a lower target');
+assert.equal(context.Space.planBattlePickup(battleProfile,battleBag,{},20).added,0);
+console.log('loadout tests passed: profile persistence, inventory accounting, refill limits, equipment, suggestions and battle-only pickup plans');

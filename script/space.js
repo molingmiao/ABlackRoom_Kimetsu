@@ -274,7 +274,7 @@ var Space = {
 		nodes.forEach(function(n, idx) {
 			$('<div>')
 				.addClass('nodeBtn nodeType-' + n.type)
-				.html(Space._nodeLabel(n))
+				.html(Space._nodeLabel(n) + (window.CampGuide ? CampGuide.routeMaterials(n.type, Space.currentFloor) : ''))
 				.click(function() { Space.enterNode(n, idx); })
 				.appendTo(nodeArea);
 		});
@@ -392,6 +392,31 @@ var Space = {
 	},
 
 	// 玩家未拾取的战斗掉落，由后援队伍直接收进紫藤屋仓库（stores）
+	planBattlePickup: function(profile, bag, loot, capacity) {
+		var available = {};
+		Object.keys(bag || {}).forEach(function(item) { available[item] = Path.loadoutCount(bag[item]); });
+		Object.keys(loot || {}).forEach(function(item) { available[item] = (available[item] || 0) + Path.loadoutCount(loot[item]); });
+		return Path.planLoadout(profile, bag || {}, available, capacity);
+	},
+	collectConfiguredLoot: function() {
+		var event = Events.activeEvent(), scene = event && event.scenes[Events.activeScene];
+		if (Engine.activeModule !== Space || !Events.won || !scene || !scene.configuredPickup || scene.pickupCompleted) return;
+		scene.pickupCompleted = true;
+		var profile = Path.getLoadout('castle');
+		if (profile) {
+			var loot = {}, buttons = {};
+			$('#lootButtons .lootRow').each(function() {
+				var key = $(this).data('item'), button = $(this).children('.lootTake').first();
+				if (key) { loot[key] = button.data('numLeft') || 0; buttons[key] = button; }
+			});
+			var result = Space.planBattlePickup(profile, Path.outfit || {}, loot, Path.getCapacity());
+			Object.keys(loot).forEach(function(key) {
+				var count = Math.max(0, (result.outfit[key] || 0) - (Path.outfit[key] || 0));
+				for (var i = 0; i < count; i++) Events.getLoot(buttons[key], true);
+			});
+		}
+		Space._collectRemainingLoot();
+	},
 	_collectRemainingLoot: function() {
 		var rows = $('#lootButtons .lootRow');
 		if (!rows.length) return;
@@ -403,6 +428,7 @@ var Space = {
 			if (name && numLeft > 0) {
 				take.data('numLeft', 0); // A repeated completion callback must not duplicate warehouse rewards.
 				$SM.add('stores["' + name + '"]', numLeft);
+				if (window.CastleReport) CastleReport.recordMaterial('banked', name, numLeft);
 				collected.push(_(name) + '+' + numLeft);
 			}
 		});
@@ -777,6 +803,16 @@ var Space = {
 			}
 		};
 		// 精英附带 1 项血鬼术（弹药不够时更易重伤）
+		if (!isElite) {
+			scene.configuredPickup = true;
+			scene.buttons.continue.text = _('send loot home and continue');
+			scene.buttons.collectConfigured = {
+				text: _('refill from loot and continue'), cooldown: Events._LEAVE_COOLDOWN,
+				available: function() { return !!Path.getLoadout('castle'); },
+				onChoose: Space.collectConfiguredLoot, onEnd: Space.afterBattle, nextScene: 'end'
+			};
+			scene.deathMessage += ' ' + _('loot refill uses your saved castle targets and free bag space, never home stock or equipment changes. remaining loot goes home.');
+		}
 		if (isElite) scene.telegraphAttacks = Space._pickBloodArts(1, e.dmg);
 		Events.startEvent({ title: titleText, scenes: { 'start': scene } });
 	},
@@ -924,6 +960,7 @@ var Space = {
 				storeMod[m] = ($SM.get('stores["' + m + '"]', true) || 0) - cost[m];
 			}
 			$SM.setM('stores', storeMod);
+			if (window.CastleReport) Object.keys(cost).forEach(function(key) { CastleReport.recordMaterial('spent', key, cost[key]); });
 		}
 		if (!Path.outfit) Path.outfit = {};
 		Path.outfit[item] = (Path.outfit[item] || 0) + 1;
@@ -999,7 +1036,7 @@ var Space = {
 			Notifications.notify(null, _('not enough {0}.', _(mat)));
 			return;
 		}
-		if (!Engine.options.testerMode) $SM.add('stores["' + mat + '"]', -cost);
+		if (!Engine.options.testerMode) { $SM.add('stores["' + mat + '"]', -cost); if (window.CastleReport) CastleReport.recordMaterial('spent', mat, cost); }
 		Space._shopStock.potion = (Space._shopStock.potion || 1) - 1;
 		Space._drinkPotion(Space._randomPotion());
 	},
@@ -1017,7 +1054,7 @@ var Space = {
 			Notifications.notify(null, _('not enough {0}.', _(mat)));
 			return;
 		}
-		if (!Engine.options.testerMode) $SM.add('stores["' + mat + '"]', -cost);
+		if (!Engine.options.testerMode) { $SM.add('stores["' + mat + '"]', -cost); if (window.CastleReport) CastleReport.recordMaterial('spent', mat, cost); }
 		Space._shopStock[item] = stock - 1;
 		if (!Path.outfit) Path.outfit = {};
 		Path.outfit[item] = (Path.outfit[item] || 0) + 1;
@@ -1143,6 +1180,7 @@ var Space = {
 	},
 
 	triggerTreasure: function() {
+		var materialsGranted = false;
 		var loot = Space._rollTreasure(Space.currentFloor);
 		var potion = (Math.random() < 0.35) ? Space._randomPotion() : null;
 		var lootMsg = [];
@@ -1157,7 +1195,13 @@ var Space = {
 			scenes: {
 				'start': {
 					text: text,
-					onLoad: function() { $SM.addM('stores', loot); if (potion) Space._drinkPotion(potion); },
+					onLoad: function() {
+						if (materialsGranted) return;
+						materialsGranted = true;
+						$SM.addM('stores', loot);
+						if (window.CastleReport) Object.keys(loot).forEach(function(key) { CastleReport.recordMaterial('treasure', key, loot[key]); CastleReport.recordMaterial('banked', key, loot[key]); });
+						if (potion) Space._drinkPotion(potion);
+					},
 					buttons: {
 						'continue': {
 							text: _('continue down'),

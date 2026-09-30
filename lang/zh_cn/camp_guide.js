@@ -1,4 +1,13 @@
 _.addTranslation({
+  'send loot home and continue': '全部送回并继续',
+  'refill from loot and continue': '按配置收取并继续',
+  'loot refill uses your saved castle targets and free bag space, never home stock or equipment changes. remaining loot goes home.': '若已保存无限城配置，可按目标数量收取本场战利品；仅使用背包剩余空间，不取家中库存、不换装备，其余送回。未保存配置时仍可手动拾取。',
+  'production reserves': '生产保留库存',
+  'production held for reserves: {0}. no inputs are consumed for this batch.': '为保留库存暂停本轮生产：{0}。本轮不会扣除任何原料。',
+  '{0}: stock {1}, reserved {2}, batch needs {3}': '{0}：库存 {1}，保留 {2}，整组每轮需要 {3}',
+  'reserves only limit automatic worker production. zero disables protection. manual crafting, trade, departure and events can still use these materials.': '仅限制工人自动生产，填 0 表示不保留。手动制作、交易、出征和事件仍可消耗这些材料。库存足够完成整组一轮并留下保留量时，生产会自动恢复。',
+  'no known production inputs yet.': '尚未发现可设置的生产原料。',
+  'reserve quantities must be whole numbers from 0 to {0}. nothing was saved.': '保留量必须是 0～{0} 的整数，本次未保存任何更改。',
   'these assigned jobs consume materials faster than they produce them at full operation; current stock only buffers the gap.': '持续供需缺口：按当前分工满负荷运转，以下材料消耗快于产出，现有库存只能暂时填补缺口。',
   '{0}: supply {1}/min, demand {2}/min, shortfall {3}/min. assigned sources: {4}; consumers: {5}.': '{0}：每分钟产出 {1}，消耗 {2}，缺口 {3}。当前生产方：{4}；消耗方：{5}。',
   'increase available upstream jobs or reduce consumers. manual gathering and trading can also cover the gap; these figures are not a depletion countdown.': '可增加已解锁的上游工种人数，或减少消耗方人数；手动采集、交易也能补缺。这是供需估算，不是库存耗尽倒计时。',
