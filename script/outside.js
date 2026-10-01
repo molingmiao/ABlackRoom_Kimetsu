@@ -706,6 +706,7 @@ var Outside = {
 	},
 	
 	checkTraps: function() {
+		if ($SM.get('game.buildings["trap"]', true) <= 0) return;
 		var drops = {};
 		var msg = [];
 		var numTraps = $SM.get('game.buildings["trap"]', true);
@@ -750,11 +751,19 @@ var Outside = {
 				}
 			}
 		} catch (e) { /* ignore */ }
+		// The first opening check teaches both material uses, independent of random rolls.
+		var firstCatch = window.EarlyGame && EarlyGame.firstCatchPending();
+		if (firstCatch) {
+			drops.fur = Math.max(drops.fur || 0, 3);
+			drops.meat = Math.max(drops.meat || 0, 2);
+			$SM.set('game.firstTrapCatch', true, true);
+		}
 		// 记录查陷阱次数
 		$SM.add('game.trapCount', 1);
 		
 		Notifications.notify(Outside, s);
 		$SM.addM('stores', drops);
+		if (firstCatch) Notifications.notify(Outside, _('首获：陷阱至少带回毛皮 3、生肉 2。毛皮用于建造和交易，猎屋解锁后可安排猎人稳定获取。'));
 		AudioEngine.playSound(AudioLibrary.CHECK_TRAPS);
 	},
 	

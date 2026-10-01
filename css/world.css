@@ -82,3 +82,9 @@ body.world-active #equipDoll,
 body.world-active #suppliesRow {
 	display: none !important;
 }
+
+#worldTravelGuide { box-sizing: border-box; max-width: 620px; border-left: 3px solid #738567; margin: 0 0 8px; padding: 5px 10px; font-size: 12px; line-height: 1.5; }
+#worldTravelGuide summary { font-weight: bold; cursor: pointer; }
+#worldTravelGuide p { margin: 3px 0 0; }
+#worldTravelGuide[data-status="caution"] { border-color: #b28c32; }
+#worldTravelGuide[data-status="danger"] { border-color: #bd5a47; }

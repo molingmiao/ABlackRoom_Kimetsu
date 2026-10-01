@@ -209,11 +209,11 @@ var CampGuide = {
     return {errors:errors, warnings:warnings, ready:ready};
   },
   expeditionInfo: function() {
-    var equipped = [];
+    var equipped = [], outfit = Path.outfit || {};
     ['primary','secondary','tool'].forEach(function(cat) { equipped = equipped.concat(Path.getEquipped(cat)); });
     Object.keys(World.Weapons).forEach(function(key) {
-      if (!Path.getWeaponCategory(key) && Path.outfit[key] > 0 && equipped.indexOf(key) < 0) equipped.push(key);
+      if (!Path.getWeaponCategory(key) && outfit[key] > 0 && equipped.indexOf(key) < 0) equipped.push(key);
     });
-    return CampGuide.expedition(Path.outfit || {}, $SM.get('stores') || {}, equipped, World.Weapons, Path.getCapacity(), Path.getWeight, Engine.options.testerMode);
+    return CampGuide.expedition(outfit, $SM.get('stores') || {}, equipped, World.Weapons, Path.getCapacity(), Path.getWeight, Engine.options.testerMode);
   }
 };

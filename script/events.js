@@ -1055,7 +1055,7 @@ var Events = {
 			}
 			Events.clearTimeouts();
 			Events.endEvent();
-			World.die();
+			World.die('combat');
 			return true;
 		}
 		return false;
@@ -1152,7 +1152,7 @@ var Events = {
 	loseFight: function(){
 		Events.endFight();
 		Events.endEvent();
-		World.die();
+		World.die('combat');
 	},
 
 	drawDrop:function(btn) {
@@ -1724,6 +1724,7 @@ var Events = {
 		Button.saveCooldown = false;
 		event.ending = false;
 		Events.eventStack.unshift(event);
+		if (window.FieldTreatment) FieldTreatment.update();
 		event.eventPanel = $('<div>').attr('id', 'event').addClass('eventPanel').css('opacity', '0');
 		if(options != null && options.width != null) {
 			Events.eventPanel().css('width', options.width);
@@ -1768,6 +1769,7 @@ var Events = {
 			// Force refocus on the body. I hate you, IE.
 			$('body').focus();
 			if (typeof onEnd === 'function') onEnd();
+			if (window.FieldTreatment) FieldTreatment.update();
 		});
 	},
 

@@ -185,6 +185,7 @@ var World = {
     $('<div>').attr('id', 'backpackTitle').appendTo(outer);
     $('<div>').attr('id', 'backpackSpace').appendTo(outer);
     $('<div>').attr('id', 'healthCounter').appendTo(outer);
+    if (window.FieldTreatment) FieldTreatment.init(outer);
 
     Engine.updateOuterSlider();
 
@@ -323,6 +324,8 @@ var World = {
 
     // Update bagspace
     $('#backpackSpace').text(_('free {0}/{1}', Math.floor(Path.getCapacity() - total) , Path.getCapacity()));
+    World.updateTravelGuide();
+    if (window.FieldTreatment) FieldTreatment.update();
   },
 
   setWater: function(w) {
@@ -340,6 +343,8 @@ var World = {
         World.health = World.getMaxHealth();
       }
       $('#healthCounter').text(_('hp: {0}/{1}', World.health , World.getMaxHealth()));
+      World.updateTravelGuide();
+      if (window.FieldTreatment) FieldTreatment.update();
     }
   },
 
@@ -372,18 +377,26 @@ var World = {
   },
 
   move: function(direction) {
+    if (Engine.activeModule !== World || World.dead || !World.state || Engine.keyLock || Events.activeEvent()) return false;
+    if (!Array.isArray(direction) || !Number.isInteger(direction[0]) || !Number.isInteger(direction[1])
+      || Math.abs(direction[0]) + Math.abs(direction[1]) !== 1) return false;
+    var nextX = World.curPos[0] + direction[0], nextY = World.curPos[1] + direction[1];
+    if (nextX < 0 || nextY < 0 || nextX > World.RADIUS * 2 || nextY > World.RADIUS * 2) return false;
     var oldTile = World.state.map[World.curPos[0]][World.curPos[1]];
     World.curPos[0] += direction[0];
     World.curPos[1] += direction[1];
     World.narrateMove(oldTile, World.state.map[World.curPos[0]][World.curPos[1]]);
     World.lightMap(World.curPos[0], World.curPos[1], World.state.mask);
     World.drawMap();
-    World.doSpace();
-
     // 记录与村庄的最远距离（用于探索成就）
     var curDist = World.getDistance();
     var oldMax = $SM.get('game.maxDistance', true) || 0;
     if (curDist > oldMax) $SM.set('game.maxDistance', curDist, true);
+    if (window.ExpeditionReport) ExpeditionReport.recordMove(curDist);
+    World.doSpace();
+    World.updateTravelGuide();
+    if (window.FieldTreatment) FieldTreatment.update();
+    if (World.dead || Engine.activeModule !== World) return true;
 
     // play random footstep
     var randomFootstep = Math.floor(Math.random() * 5) + 1;
@@ -396,6 +409,7 @@ var World = {
         Notifications.notify(World, _('safer here'));
       }
     }
+    return true;
   },
 
   keyDown: function(event) {
@@ -474,7 +488,7 @@ var World = {
         World.danger = false;
         return true;
       }
-      if(World.getDistance < 18 && $SM.get('stores["i armour"]', true) > 0) {
+      if(World.getDistance() < 18 && $SM.get('stores["i armour"]', true) > 0) {
         World.danger = false;
         return true;
       }
@@ -490,10 +504,14 @@ var World = {
     movesPerFood *= $SM.hasPerk('breath no food') ? 2 : 1;
     if(World.foodMove >= movesPerFood) {
       World.foodMove = 0;
-      var num = Path.outfit['cured meat'];
+      // An omitted ration must behave like zero stock, never NaN.
+      var num = Number.isFinite(Path.outfit['cured meat']) ? Math.max(0,Math.floor(Path.outfit['cured meat'])) : 0;
       num--;
       if(num === 0) {
         Notifications.notify(World, _('the meat has run out'));
+        // The last actual ration still nourishes the player.
+        World.starvation = false;
+        World.setHp(World.health + World.meatHeal());
       } else if(num < 0) {
         // Starvation! Hooray!
         num = 0;
@@ -506,7 +524,7 @@ var World = {
           if($SM.get('character.starved') >= 10 && !$SM.hasPerk('breath no food')) {
             $SM.addPerk('breath no food');
           }
-          World.die();
+          World.die('food');
           return false;
         }
       } else {
@@ -524,6 +542,7 @@ var World = {
       water--;
       if(water === 0) {
         Notifications.notify(World, _('there is no more water'));
+        World.thirst = false;
       } else if(water < 0) {
         water = 0;
         if(!World.thirst) {
@@ -535,7 +554,7 @@ var World = {
           if($SM.get('character.dehydrated') >= 10 && !$SM.hasPerk('breath no water')) {
             $SM.addPerk('breath no water');
           }
-          World.die();
+          World.die('water');
           return false;
         }
       } else {
@@ -620,6 +639,47 @@ var World = {
     from = from || World.curPos;
     to = to || World.VILLAGE_POS;
     return Math.abs(from[0] - to[0]) + Math.abs(from[1] - to[1]);
+  },
+
+  // Ordinary terrain consumes supplies; the final village step and landmarks do not.
+  // This is a no-detour terrain estimate, not a pathfinder or a safety promise.
+  travelBudget: function(distance, foodMove, waterMove, foodRate, waterRate) {
+    var steps = Math.max(0,Math.floor(distance) - 1);
+    var needed = function(phase,rate) {
+      phase = Number.isFinite(phase) ? Math.max(0,Math.min(rate - 1,Math.floor(phase))) : 0;
+      return Math.floor((steps + phase) / rate);
+    };
+    return {steps:steps, food:needed(foodMove,foodRate), water:needed(waterMove,waterRate)};
+  },
+  travelInfo: function() {
+    if (Engine.activeModule !== World || World.dead || !World.state || !World.curPos) return null;
+    var distance = World.getDistance(), directions = [];
+    var dx = World.VILLAGE_POS[0] - World.curPos[0], dy = World.VILLAGE_POS[1] - World.curPos[1];
+    if (dx) directions.push((dx > 0 ? '东' : '西') + Math.abs(dx) + ' 格');
+    if (dy) directions.push((dy > 0 ? '南' : '北') + Math.abs(dy) + ' 格');
+    var budget = World.travelBudget(distance,World.foodMove,World.waterMove,
+      World.MOVES_PER_FOOD * ($SM.hasPerk('breath no food') ? 2 : 1),
+      World.MOVES_PER_WATER * ($SM.hasPerk('breath no water') ? 2 : 1));
+    var food = Math.max(0,(Path.outfit || {})['cured meat'] || 0), water = Math.max(0,World.water || 0);
+    var status = World.starvation || World.thirst || food < budget.food || water < budget.water ? 'danger'
+      : food <= budget.food + 1 || water <= budget.water + 1 || World.health <= World.getMaxHealth() * 0.3 ? 'caution' : 'normal';
+    return {distance:distance,direction:directions.join('、') || '已在庄园',budget:budget,food:food,water:water,status:status};
+  },
+  updateTravelGuide: function() {
+    var info = World.travelInfo(), guide = $('#worldTravelGuide');
+    if (!info) {if (guide.length) guide.hide();return;}
+    if (!guide.length) {
+      guide = $('<details>').attr('id','worldTravelGuide').prop('open',true).insertBefore('#map');
+      $('<summary>').appendTo(guide);
+      $('<p>').addClass('travelDirection').appendTo(guide);
+      $('<p>').addClass('travelBudget').appendTo(guide);
+      $('<p>').addClass('travelAdvice').appendTo(guide);
+    }
+    guide.show().attr('data-status',info.status);
+    guide.find('summary').text('归途补给 · ' + (info.status === 'danger' ? '补给吃紧' : info.status === 'caution' ? '留意返程' : '距庄园 ' + info.distance + ' 步'));
+    guide.find('.travelDirection').text('庄园方向：' + info.direction + '；不绕路至少 ' + info.distance + ' 步。');
+    guide.find('.travelBudget').text('其余路段按普通地形估算：熏肉约 ' + info.budget.food + '、水约 ' + info.budget.water + '；现有熏肉 ' + info.food + '、水 ' + info.water + '。');
+    guide.find('.travelAdvice').text((info.status === 'danger' ? '建议尽快返程或寻找已知补给点。' : info.status === 'caution' ? '不要把返程储备全部用于继续深入或治疗。' : '') + '估算不计战斗、治疗与绕路；地标路段可能少消耗。补给充足也不保证安全。');
   },
 
   getTerrain: function() {
@@ -946,7 +1006,7 @@ var World = {
     map.html(mapString);
   },
 
-  die: function() {
+  die: function(reason) {
     if(!World.dead) {
       var castleDeath = typeof Space !== 'undefined' && Engine.activeModule === Space;
       World.dead = true;
@@ -963,12 +1023,15 @@ var World = {
           $SM.set('previous.embarkSnapshot', null, true);
         } else {
           World._reportExpeditionSummary(true);
+          World.finishExpeditionReport('death',reason || 'unknown');
         }
       } catch (e) { /* ignore */ }
       Engine.keyLock = true;
       // Dead! Discard any world changes and go home
       Notifications.notify(World, _('the world fades'));
       World.state = null;
+      World.updateTravelGuide();
+      if (window.FieldTreatment) FieldTreatment.reset();
       // 无限城中获得的所有掉落都返回家中，不再因为死亡而消失。
       if (Path && Path.outfit) {
         for (var k in Path.outfit) {
@@ -1007,6 +1070,7 @@ var World = {
   },
 
   goHome: function() {
+    if (Engine.activeModule !== World || World.dead || !World.state) return false;
     // 远征结算：在 returnOutfit 之前打出一条总结通知
     try { World._reportExpeditionSummary(false); } catch (e) { /* ignore */ }
     // Home safe! Commit the changes.
@@ -1035,7 +1099,9 @@ var World = {
       Engine.event('progress', 'fabricator');
     }
     World.redeemBlueprints();
+    World.finishExpeditionReport('return');
     World.state = null;
+    if (window.FieldTreatment) FieldTreatment.reset();
 
     if(Path.outfit['cured meat'] > 0) {
       Button.setDisabled($('#embarkButton'), false);
@@ -1052,6 +1118,23 @@ var World = {
     Engine.keyLock = false;
     Path.onArrival();
     Engine.restoreNavigation = true;
+    World.updateTravelGuide();
+    return true;
+  },
+
+  finishExpeditionReport: function(outcome,reason) {
+    if (!window.ExpeditionReport || !World.state) return null;
+    var unlocks = [];
+    var flags = {ironmine:'铁矿供应',coalmine:'煤矿供应',sulphurmine:'硫磺矿供应',ship:'无限城入口',executioner:'制造器'};
+    Object.keys(flags).forEach(function(key) {
+      if (outcome === 'return' && World.state[key] && !(World._expeditionFlags || {})[key]) unlocks.push(flags[key]);
+    });
+    if (outcome === 'return') Object.keys($SM.get('character.blueprints') || {}).forEach(function(key) {
+      if ($SM.get('character.blueprints[' + JSON.stringify(key) + ']') && !(World._expeditionBlueprints || {})[key]) unlocks.push('制造图纸：' + _(key));
+    });
+    var report = ExpeditionReport.finish(outcome,{outfit:Path.outfit || {},map:World.state.map,mask:World.state.mask,unlocks:unlocks,reason:reason});
+    if (report) Notifications.notify(null,outcome === 'return' ? '远征已结算：地图进展和剩余物资已带回，可在备战页查看远征报告。' : '远征失败：本次地图进展未保存，剩余背包已归还；可在备战页查看原因与建议。');
+    return report;
   },
 
   redeemBlueprints: () => {
@@ -1087,10 +1170,13 @@ var World = {
 
   // 远征结算：只对比背包（outfit）在出发时与返回时的差
   // 不再对比 stores —— 因为远征期间村庄村民仍在持续产资源，会污染结算
-  // 参数 isDeath: true 时表示死亡返回，整包 outfit 视为遗失
+  // The legacy fallback compares net bag changes; death also returns remaining items.
   _reportExpeditionSummary: function(isDeath) {
     var snap = $SM.get('previous.embarkSnapshot');
     if (!snap || !snap.outfit) return;
+    // Clear even a zero-net trip, so a late callback cannot report an old expedition.
+    $SM.set('previous.embarkSnapshot', null, true);
+    if (window.ExpeditionReport) return;
     var beforeOutfit = snap.outfit;
     var afterOutfit = Path.outfit || {};
 
@@ -1101,13 +1187,9 @@ var World = {
     outfitKeys.forEach(function(k) {
       var before = beforeOutfit[k] || 0;
       var after = afterOutfit[k] || 0;
-      if (isDeath) {
-        if (before > 0) consumed[k] = before;
-      } else {
-        var diff = after - before;
-        if (diff > 0) gained[k] = diff;
-        else if (diff < 0) consumed[k] = -diff;
-      }
+      var diff = after - before;
+      if (diff > 0) gained[k] = diff;
+      else if (diff < 0) consumed[k] = -diff;
     });
 
     var fmt = function(dict) {
@@ -1121,7 +1203,7 @@ var World = {
     if (consumedStr) parts.push(_('consumed: ') + consumedStr);
     if (gainedStr)   parts.push(_('gained: ') + gainedStr);
     if (!parts.length) return;
-    var prefix = isDeath ? _('expedition summary (lost): ') : _('expedition summary: ');
+    var prefix = isDeath ? '远征失败（剩余背包归还）：' : _('expedition summary: ');
     try { Notifications.notify(null, prefix + parts.join(' ； ')); } catch (e) { /* ignore */ }
     $SM.set('previous.embarkSnapshot', null, true);
   },
@@ -1205,6 +1287,7 @@ var World = {
     Engine.keyLock = false;
     // Explore in a temporary world-state. We'll commit the changes if you return home safe.
     World.state = $.extend(true, {}, $SM.get('game.world'));
+    if (window.FieldTreatment) FieldTreatment.reset();
     World.setWater(World.getMaxWater());
     World.setHp(World.getMaxHealth());
     World.foodMove = 0;
@@ -1214,6 +1297,10 @@ var World = {
     World.usedOutposts = {};
     World.curPos = World.copyPos(World.VILLAGE_POS);
     World.drawMap();
+    World._expeditionFlags = {};
+    World._expeditionBlueprints = $.extend({},$SM.get('character.blueprints') || {});
+    ['ironmine','coalmine','sulphurmine','ship','executioner'].forEach(function(key) {World._expeditionFlags[key] = !!World.state[key];});
+    if (window.ExpeditionReport) ExpeditionReport.begin({outfit:Path.outfit || {},map:World.state.map,mask:World.state.mask,equipped:Path.getLoadoutEquipment()});
     World.setTitle();
     AudioEngine.playBackgroundMusic(AudioLibrary.MUSIC_WORLD);
     World.dead = false;

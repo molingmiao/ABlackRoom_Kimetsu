@@ -2,5 +2,11 @@
 .earlyGameTask summary { cursor: pointer; font-weight: bold; }
 .earlyGameTask p { margin: 6px 0 0; }
 .earlyGameTaskCost { font-variant-numeric: tabular-nums; }
+.campaignGoal { font-weight: bold; }
+.campaignClaim { margin-top: 8px; padding: 4px 10px; font: inherit; color: inherit; background: transparent; border: 1px solid #888; cursor: pointer; }
+.campaignClaim:disabled { opacity: 0.55; cursor: default; }
+.guestCare, .openingSupply button, .openingHunters button { display: block; margin-top: 6px; padding: 4px 8px; font: inherit; text-align: left; color: inherit; background: transparent; border: 1px solid #888; cursor: pointer; }
+.guestCare:disabled, .openingHunters button:disabled { opacity: 0.55; cursor: default; }
+.openingSupply, .openingHunters { border-top: 1px dashed #888; margin-top: 10px; padding-top: 4px; }
 #roomPanel #buildBtns, #roomPanel #craftBtns, #roomPanel #buyBtns { top: calc(50px + var(--early-guide-height, 0px)); }
 #outsidePanel #workers { top: calc(-4px + var(--early-guide-height, 0px)); }

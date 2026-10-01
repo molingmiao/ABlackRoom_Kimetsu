@@ -125,7 +125,7 @@ var Room = {
 			cost: function () {
 				var n = $SM.get('game.buildings["hut"]', true);
 				return {
-					'wood': 100 + (n * 50)
+					'wood': n === 0 ? 80 : 100 + (n * 50)
 				};
 			},
 			audio: AudioLibrary.BUILD_HUT
@@ -139,7 +139,7 @@ var Room = {
 			type: 'building',
 			cost: function () {
 				return {
-					wood: 200,
+					wood: 160,
 					fur: 10,
 					meat: 5
 				};
@@ -155,7 +155,7 @@ var Room = {
 			type: 'building',
 			cost: function () {
 				return {
-					'wood': 400,
+					'wood': 320,
 					'fur': 100
 				};
 			},
@@ -185,7 +185,7 @@ var Room = {
 			type: 'building',
 			cost: function () {
 				return {
-					'wood': 600,
+					'wood': 480,
 					'meat': 50
 				};
 			},
@@ -200,7 +200,7 @@ var Room = {
 			type: 'building',
 			cost: function () {
 				return {
-					'wood': 800,
+					'wood': 640,
 					'leather': 100,
 					'scales': 10
 				};
@@ -661,7 +661,7 @@ var Room = {
 		Room.updateBuildButtons();
 
 		Room._fireTimer = Engine.setTimeout(Room.coolFire, Room._FIRE_COOL_DELAY);
-		Room._tempTimer = Engine.setTimeout(Room.adjustTemp, Room._ROOM_WARM_DELAY);
+		Room._tempTimer = Engine.setTimeout(Room.adjustTemp, window.EarlyGame ? EarlyGame.warmDelay(Room._ROOM_WARM_DELAY) : Room._ROOM_WARM_DELAY);
 
 		/*
 		 * Builder states:
@@ -692,6 +692,15 @@ var Room = {
 			Notifications.notify(Room, _("the room is {0}", Room.TempEnum.fromInt($SM.get('game.temperature.value')).text));
 			Room.changed = false;
 		}
+		Room.welcomeBuilder();
+
+		Engine.moveStoresView(null, transition_diff);
+
+		Room.setMusic();
+		if (window.EarlyGame) EarlyGame.render();
+	},
+
+	welcomeBuilder: function () {
 		if ($SM.get('game.builder.level') == 3) {
 			$SM.add('game.builder.level', 1);
 			$SM.setIncome('builder', {
@@ -699,12 +708,9 @@ var Room = {
 				stores: { 'wood': 2 }
 			});
 			Room.updateIncomeView();
+			Room.updateBuildButtons();
 			Notifications.notify(Room, _("Shinobu is on her feet. she surveys the estate and says she can restore it."));
 		}
-
-		Engine.moveStoresView(null, transition_diff);
-		
-		Room.setMusic();
 	},
 
 	TempEnum: {
@@ -855,7 +861,7 @@ var Room = {
 		if ($SM.get('game.temperature.value') != old) {
 			Room.changed = true;
 		}
-		Room._tempTimer = Engine.setTimeout(Room.adjustTemp, Room._ROOM_WARM_DELAY);
+		Room._tempTimer = Engine.setTimeout(Room.adjustTemp, window.EarlyGame ? EarlyGame.warmDelay(Room._ROOM_WARM_DELAY) : Room._ROOM_WARM_DELAY);
 	},
 
 	unlockForest: function () {

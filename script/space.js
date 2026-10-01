@@ -543,9 +543,9 @@ var Space = {
 		var n = $SM.get('game.castleMeta.bossKilled', true) || 0;
 		$SM.set('game.castleMeta.bossKilled', n + 1, true);
 	},
-	getMaxHpBonus: function() {
+	getMaxHpBonus: function(level) {
 		// = 硬体术天赋（本 run） + 累计层数永久 HP（跨 run） + 探索者赐福 15%
-		var bonus = Space.getTalentLevel('hardBody') * 5;
+		var bonus = (typeof level === 'number' ? level : Space.getTalentLevel('hardBody')) * 5;
 		bonus += Space.getPermanentHpBonus();
 		if (Space.hasExplorerBoon()) {
 			var base = World.getBaseMaxHealth();
@@ -574,6 +574,39 @@ var Space = {
 		return Math.min(0.25, base + perkBonus);
 	},
 	getAccuracyBonus: function() { return Space.getTalentLevel('steadyHand') * 0.01; },
+	talentPreview: function(id) {
+		var talent = Space.TALENTS.find(function(t) {return t.id === id;});
+		if (!talent) return null;
+		var level = Space.getTalentLevel(id), next = Math.min(talent.maxLevel, level + 1), before, after, metric;
+		var values = function(lvl) {
+			switch (id) {
+			case 'hardBody': return World.getMaxHealth() + Space.getMaxHpBonus(lvl) - Space.getMaxHpBonus();
+			case 'sharpEdge': return (1 + lvl * talent.per) * (1 + Space.getPermanentDmgMult());
+			case 'ironWall': return Math.min(0.30, lvl * talent.per);
+			case 'bloodDrink': return Math.min(0.25, Space.getLifestealPct() + (lvl - level) * talent.per);
+			case 'steadyHand': return lvl * talent.per;
+			case 'swiftBlade': return 1 - Math.min(0.30, lvl * talent.per);
+			}
+		};
+		metric = {hardBody:'maximum health',sharpEdge:'castle weapon damage multiplier',ironWall:'talent damage reduction',bloodDrink:'total castle lifesteal',steadyHand:'talent accuracy bonus',swiftBlade:'talent cooldown multiplier'}[id];
+		before = values(level); after = values(next);
+		var peak = ($SM.get('game.castleMeta.peakTalent') || {})[id] || 0;
+		return {level:level,next:next,metric:metric,before:before,after:after,capped:Math.abs(after-before)<0.000001,
+			inheritBefore:Space.getStartingTalentLevel(id,peak),inheritAfter:Space.getStartingTalentLevel(id,Math.max(peak,next))};
+	},
+	talentPreviewText: function(id) {
+		var p = Space.talentPreview(id);
+		if (!p) return '';
+		var format = function(value) {
+			if (id === 'hardBody') return String(value);
+			if (id === 'sharpEdge' || id === 'swiftBlade') return '×' + (Math.round(value*1000)/1000);
+			return (Math.round(value*1000)/10) + '%';
+		};
+		var text = _(p.metric) + ': ' + format(p.before) + ' → ' + format(p.after);
+		if (p.capped) text += ' · ' + _('effect already capped; no immediate gain');
+		text += '\n' + _('next descent inheritance: Lv.{0} → Lv.{1}', p.inheritBefore, p.inheritAfter);
+		return text;
+	},
 
 	_offerTalent: function(options) {
 		options = options || {};
@@ -610,6 +643,7 @@ var Space = {
 		};
 
 		var text = [_('the demon fades. faint red motes drift toward you — pick one to absorb.')];
+		text.push(_('previews show only the named bonuses, not final damage or hit chance. enemy defenses, other effects and rounding still apply.'));
 		if (batchLeft > 1) {
 			text.push(_('the swarm leaves behind {0} more opportunities to take on a new edge.', batchLeft));
 		}
@@ -617,6 +651,7 @@ var Space = {
 			var curLvl = Space.getTalentLevel(t.id);
 			var val = (t.per < 1) ? Math.round(t.per * 1000) / 10 : t.per;
 			text.push('• ' + _(t.nameKey) + ' Lv.' + (curLvl + 1) + ': ' + _(t.descKey, val));
+			text.push(Space.talentPreviewText(t.id));
 		});
 		Events.startEvent({
 			title: _('slayer talent'),
@@ -627,6 +662,7 @@ var Space = {
 				}
 			}
 		});
+		Events.eventPanel().addClass('talentChoicePreview');
 	},
 
 	_takeTalent: function(id, onDone) {

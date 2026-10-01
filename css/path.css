@@ -293,3 +293,8 @@ div.outfitRow .scrapBtn:hover {
 #loadoutPreview { margin-top: 7px; line-height: 1.5; }
 #loadoutPreview summary { cursor: pointer; }
 .loadoutPreviewDetails { white-space: pre-line; max-height: 180px; overflow-y: auto; margin-top: 6px; }
+#journeyGuide { border-left: 3px solid #738567; padding: 8px 12px; margin-bottom: 24px; width: 528px; max-width: 100%; box-sizing: border-box; font-size: 13px; line-height: 1.6; }
+#journeyGuide summary { cursor: pointer; font-weight: bold; }
+#journeyGuide .journeyChecklist { white-space: pre-line; margin-top: 6px; }
+#journeyGuide p { margin: 6px 0; }
+#prepareJourneyBtn { padding: 4px 8px; font: inherit; color: inherit; background: transparent; border: 1px solid #888; cursor: pointer; }

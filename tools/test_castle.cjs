@@ -218,4 +218,30 @@ for (const count of [3, 4, 5]) {
   }
   assert.ok(c.Space._bossDef(90).hp / c.Space._bossDef(80).hp < 1.5);
 }
-console.log('PASS: all Boss branches, 3–5 ambush rewards, event ownership, growth, shared cooldown, healing, node probabilities, and balance bounds.');
+{
+  const {ctx:c,state,sm}=fixture();
+  c.World.getBaseMaxHealth=()=>85;
+  sm.set('character.infinityTalents.bloodDrink',10);
+  for(const perk of ['water breath I','flame breath I','thunder breath I']) sm.set('character.perks["'+perk+'"]',true);
+  let p=c.Space.talentPreview('bloodDrink');
+  assert.equal(p.before,0.25);assert.equal(p.after,0.25);assert.equal(p.capped,true);
+  sm.set('character.infinityTalents.hardBody',2);
+  sm.set('game.castleMeta.peakTalent.hardBody',2);
+  sm.set('game.castleMeta.perfectExploration',true);
+  p=c.Space.talentPreview('hardBody');
+  assert.equal(p.inheritBefore,0);assert.equal(p.inheritAfter,1);
+  const original=JSON.stringify(state),hp=c.World.health;
+  for(const t of c.Space.TALENTS) {
+    const preview=c.Space.talentPreview(t.id);
+    assert.ok(Number.isFinite(preview.before)&&Number.isFinite(preview.after));
+    assert.ok(c.Space.talentPreviewText(t.id).includes('→'));
+  }
+  assert.equal(JSON.stringify(state),original,'previews do not mutate talents or inheritance');assert.equal(c.World.health,hp);
+  const predicted=p.after;
+  c.Space.setTalentLevel('hardBody',3);
+  assert.equal(c.World.getMaxHealth(),predicted,'HP preview includes explorer bonus rounding');
+  sm.set('game.castleMeta.peakTalent.hardBody',20);
+  assert.equal(c.Space.talentPreview('hardBody').inheritAfter,8,'existing peak inheritance is never lowered');
+  assert.equal(c.Space.talentPreview('unknown'),null);
+}
+console.log('PASS: all Boss branches, 3–5 ambush rewards, event ownership, growth, shared cooldown, healing, node probabilities, balance bounds and read-only talent previews.');

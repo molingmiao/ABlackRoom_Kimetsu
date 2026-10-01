@@ -19,6 +19,8 @@ const gameGlobals = {
 	CombatStyles: 'writable',
 	CombatTelegraphs: 'writable',
 	CastleReport: 'writable',
+	ExpeditionReport: 'writable',
+	FieldTreatment: 'writable',
 	Fabricator: 'writable',
 	Events: 'writable',
 	Notifications: 'writable',

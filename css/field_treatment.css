@@ -1,0 +1,62 @@
+#worldFieldTreatment {
+  position: absolute;
+  top: 0;
+  left: 670px;
+  box-sizing: border-box;
+  width: 230px;
+  margin: 0 0 8px;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+#worldFieldTreatment .fieldTreatmentActions {
+  display: flex;
+  width: 100%;
+  flex-wrap: wrap;
+  gap: 5px;
+  flex-direction: column;
+}
+
+#worldFieldTreatment .fieldTreatmentTitle {
+  font-weight: bold;
+  margin-bottom: 3px;
+}
+
+#worldFieldTreatment button.button {
+  position: relative;
+  display: inline-block;
+  float: none;
+  /* Language styles force every .button to 100px; keep this sidebar readable. */
+  width: 100% !important;
+  box-sizing: border-box;
+  margin: 0;
+  padding: 5px 24px 5px 8px;
+  border: 1px solid currentColor;
+  border-left: 3px solid #5b7;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+#worldFieldTreatment button:disabled {
+  cursor: default;
+  opacity: 0.55;
+}
+
+#worldFieldTreatment button:focus-visible {
+  outline: 2px solid currentColor;
+  outline-offset: 2px;
+}
+
+#worldFieldTreatment .fieldTreatmentNote,
+#worldFieldTreatment .fieldTreatmentReserve,
+#worldFieldTreatment .fieldTreatmentStatus {
+  margin: 3px 0 0;
+}
+
+#worldFieldTreatment .fieldTreatmentReserve {
+  border-left: 3px solid #bd5a47;
+  padding-left: 6px;
+  font-weight: bold;
+}

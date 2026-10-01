@@ -1,0 +1,37 @@
+.eventPanel.expeditionReport:after {
+  background: inherit;
+  z-index: -1;
+}
+
+.eventPanel.expeditionReport .eventTitle {
+  position: static;
+  margin-bottom: 12px;
+}
+
+.eventPanel.expeditionReport .eventTitle:after {
+  display: none;
+}
+
+.eventPanel.expeditionReport #description {
+  max-height: 55vh;
+  overflow-y: auto;
+  padding-right: 10px;
+  line-height: 1.6;
+}
+
+.eventPanel.expeditionReport #description > div {
+  padding-bottom: 10px;
+}
+
+.eventPanel.expeditionReport #description > div:first-child {
+  font-weight: bold;
+}
+
+.eventPanel.expeditionReport #buttons {
+  margin-top: 12px;
+}
+
+.expeditionReportLink {
+  display: inline-block;
+  margin-top: 8px;
+}

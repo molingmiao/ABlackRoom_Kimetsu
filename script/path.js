@@ -267,6 +267,7 @@ var Path = {
 			.appendTo('div#locationSlider');
 
 		this.scroller = $('<div>').attr('id', 'pathScroller').appendTo(this.panel);
+		Path.createJourneyGuide();
 		
 		// Add the outfitting area
 		var suppliesRow = $('<div>').attr('id', 'suppliesRow').appendTo(this.scroller);
@@ -278,6 +279,7 @@ var Path = {
 
 		Path.createLoadoutPanel();
 		$('<button>').attr({id:'materialSourcesButton',type:'button'}).text('材料获取途径').on('click', CampGuide.showMaterialSources).appendTo(Path.scroller);
+		$('<button>').attr({id:'expeditionReportButton',type:'button'}).text('查看上次远征报告').on('click',function() {if (window.ExpeditionReport) ExpeditionReport.show();}).appendTo(Path.scroller);
 
 		// 补齐配置与出发并排；补齐不会替换玩家选择的装备。
 		var buttonsRow = $('<div>').attr('id', 'pathButtonsRow').appendTo(this.scroller);
@@ -297,6 +299,7 @@ var Path = {
 		
 		Path.outfit = $SM.get('outfit');
 		Path.updateLoadoutPanel();
+		Path.updateJourneyGuide();
 		
 		Engine.updateSlider();
 		
@@ -555,6 +558,7 @@ var Path = {
 
 		Path.updateBagSpace(currentBagCapacity);
 		Path.updateLoadoutPanel();
+		Path.updateJourneyGuide();
 
 	},
 
@@ -736,6 +740,58 @@ var Path = {
 		}
 	},
 
+	journeyGuideVisible: function() {
+		return !!$SM.get('features.location.path') && !$SM.get('features.location.spaceShip')
+			&& $SM.get('game.embarks',true) < 3 && $SM.get('game.maxDistance',true) < 8
+			&& !$SM.get('game.buildings["iron mine"]',true);
+	},
+	journeyChecklist: function() {
+		var info = CampGuide.expeditionInfo();
+		var food = Math.min(Path.loadoutCount((Path.outfit || {})['cured meat']),Path.loadoutCount($SM.get('stores["cured meat"]',true)));
+		var lines = [food >= 5 ? '口粮已备：熏肉 ' + food + ' 份。' : '口粮待备：至少携带 5 份熏肉；生肉不能作为远征口粮。'];
+		if (info.errors.length) lines.push('出发受阻：先修正下方库存、数量或容量问题。');
+		else if (info.ready.length) lines.push('可用上阵武器：' + info.ready.map(function(key) {return _(key);}).join('、') + '。');
+		else lines.push('武器待备：在装备栏选择武器，并装入背包。没有武器也能徒手出发，但战斗更吃力。');
+		if (!food && !$SM.get('stores["cured meat"]',true)) lines.push($SM.get('game.campaignClaims.compass')
+			? '没有熏肉库存：建熏肉房并安排熏肉工人生产；需要生肉和木材作为原料。'
+			: '没有熏肉库存：检查尚未领取的“走出庄园”阶段奖励，或建熏肉房并安排工人生产。');
+		lines = lines.concat(info.errors,info.warnings);
+		return lines;
+	},
+	createJourneyGuide: function() {
+		var guide = $('<details>').attr('id','journeyGuide').prop('open',true).appendTo(Path.scroller);
+		$('<summary>').text('初次远征 · 先在近郊熟悉探索（可收起）').appendTo(guide);
+		$('<div>').addClass('journeyChecklist').attr({role:'status','aria-live':'polite'}).appendTo(guide);
+		$('<p>').text('先走出两三格，再沿来路返回庄园。水和食物会随移动消耗；治疗也消耗熏肉。战斗实时进行，请使用画面上的攻击、治疗快捷键。近郊也可能遇敌，这不是安全保证。').appendTo(guide);
+		$('<button>').attr({id:'prepareJourneyBtn',type:'button'}).on('click',Path.prepareJourney).appendTo(guide);
+	},
+	updateJourneyGuide: function() {
+		$('#journeyGuide').toggle(Path.journeyGuideVisible());
+		if (!Path.journeyGuideVisible()) return;
+		var checklist = $('#journeyGuide .journeyChecklist'), text = Path.journeyChecklist().join('\n');
+		if (checklist.text() !== text) checklist.text(text);
+		$('#prepareJourneyBtn').text(Path.getLoadout('expedition') ? '按已有远征配置补齐（不覆盖配置）' : '建立近郊配置并补齐（仅用库存）');
+	},
+	prepareJourney: function() {
+		if (Engine.activeModule !== Path || Events.activeEvent() || !Path.journeyGuideVisible()) return false;
+		if (!Path.getLoadout('expedition')) {
+			var equipment = Path.getLoadoutEquipment(), targets = {'cured meat':5};
+			for (var cat in equipment) equipment[cat].forEach(function(key) {
+				if (!key) return;
+				targets[key] = 1;
+				var cost = World.Weapons[key] && World.Weapons[key].cost || {};
+				Object.keys(cost).forEach(function(ammo) {
+					// Self-consuming thrown weapons need several uses, not an extra item type.
+					targets[ammo] = Math.max(targets[ammo] || 0,Path.loadoutCount(cost[ammo]) * 5);
+				});
+			});
+			$SM.set('character.loadouts.expedition',{version:1,targets:targets,equipped:equipment},true);
+		}
+		$SM.set('character.selectedLoadout','expedition',true);
+		Path.autoFillSupplies();
+		Path.updateJourneyGuide();
+		return true;
+	},
 	// Saved preparation targets are independent of the current expedition inventory.
 	LOADOUT_NAMES: { expedition: 'expedition loadout', castle: 'infinity castle loadout' },
 	loadoutCount: function(value) {
@@ -918,6 +974,7 @@ var Path = {
 		$('<div>').attr({ id: 'loadoutResult', role: 'status', 'aria-live': 'polite' }).appendTo(panel);
 	},
 	updateLoadoutPanel: function() {
+		$('#expeditionReportButton').toggle(!!(window.ExpeditionReport && ExpeditionReport.latest()));
 		var profile = Path.getLoadout(Path.getLoadoutId()), parts = [];
 		$('#loadoutSelect').val(Path.getLoadoutId());
 		$('#equipLoadoutBtn').prop('disabled', !profile);
@@ -1009,6 +1066,7 @@ var Path = {
 			Path.updateOutfitting();
 		} else if(Engine.activeModule == Path && (e.category == 'stores' || e.category == 'outfit' || e.category == 'character')) {
 			Path.updateLoadoutPanel();
+			Path.updateJourneyGuide();
 		}
 	}
 };

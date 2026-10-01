@@ -7,17 +7,20 @@ let saves = 0, message = '';
 const context = {
   State: {},
   _: (text, ...args) => text.replace(/\{(\d+)\}/g, (_, i) => args[i]),
-  Engine: { saveGame() { saves++; }, log() {} },
+  Engine: { options:{testerMode:false}, saveGame() { saves++; }, log() {} },
+  Events: {activeEvent:()=>null},
   $: { Dispatch: () => ({ publish() {} }) },
 };
 vm.createContext(context);
-for (const file of ['state_manager.js', 'world.js', 'path.js', 'space.js']) {
+context.window=context;
+for (const file of ['state_manager.js', 'world.js', 'path.js', 'space.js','camp_guide.js']) {
   vm.runInContext(fs.readFileSync(path.join(__dirname, '../script', file), 'utf8'), context);
 }
 const P = context.Path, SM = context.$SM = context.StateManager;
 P.updateOutfitting = () => {};
 P.updateLoadoutPanel = () => {};
 P.showLoadoutResult = text => { message = text; };
+P.updateJourneyGuide=()=>{};
 const plain = value => JSON.parse(JSON.stringify(value));
 const weight = bag => Object.keys(bag).reduce((sum, key) => sum + bag[key] * P.getWeight(key), 0);
 function reset() {
@@ -145,4 +148,68 @@ assert.equal(pickup.added,0,'full bags pick up nothing');
 pickup=plain(context.Space.planBattlePickup(battleProfile,{medicine:6},battleLoot,20));
 assert.equal(pickup.outfit.medicine,6,'never discard extras to meet a lower target');
 assert.equal(context.Space.planBattlePickup(battleProfile,battleBag,{},20).added,0);
-console.log('loadout tests passed: profile persistence, inventory accounting, refill limits, equipment, suggestions and battle-only pickup plans');
+// Beginner setup uses the same planner and never charges stores or replaces custom presets.
+reset();
+SM.set('features.location.path',true,true);
+SM.set('stores',{'bone yari':1,'cured meat':12,torch:2},true);
+SM.set('character.equipped',{primary:['bone yari'],secondary:[],tool:[]},true);
+P.outfit={torch:2};
+context.Engine.activeModule=P;
+const beginnerStores=plain(context.State.stores), beginnerGear=plain(context.State.character.equipped);
+const checklistBefore=JSON.stringify(context.State);
+assert.match(P.journeyChecklist().join('\n'),/口粮待备/);
+assert.equal(JSON.stringify(context.State),checklistBefore,'checklist is read-only');
+assert.equal(P.prepareJourney(),true);
+assert.equal(P.outfit['bone yari'],1);assert.equal(P.outfit['cured meat'],5);assert.equal(P.outfit.torch,2);
+assert.deepEqual(plain(context.State.stores),beginnerStores,'selection is only charged by actual departure');
+assert.deepEqual(plain(context.State.character.equipped),beginnerGear,'selected equipment is retained');
+assert.ok(weight(P.outfit)<=P.getCapacity());
+assert.match(P.journeyChecklist().join('\n'),/口粮已备/);
+assert.match(P.journeyChecklist().join('\n'),/可用上阵武器/);
+const firstPreset=plain(P.getLoadout('expedition')), firstBag=plain(P.outfit);
+assert.equal(P.prepareJourney(),true);
+assert.deepEqual(plain(P.outfit),firstBag,'beginner refill is idempotent');
+assert.deepEqual(plain(P.getLoadout('expedition')),firstPreset);
+SM.set('character.loadouts.expedition',{version:1,targets:{'cured meat':2,torch:1},equipped:{}},true);
+SM.set('character.loadouts.castle',{version:1,targets:{medicine:7}},true);
+SM.set('character.selectedLoadout','castle',true);
+P.outfit={'cured meat':1,torch:2};
+const customPresets=plain(context.State.character.loadouts);
+assert.equal(P.prepareJourney(),true);
+assert.equal(P.outfit['cured meat'],2);assert.equal(P.outfit.torch,2,'extra selections are not discarded');
+assert.equal(SM.get('character.selectedLoadout'),'expedition');
+assert.deepEqual(plain(context.State.character.loadouts),customPresets,'both existing presets preserved');
+context.Events.activeEvent=()=>({});
+const blocked=JSON.stringify(context.State);assert.equal(P.prepareJourney(),false);assert.equal(JSON.stringify(context.State),blocked);
+context.Events.activeEvent=()=>null;context.Engine.activeModule=context.Space;
+assert.equal(P.prepareJourney(),false,'hidden path action cannot refill an active castle bag');
+context.Engine.activeModule=P;
+for (const [key,value] of [['game.embarks',3],['game.maxDistance',8],['features.location.spaceShip',true],['game.buildings["iron mine"]',1]]) {
+  SM.set(key,value,true);assert.equal(P.journeyGuideVisible(),false);assert.equal(P.prepareJourney(),false);
+  SM.set(key,0,true);
+}
+reset();SM.set('features.location.path',true,true);context.Engine.activeModule=P;
+SM.set('stores',{'wisteria gun':1,'wisteria bullet':2,'cured meat':3},true);
+SM.set('character.equipped',{secondary:['wisteria gun']},true);
+assert.equal(P.prepareJourney(),true);
+assert.equal(P.outfit['wisteria bullet'],2,'ammo cannot be created from missing stock');
+assert.ok(weight(P.outfit)<=10);
+assert.match(message,/stock short/);
+assert.equal(SM.get('character.loadouts.expedition.targets["wisteria bullet"]'),5,'preset records five ammunition uses');
+reset();SM.set('features.location.path',true,true);context.Engine.activeModule=P;
+SM.set('stores',{torch:10,'cured meat':6},true);P.outfit={torch:10};
+assert.equal(P.prepareJourney(),true);
+assert.equal(P.outfit['cured meat'],undefined,'full bag is not silently cleared to fit tutorial supplies');
+assert.match(message,/space short/);
+P.outfit=undefined;
+assert.doesNotThrow(()=>P.journeyChecklist(),'first unlocked path can have no prior backpack');
+assert.match(P.journeyChecklist().join('\n'),/口粮待备/);
+SM.set('stores',{},true);SM.set('game.campaignClaims.compass',true,true);
+assert.match(P.journeyChecklist().join('\n'),/需要生肉和木材/);
+assert.ok(!P.journeyChecklist().join('\n').includes('尚未领取'),'claimed rewards are not recommended as a repeatable food source');
+SM.set('stores',{'bone yari':0,'cured meat':6},true);
+SM.set('character.equipped',{primary:['bone yari']},true);
+P.outfit={'bone yari':1,'cured meat':5};
+assert.match(P.journeyChecklist().join('\n'),/出发受阻/);
+assert.ok(!P.journeyChecklist().join('\n').includes('可用上阵武器'),'stale unavailable backpack selections are not advertised as ready');
+console.log('loadout tests passed: persistent targets, accounting, refill limits, beginner checklist and presets, custom profile preservation and battle-only pickup plans');
