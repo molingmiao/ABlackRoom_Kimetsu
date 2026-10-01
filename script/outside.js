@@ -46,7 +46,7 @@ var Outside = {
 			name: _('charcutier'),
 			delay: 10,
 			stores: {
-				'meat': -5,
+				'meat': -2,
 				'wood': -5,
 				'cured meat': 1
 			}

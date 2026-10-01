@@ -15,13 +15,13 @@
     "format:check": "prettier --check \"script/**/*.js\" \"dev-server.js\" \"*.html\" \"css/**/*.css\"",
     "check": "node --check dev-server.js",
     "test:migrate": "node tools/test_migrate.cjs",
-    "test:castle": "node tools/test_castle.cjs && node tools/test_hotkeys.cjs && node tools/test_combat_styles.cjs && node tools/test_loadouts.cjs && node tools/test_castle_report.cjs && node tools/test_departure.cjs && node tools/test_telegraphs.cjs",
+    "test:castle": "node tools/test_castle.cjs && node tools/test_hotkeys.cjs && node tools/test_combat_styles.cjs && node tools/test_loadouts.cjs && node tools/test_castle_report.cjs && node tools/test_departure.cjs && node tools/test_telegraphs.cjs && node tools/test_battle_exit_order.cjs && node tools/test_drop_inventory.cjs",
     "test:browser": "node tools/test_browser.cjs",
-    "test:early": "node tools/test_early_game.cjs",
+    "test:early": "node tools/test_early_game.cjs && node tools/test_campaign_train.cjs && node tools/test_campaign_progress.cjs",
     "test:expedition": "node tools/test_travel_budget.cjs && node tools/test_expedition_report.cjs && node tools/test_field_treatment.cjs",
     "test:camp": "node tools/test_camp_guide.cjs",
     "test:reserves": "node tools/test_production_reserves.cjs",
-    "test:economy": "node tools/test_economy.cjs",
+    "test:economy": "node tools/test_economy.cjs && node tools/test_cured_meat_recipe.cjs",
     "update_pot": "pybabel extract -F lang/babel.cfg -c \"TRANSLATORS\" script -o lang/adarkroom.pot"
   },
   "dependencies": {

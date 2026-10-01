@@ -7,3 +7,33 @@
 .productionOverview #buttons > button { font: inherit; color: inherit; background: transparent; border: 1px solid #888; margin-right: 12px; padding: 6px 18px; cursor: pointer; }
 .castleLootSummary #description { max-height: 50vh; overflow-y: auto; padding-right: 10px; }
 .talentChoicePreview #description { max-height: 45vh; overflow-y: auto; white-space: pre-line; padding-right: 10px; }
+
+.eventPanel.materialSources:after { background: inherit; z-index: -1; }
+.materialSources .eventTitle { position: static; margin-bottom: 10px; }
+.materialSources .eventTitle:after { display: none; }
+.materialSources #description { min-height: 0; line-height: 1.5; }
+.materialSourceIntro { font-size: 13px; margin: 0 0 10px; }
+.materialSourceTabs { display: flex; gap: 8px; margin-bottom: 12px; }
+.materialSourceTabs button { font: inherit; color: inherit; background: transparent; border: 1px solid #999; padding: 5px 20px; cursor: pointer; }
+.materialSourceTabs button[aria-pressed="true"] { border: 2px solid currentColor; padding: 4px 19px; font-weight: bold; }
+.materialSourceTabs button:focus-visible { outline: 2px solid currentColor; outline-offset: 2px; }
+#materialSourceBody { max-height: 45vh; overflow-y: auto; padding-right: 12px; }
+.materialSourceHeading, .materialSourceSectionHeader { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+.materialSourceHeading { margin-bottom: 8px; }
+.materialSourceHeading h2 { margin: 0; font-size: 18px; }
+.materialSourceHeading > span { font-size: 12px; }
+.materialSourceSection { border: 1px solid #999; padding: 10px 12px; margin-bottom: 10px; }
+.materialSourceSectionHeader { margin-bottom: 5px; }
+.materialSourceSection h3 { margin: 0; font-size: 14px; }
+.materialSourceTag { font-size: 11px; border: 1px solid #999; padding: 1px 5px; }
+.materialSourceRow + .materialSourceRow { border-top: 1px dashed #999; padding-top: 8px; margin-top: 8px; }
+.materialSourceRow h4 { margin: 0 0 3px; font-size: 13px; }
+.materialSourceSection p { font-size: 13px; margin: 3px 0; }
+.materialSourceSection .materialSourceDetail { font-size: 12px; }
+.materialSourceLocation { border-left: 3px solid #738567; padding-left: 7px; }
+.materialSourceLocation, .materialSourceYield { font-weight: bold; }
+.materialSourceRules { font-size: 12px; margin: 10px 0 0; }
+.materialSourceRules summary { cursor: pointer; }
+.materialSourceRules p { margin: 6px 0 0; max-height: 15vh; overflow-y: auto; }
+.materialSources #buttons { margin-top: 14px; }
+.materialSourceEmpty { margin: 12px 0; font-size: 14px; }

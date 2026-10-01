@@ -19,12 +19,61 @@
   line-height: 1.6;
 }
 
-.eventPanel.expeditionReport #description > div {
-  padding-bottom: 10px;
+.expeditionOutcome {
+  border-left: 4px solid currentColor;
+  padding: 6px 12px;
+  margin-bottom: 12px;
 }
 
-.eventPanel.expeditionReport #description > div:first-child {
-  font-weight: bold;
+.expeditionOutcome > strong {
+  font-size: 18px;
+}
+
+.expeditionReport p {
+  margin: 4px 0;
+}
+
+.expeditionSection {
+  border-top: 1px solid #999;
+  margin-top: 12px;
+  padding-top: 8px;
+}
+
+.expeditionSection h3 {
+  font-size: 14px;
+  margin: 0 0 6px;
+}
+
+.expeditionMetrics {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px 24px;
+}
+
+.expeditionMetrics > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.expeditionResourceRow {
+  display: grid;
+  grid-template-columns: 112px 1fr;
+  gap: 12px;
+  margin: 5px 0;
+}
+
+.expeditionResourceRow strong {
+  overflow-wrap: anywhere;
+}
+
+.expeditionRules {
+  margin-top: 12px;
+  font-size: 13px;
+}
+
+.expeditionRules summary {
+  cursor: pointer;
 }
 
 .eventPanel.expeditionReport #buttons {

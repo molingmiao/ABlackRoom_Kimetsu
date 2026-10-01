@@ -51,9 +51,23 @@ assert.ok(expected(encounter('thunder demon'))>expected(encounter('spider demon 
 assert.equal(c.Room.TradeGoods.medicine.cost().scales,20);
 assert.equal(c.Room.TradeGoods['wisteria bullet'].cost().scales,4);
 assert.equal(c.Room.TradeGoods['demon stone'].cost().scales,250);
-assert.equal(c.Room.TradeGoods['demon stone'].cost().fur,1500,'rare fallback retains substantial renewable-material cost');
 assert.equal(c.Room.TradeGoods.compass.cost().scales,20,'opening gate unchanged');
-assert.equal(c.Room.TradeGoods.scales.cost().fur,150,'early resource exchange unchanged');
+const furExchangeCosts = {
+  scales: {fur:15},
+  teeth: {fur:30},
+  iron: {fur:15,scales:50},
+  coal: {fur:20,teeth:50},
+  steel: {fur:30,scales:50,teeth:50},
+  'demon stone': {fur:150,scales:250,teeth:100},
+  compass: {fur:40,scales:20,teeth:10}
+};
+for (const [item,cost] of Object.entries(furExchangeCosts)) {
+  assert.deepEqual(JSON.parse(JSON.stringify(c.Room.TradeGoods[item].cost())),cost,`${item}: exchange fur is one tenth; other ingredients stay unchanged`);
+}
+assert.deepEqual(Object.keys(c.Room.TradeGoods).filter(item=>c.Room.TradeGoods[item].cost().fur).sort(),Object.keys(furExchangeCosts).sort(),'every fur-consuming exchange is covered');
+for (const [item,fur] of [['lodge',10],['trading post',100],['tannery',50]]) {
+  assert.equal(c.Room.Craftables[item].cost().fur,fur,'construction fur costs must not receive the purchase discount');
+}
 // Exercise actual purchase accounting, including quantity and failed purchases.
 let stores={scales:40,teeth:24,medicine:0};
 const itemKey=key=>key.replace(/^stores[.\["']+/, '').replace(/[\]"']+$/, '');
@@ -68,6 +82,27 @@ stores={scales:40,teeth:11,medicine:2};
 const beforeBuy=JSON.stringify(stores);
 assert.equal(c.Room.buy({attr:()=> 'medicine'}),false);
 assert.equal(JSON.stringify(stores),beforeBuy,'missing second ingredient does not partially charge the first');
+// Use the real purchase handler for every discounted exchange, including its quantity cap.
+for (const [item,cost] of Object.entries(furExchangeCosts)) {
+  const quantity=item==='compass'?1:3;
+  const stockForPurchase=()=>({...Object.fromEntries(Object.entries(cost).map(([ingredient,price])=>[ingredient,price*quantity])),[item]:0,wood:37});
+  stores=stockForPurchase();
+  assert.equal(c.Room._getBuyMax(item,c.Room.TradeGoods[item]),quantity);
+  c.Room.buy({attr:()=>item},{shiftKey:true,customQuantity:item==='compass'?99:quantity});
+  assert.deepEqual(stores,{...Object.fromEntries(Object.keys(cost).map(ingredient=>[ingredient,0])),[item]:quantity,wood:37},`${item}: batch purchase charges the discounted fur and every unchanged ingredient`);
+  if (item==='compass') {
+    const atMaximum=JSON.stringify(stores);
+    c.Room.buy({attr:()=>item},{shiftKey:true,customQuantity:99});
+    assert.equal(JSON.stringify(stores),atMaximum,'compass maximum remains one even with bulk purchases');
+  }
+  for (const missing of Object.keys(cost)) {
+    stores=stockForPurchase(); stores[missing]--;
+    const before=JSON.stringify(stores);
+    assert.equal(c.Room._getBuyMax(item,c.Room.TradeGoods[item]),quantity-1,`${item}: quantity preview is limited by ${missing}`);
+    assert.equal(c.Room.buy({attr:()=>item},{shiftKey:true,customQuantity:quantity}),false);
+    assert.equal(JSON.stringify(stores),before,`${item}: insufficient ${missing} neither consumes another ingredient nor grants the item`);
+  }
+}
 // Revisiting the same treasure scene cannot mint a second reward.
 c.$SM.addM=(key,values)=>Object.keys(values).forEach(item=>{stores[item]=(stores[item]||0)+values[item];});
 let treasureEvent;
@@ -88,4 +123,4 @@ for (const floor of [10,30,60,90]) {
   assert.ok(teeth>=24,'route materials support at least two boss-shop medicines');
   console.log(`MODEL floor ${floor}: six normal wins + one elite + boss = ${scales.toFixed(1)} scales, ${teeth.toFixed(1)} teeth expected (no prestige bonus).`);
 }
-console.log('PASS: guaranteed materials, bounded floor growth, elite/boss incentives, treasure bonus, midgame encounters and unchanged early gates.');
+console.log('PASS: guaranteed materials, bounded floor growth, elite/boss incentives, treasure bonus, tenth-price fur exchanges, unchanged non-fur/construction costs and atomic batch purchases.');

@@ -801,6 +801,7 @@ body.noMask #description {
 #dropMenu > div {
 	padding: 0px 5px 5px 5px;
 	cursor: pointer;
+	white-space: nowrap;
 }
 
 #dropMenu > div:hover {

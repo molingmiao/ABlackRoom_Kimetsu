@@ -1,0 +1,95 @@
+const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const path = require('node:path');
+const vm = require('node:vm');
+const c = {State:{}, _:text=>text, AudioLibrary:{}, Room:{}, Outside:{},
+  Engine:{options:{},log(){},saveGame(){}}, Events:{Setpieces:{}}, Math:Object.create(Math)};
+c.$=()=>({each(){}});
+c.$.Dispatch=()=>({publish(){}});
+c.window=c;
+vm.createContext(c);
+for (const file of ['state_manager.js','world.js','early_game.js','events/global.js']) {
+  vm.runInContext(fs.readFileSync(path.join(__dirname,'../script',file),'utf8'),c);
+}
+c.$SM=c.StateManager;
+const sm=c.$SM, world=c.World;
+const copy=value=>JSON.parse(JSON.stringify(value));
+const map=()=>Array.from({length:61},()=>Array(61).fill('.'));
+let oldMap=map();
+oldMap[30][30]='A'; oldMap[35][30]='I!'; oldMap[40][30]='C!'; oldMap[50][30]='S!';
+oldMap[45][30]='M!'; oldMap[58][30]='X'; oldMap[2][30]='W!';
+sm.set('game.world',{map:oldMap,mask:[[true,false]],ironmine:true,ship:true});
+sm.set('stores',{fur:12,iron:3}); sm.set('game.castleMeta.perfectExploration',true);
+const original=copy(c.State), originalMapReference=sm.get('game.world.map');
+assert.equal(world.ensureCampaignLandmarks(),true);
+assert.equal(originalMapReference[12][30],'.','migration must not edit an in-use map reference');
+const migrated=sm.get('game.world.map');
+let additions=0;
+migrated.forEach((row,x)=>row.forEach((cell,y)=>{
+  if(cell!==original.game.world.map[x][y]) {
+    additions++;
+    assert.equal(cell,'T');
+    assert.equal(world.getDistance([x,y]),18);
+    assert.ok(world.isTerrain(original.game.world.map[x][y]));
+  }
+}));
+assert.equal(additions,1);
+assert.deepEqual(copy(sm.get('game.world.mask')),original.game.world.mask);
+assert.deepEqual(copy(sm.get('stores')),original.stores);
+assert.equal(sm.get('game.world.ironmine'),true);
+assert.equal(sm.get('game.world.ship'),true);
+assert.equal(sm.get('game.castleMeta.perfectExploration'),true);
+const after=JSON.stringify(c.State);
+assert.equal(world.ensureCampaignLandmarks(),false);
+assert.equal(JSON.stringify(c.State),after,'reloading cannot add a duplicate train');
+const station=migrated.flatMap((row,x)=>row.map((cell,y)=>cell==='T'?[x,y]:null).filter(Boolean))[0];
+migrated[station[0]][station[1]]='T!';
+assert.equal(world.ensureCampaignLandmarks(),false,'completed train also prevents duplicates');
+oldMap=map();
+oldMap.forEach((row,x)=>row.forEach((cell,y)=>{if(world.getDistance([x,y])===18) row[y]='#';}));
+sm.set('game.world.map',oldMap);
+assert.equal(world.ensureCampaignLandmarks(),true,'crowded old maps use the nearest terrain ring');
+assert.equal(sm.get('game.world.map').flat().filter(cell=>cell==='T').length,1);
+oldMap=Array.from({length:61},()=>Array(61).fill('P!'));
+sm.set('game.world.map',oldMap);
+assert.equal(world.ensureCampaignLandmarks(),false,'no landmark or visited safe house can be overwritten');
+assert.deepEqual(copy(sm.get('game.world.map')),oldMap);
+sm.set('game.world.map',null);
+assert.equal(world.ensureCampaignLandmarks(),false,'absent maps are not regenerated');
+
+// Story prerequisites follow the new chapter order, while old unlocked games keep access.
+c.Engine.activeModule=c.Room;
+sm.set('game.cityCleared',true);
+const event=title=>c.Events.Global.find(item=>item.title===title);
+const district=event('The Pleasure District'), smiths=event('Smith Village Under Siege'), pillars=event('The Pillars Convene');
+assert.equal(!!district.isAvailable(),false,'clearing a city alone cannot skip the train chapter');
+sm.set('game.world.mugentrain',true);
+assert.equal(!!district.isAvailable(),true,'uses the actual game.cityCleared key');
+sm.set('game.cityCleared',false); sm.set('character.cityCleared',true);
+assert.equal(!!district.isAvailable(),true,'legacy character city flag remains supported');
+sm.set('game.buildings.workshop',1);
+assert.equal(!!smiths.isAvailable(),false);
+sm.set('game.yoshiwaraDone',true);
+assert.equal(!!smiths.isAvailable(),true);
+sm.set('character.blueprints',{'wind armour':false});
+sm.set('game.swordsmithVillageDone',true);
+assert.equal(!!pillars.isAvailable(),false,'false blueprint keys are not discoveries');
+sm.set('character.blueprints["wind armour"]',true);
+assert.equal(!!pillars.isAvailable(),true);
+assert.match(pillars.scenes.start.text.join(' '),/炼狱的席位空着/);
+assert.match(pillars.scenes.select.buttons.flame.text,/炎柱遗志/);
+assert.equal(pillars.scenes.select.buttons.review.nextScene[1],'thanks','fully trained players can still complete a real training review');
+assert.equal(pillars.scenes.select.buttons.review.cost['cured meat'],50);
+sm.set('features.location.spaceShip',true);
+sm.set('game.world.mugentrain',false);sm.set('game.yoshiwaraDone',false);sm.set('game.swordsmithVillageDone',false);
+for(const id of ['district','smiths','pillars']) assert.equal(c.EarlyGame.storyPrerequisite(id),true);
+assert.equal(c.EarlyGame.migrateCampaign(),true);
+assert.equal(sm.get('game.campaignLegacyCastle'),true,'existing unlocked castle saves are marked once');
+const legacy=JSON.stringify(c.State);
+assert.equal(c.EarlyGame.migrateCampaign(),false);
+assert.equal(JSON.stringify(c.State),legacy,'migration is idempotent');
+c.State={};
+assert.equal(c.EarlyGame.migrateCampaign(),true);
+sm.set('features.location.spaceShip',true);
+for(const id of ['district','smiths','pillars']) assert.equal(c.EarlyGame.storyPrerequisite(id),false,'newly discovering the castle does not impersonate a legacy save');
+console.log('PASS: twenty-stage chapter order, actual city flags, training fallback, lore continuity, safe old-map station migration and legacy castle access.');

@@ -4,7 +4,14 @@ const path = require('node:path');
 const vm = require('node:vm');
 const state = {};
 let writes = 0, shown = null, activeEvent = null, className;
+const renderedText = [];
+const element = {
+  addClass(name) { if (name === 'expeditionReport') className = name; return this; },
+  find() { return this; }, empty() { renderedText.length = 0; return this; },
+  appendTo() { return this; }, text(value) { renderedText.push(value); return this; }
+};
 const context = {
+  $: () => element,
   $SM: {get: key => state[key], set: (key, value) => { writes++; state[key] = value; }},
   _: text => text,
   Engine: {activeModule: null},
@@ -18,7 +25,7 @@ const context = {
   Events: {
     activeEvent: () => activeEvent,
     startEvent: (event, options) => { shown = {event, options}; },
-    eventPanel: () => ({addClass: name => {className = name;}})
+    eventPanel: () => element
   }
 };
 vm.createContext(context);
@@ -67,7 +74,9 @@ assert.equal(JSON.stringify(state), snapshot);
 assert.equal(report.show(), true);
 assert.equal(className, 'expeditionReport');
 assert.equal(shown.event.scenes.start.buttons.closeExpeditionReport.nextScene, 'end');
-assert.match(shown.event.scenes.start.text.join(' '), /净增加.*净减少.*不含庄园生产/);
+assert.equal(shown.event.scenes.start.text.length, 0, 'structured sections replace flat paragraphs');
+assert.match(renderedText.join(' '), /净增加.*净减少.*不含庄园生产/);
+assert.match(renderedText.join(' '), /已返回庄园.*地图进展已保存.*探索进展.*3 步.*本次解锁.*iron mine.*下次准备/);
 assert.equal(JSON.stringify(state), snapshot, 'review is read-only');
 activeEvent = {};
 assert.equal(report.show(), false, 'cannot interrupt another event');
@@ -96,6 +105,8 @@ assert.equal(completed.reduced['wisteria gun'], undefined, 'returned weapon is n
 assert.equal(completed.gained.fur, 4, 'loot returned on death counts as net gain');
 assert.match(reloaded.lines(completed).join(' '), /地图变化未保存，剩余背包已归还仓库/);
 assert.match(reloaded.suggestions(completed)[0], /wisteria bullet.*近战/);
+reloaded.render(completed, element);
+assert.match(renderedText.join(' '), /本次倒下.*地图变化未保存.*剩余背包已归还仓库/);
 ['map', 'mask', 'position', 'curPos', 'outfit', 'equipped', 'state'].forEach(key => {
   assert.equal(Object.hasOwn(completed, key), false, 'completed report contains no resumable ' + key);
 });

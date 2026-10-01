@@ -153,12 +153,46 @@ var ExpeditionReport = {
     Events.startEvent({
       title: '远征回顾', scenes: {
         start: {
-          text: ExpeditionReport.lines(report),
+          text: [],
           buttons: { closeExpeditionReport: { text: '关闭回顾', nextScene: 'end' } }
         }
       }
-    }, { width: '460px' });
-    Events.eventPanel().addClass('expeditionReport');
+    }, { width: '520px' });
+    ExpeditionReport.render(report, Events.eventPanel().addClass('expeditionReport'));
     return true;
+  },
+  render: function(report, panel) {
+    var desc = panel.find('#description').empty();
+    var outcome = $('<section>').addClass('expeditionOutcome').appendTo(desc);
+    $('<strong>').text(report.outcome === 'death' ? '本次倒下' : '已返回庄园').appendTo(outcome);
+    var status = $('<p>').appendTo(outcome);
+    $('<strong>').text(report.mapSaved ? '地图进展已保存' : '地图变化未保存').appendTo(status);
+    $('<span>').text(report.mapSaved ? '；剩余背包已归还仓库。' : '，下次需要重新探索；剩余背包已归还仓库。').appendTo(status);
+    var section = function(title, className) {
+      var card = $('<section>').addClass('expeditionSection ' + className).appendTo(desc);
+      $('<h3>').text(title).appendTo(card);
+      return card;
+    };
+    var progress = section('探索进展', 'expeditionProgress');
+    var metrics = $('<div>').addClass('expeditionMetrics').appendTo(progress);
+    [['行程', report.steps + ' 步'], ['最远距离', report.farthestDistance + ' 格'],
+      ['新照亮地图', report.newTiles + ' 格'], ['新访问地点', report.newLocations + ' 处']].forEach(function(metric) {
+      var row = $('<div>').appendTo(metrics);
+      $('<span>').text(metric[0]).appendTo(row);
+      $('<strong>').text(metric[1]).appendTo(row);
+    });
+    var unlocks = section('本次解锁', 'expeditionUnlocks');
+    $('<strong>').text(report.unlocks.length ? report.unlocks.map(function(item) { return _(item); }).join('、') : '无新解锁').appendTo(unlocks);
+    var resources = section('物资变化', 'expeditionResources');
+    [['背包净增加', report.gained], ['背包净减少', report.reduced], ['归还仓库', report.returned]].forEach(function(resource) {
+      var row = $('<div>').addClass('expeditionResourceRow').appendTo(resources);
+      $('<span>').text(resource[0]).appendTo(row);
+      $('<strong>').text(ExpeditionReport._format(resource[1])).appendTo(row);
+    });
+    var advice = section('下次准备', 'expeditionAdvice');
+    ExpeditionReport.suggestions(report).forEach(function(text) { $('<p>').text(text).appendTo(advice); });
+    var rules = $('<details>').addClass('expeditionRules').appendTo(desc);
+    $('<summary>').text('物资统计说明（净变化，不是总掉落）').appendTo(rules);
+    $('<p>').text('以上仅对比出发与结算背包，不含庄园生产。净减少可能包含使用、丢弃等；净增加不是全部拾取量，不能当作总消耗或总掉落。').appendTo(rules);
   }
 };

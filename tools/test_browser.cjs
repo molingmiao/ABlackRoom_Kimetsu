@@ -73,6 +73,29 @@ async function port() {
       if (result.exceptionDetails) throw Error(result.exceptionDetails.exception?.description || result.exceptionDetails.text);
       return result.result.value;
     };
+    const checkDialogTheme = async (selector, dark) => evaluate('(' + (async function(selector, dark) {
+      if (Engine.isLightsOff() !== dark) Engine.turnLightsOff();
+      const panel = document.querySelector(selector);
+      const expected = dark ? 'rgb(39, 40, 35)' : 'rgb(255, 255, 255)';
+      for (let i = 0; i < 40 && getComputedStyle(panel).backgroundColor !== expected; i++) {
+        await new Promise(resolve => setTimeout(resolve, 50));
+      }
+      const style = getComputedStyle(panel);
+      if (style.backgroundColor !== expected) throw Error('dialog theme background incorrect: ' + style.backgroundColor);
+      const luminance = color => {
+        const rgb = color.match(/\d+/g).slice(0, 3).map(value => {
+          const channel = Number(value) / 255;
+          return channel <= 0.04045 ? channel / 12.92 : Math.pow((channel + 0.055) / 1.055, 2.4);
+        });
+        return rgb[0] * 0.2126 + rgb[1] * 0.7152 + rgb[2] * 0.0722;
+      };
+      const background = luminance(style.backgroundColor);
+      const text = luminance(getComputedStyle(panel.querySelector('#description')).color);
+      const contrast = (Math.max(background, text) + 0.05) / (Math.min(background, text) + 0.05);
+      if (contrast < 4.5) throw Error('dialog text contrast too low: ' + contrast);
+      const close = panel.querySelector('#buttons').getBoundingClientRect();
+      if (close.top < 0 || close.bottom > innerHeight) throw Error('dialog close button outside viewport');
+    }).toString() + ')(' + JSON.stringify(selector) + ',' + JSON.stringify(dark) + ')');
     await page('Runtime.enable');
     await page('Network.enable');
     await page('Network.setBlockedURLs', { urls: ['https://*'] });
@@ -645,16 +668,39 @@ async function port() {
     console.log('SCREENSHOT: ' + loadoutOutput);
     await evaluate(`(async function() {
       CampGuide.discoverEnemy('water demon');
+      window.materialInventoryBefore = JSON.stringify({stores:$SM.get('stores'),outfit:Path.outfit,equipped:$SM.get('game.equipped')});
       CampGuide.showMaterialSources();
       await new Promise(resolve => setTimeout(resolve, 250));
       if (!Events.eventPanel().text().includes('距庄园 11～20 格的森林')) throw Error('discovered source location missing');
       if (Events.eventPanel().text().includes('距庄园超过 20 格的森林')) throw Error('unseen thunder demon leaked');
       if (!CampGuide.routeMaterials('battle', 1).includes('必掉')) throw Error('known material route reward missing');
+      const panel=Events.eventPanel()[0];
+      const source=panel.querySelector('.materialSourceYield');
+      if (Number(getComputedStyle(source).fontWeight)<700) throw Error('material yields are not bold');
+      if (panel.querySelector('.materialSourceRules').open) throw Error('long material explanation should start collapsed');
+      const event=Events.activeEvent();
+      panel.querySelector('button[data-material="teeth"]').click();
+      if (panel.querySelector('button[data-material="teeth"]').getAttribute('aria-pressed')!=='true' || panel.querySelector('h2').textContent!==_('teeth')) throw Error('material selection failed');
+      if (Events.activeEvent()!==event || panel.querySelectorAll('h2').length!==1) throw Error('material selection should reuse one focused panel');
+      panel.querySelector('button[data-material="scales"]').click();
+      if (JSON.stringify({stores:$SM.get('stores'),outfit:Path.outfit,equipped:$SM.get('game.equipped')})!==window.materialInventoryBefore) throw Error('material lookup mutated inventory');
     })()`);
+    await checkDialogTheme('.materialSources', false);
     const sourceImage = await page('Page.captureScreenshot', {format:'png'});
     const sourceOutput = path.join(profile, 'material-sources.png');
     fs.writeFileSync(sourceOutput, Buffer.from(sourceImage.data, 'base64'));
     console.log('SCREENSHOT: ' + sourceOutput);
+    await checkDialogTheme('.materialSources', true);
+    const darkSourceImage = await page('Page.captureScreenshot', {format:'png'});
+    const darkSourceOutput = path.join(profile, 'material-sources-dark.png');
+    fs.writeFileSync(darkSourceOutput, Buffer.from(darkSourceImage.data, 'base64'));
+    console.log('SCREENSHOT: ' + darkSourceOutput);
+    await evaluate(`document.querySelector('.materialSourceRules').open=true`);
+    await checkDialogTheme('.materialSources', true);
+    await page('Emulation.setDeviceMetricsOverride', {width:1137,height:745,deviceScaleFactor:1,mobile:false});
+    await checkDialogTheme('.materialSources', true);
+    await page('Emulation.clearDeviceMetricsOverride');
+    await checkDialogTheme('.materialSources', false);
     await evaluate(`(async function() {
       await new Promise(resolve => Events.endEvent(resolve));
       Engine.activeModule = Space;
@@ -746,11 +792,30 @@ async function port() {
       const title=document.querySelector('.expeditionReport .eventTitle').getBoundingClientRect();
       const close=document.querySelector('#closeExpeditionReport').getBoundingClientRect();
       if(title.top<0 || title.right>innerWidth || close.top<0 || close.bottom>innerHeight) throw Error('expedition report hides its title or close button');
+      if(document.querySelectorAll('.expeditionReport strong').length<9) throw Error('expedition key facts are not emphasized');
+      if(document.querySelectorAll('.expeditionReport .expeditionSection').length!==4) throw Error('expedition sections missing');
+      if(document.querySelector('.expeditionRules').open) throw Error('statistics explanation should start collapsed');
+      window.expeditionStateBefore=JSON.stringify({stores:$SM.get('stores'),outfit:Path.outfit,report:ExpeditionReport.latest()});
     })()`);
+    await checkDialogTheme('.expeditionReport', false);
     const expeditionImage = await page('Page.captureScreenshot', {format:'png'});
     const expeditionOutput = path.join(profile, 'expedition-report.png');
     fs.writeFileSync(expeditionOutput, Buffer.from(expeditionImage.data, 'base64'));
     console.log('SCREENSHOT: ' + expeditionOutput);
+    await checkDialogTheme('.expeditionReport', true);
+    const darkExpeditionImage = await page('Page.captureScreenshot', {format:'png'});
+    const darkExpeditionOutput = path.join(profile, 'expedition-report-dark.png');
+    fs.writeFileSync(darkExpeditionOutput, Buffer.from(darkExpeditionImage.data, 'base64'));
+    console.log('SCREENSHOT: ' + darkExpeditionOutput);
+    await evaluate(`document.querySelector('.expeditionRules').open=true`);
+    await checkDialogTheme('.expeditionReport', true);
+    await page('Emulation.setDeviceMetricsOverride', {width:1137,height:745,deviceScaleFactor:1,mobile:false});
+    await checkDialogTheme('.expeditionReport', true);
+    await page('Emulation.clearDeviceMetricsOverride');
+    await checkDialogTheme('.expeditionReport', false);
+    await evaluate(`(function(){
+      if(JSON.stringify({stores:$SM.get('stores'),outfit:Path.outfit,report:ExpeditionReport.latest()})!==window.expeditionStateBefore) throw Error('reviewing and theme switching must not mutate inventory or report');
+    })()`);
     await evaluate(`(async function() {
       await new Promise(resolve=>Events.endEvent(resolve));
       Path.outfit={'nichirin katana':1,'cured meat':5}; $SM.set('outfit',Path.outfit);
@@ -774,6 +839,65 @@ async function port() {
     const returnOutput = path.join(profile, 'world-return-guide.png');
     fs.writeFileSync(returnOutput, Buffer.from(returnImage.data, 'base64'));
     console.log('SCREENSHOT: ' + returnOutput);
+    const chapterChecks = await evaluate(`(async function() {
+      const checks=[];
+      const check=(condition,name)=>{if(!condition) throw Error(name);checks.push(name);};
+      const until=async predicate=>{for(let i=0;i<160;i++){if(predicate()) return;await new Promise(resolve=>setTimeout(resolve,30));}throw Error('chapter state did not settle: '+Events.activeScene);};
+      World.goHome();
+      await new Promise(resolve=>$('#outerSlider').promise().done(resolve));
+      $SM.setM('game.buildings',{'iron mine':1,'coal mine':1,steelworks:1});
+      const savedMap=$SM.get('game.world.map').map(row=>row.slice());
+      savedMap[30][31]='M!';
+      $SM.set('game.world.map',savedMap);
+      check(savedMap.flat().filter(cell=>cell.charAt(0)==='T').length===1,'world initialization adds exactly one train station');
+      check(EarlyGame.milestones().length===20 && EarlyGame.trainReady(),'twenty-stage mainline recognizes safely returned mining and mountain progress');
+      $SM.setM('stores',{'nichirin katana':1,'cured meat':20,medicine:5});
+      Path.outfit={'nichirin katana':1,'cured meat':5,medicine:2};$SM.set('outfit',Path.outfit);
+      check(Path.embark(),'train mission uses a normal charged expedition');
+      let station;
+      World.state.map.forEach((row,x)=>row.forEach((cell,y)=>{if(cell==='T') station=[x,y];}));
+      World.curPos=station;World.drawMap();World.doSpace();
+      check(Events.activeEvent()===Events.Setpieces.mugenTrain && !$('#board').hasClass('disabled'),'the real station opens the playable train episode');
+      $('#board').trigger('click');$('#defend').trigger('click');
+      check(Events.activeScene==='flesh' && $('#enemy').data('hp')===40,'train chapter enters the actual Enmu avatar combat');
+      Events.clearTimeouts();
+      const originalHit=World.BASE_HIT_CHANCE;World.BASE_HIT_CHANCE=1;
+      $('#enemy').data('hp',1);
+      $('#attack_nichirin-katana').trigger('click');
+      await until(()=>$('#rescue').length && Events.fought);
+      World.BASE_HIT_CHANCE=originalHit;
+      check(!$SM.get('game.world.mugentrain') && !World.state.mugentrain,'winning the train fight alone does not complete the chapter');
+      Button.clearCooldown($('#rescue'));$('#rescue').trigger('click');
+      $('#stay').trigger('click');$('#listen').trigger('click');
+      check(World.state.mugentrain && !$SM.get('game.world.mugentrain'),'chapter completion remains temporary before return');
+      check(Events.eventPanel().text().includes('炎柱') && Events.eventPanel().text().includes('安全返回庄园'),'train ending explains lore and safe-return requirement');
+      await new Promise(resolve=>Events.endEvent(resolve));
+
+      // Ordinary victory: real attack, live discard counts, and treatment before exit.
+      Path.outfit={'nichirin katana':1,medicine:3,'cured meat':Path.getCapacity()-Path.getWeight('nichirin katana')-3*Path.getWeight('medicine')};
+      World.setHp(World.getMaxHealth()-5);
+      Events.startEvent({title:'战后收拾背包',scenes:{start:{combat:true,enemy:'blood mist demon',chara:'鬼',health:1,damage:1,hit:1,attackDelay:30,loot:{cloth:{min:4,max:5,chance:1}},deathMessage:'鬼已倒下。'}}});
+      Events.clearTimeouts();World.BASE_HIT_CHANCE=1;
+      $('#attack_nichirin-katana').trigger('click');
+      await until(()=>$('#leaveBtn').length && Events.fought);
+      World.BASE_HIT_CHANCE=originalHit;
+      check($('#buttons').children().last().attr('id')==='exitButtons','ordinary victory leaves treatment above the final exit');
+      const food=Path.outfit['cured meat'];
+      Events.drawDrop($('#take_cloth'));
+      check($('#drop_cured-meat').text().includes('背包 '+food) && $('#drop_medicine').text().includes('背包 3'),'actual discard menu shows every remaining backpack quantity');
+      $('#drop_cured-meat').trigger('click');
+      check(Path.outfit['cured meat']===food-1 && Path.outfit.cloth===1 && $('#drop_cured-meat').text().includes('背包 '+(food-1)),'discarding and pickup refresh quantities without reopening');
+      $('#dropMenu').remove();
+      document.body.dispatchEvent(new KeyboardEvent('keydown',{key:'2',bubbles:true}));
+      document.body.dispatchEvent(new KeyboardEvent('keyup',{key:'2',bubbles:true}));
+      check(Path.outfit.medicine===2,'reordered post-battle treatment preserves the medicine hotkey');
+      Button.clearCooldown($('#leaveBtn'));$('#leaveBtn').trigger('click');
+      await until(()=>!Events.activeEvent());
+      check(World.goHome() && $SM.get('game.world.mugentrain'),'safe return commits the new train chapter');
+      check(ExpeditionReport.latest().unlocks.includes('无限列车支援完成'),'expedition report includes the new chapter completion');
+      return checks;
+    })()`);
+    console.log(chapterChecks.map(name=>'PASS: '+name).join('\n'));
     assert.deepEqual(errors, [], 'uncaught browser exceptions');
   } finally {
     if (call && socket?.readyState === WebSocket.OPEN) {

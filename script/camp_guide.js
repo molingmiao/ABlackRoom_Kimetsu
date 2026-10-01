@@ -7,7 +7,7 @@ var CampGuide = {
   knownMaterial: function(item) {
     return Object.prototype.hasOwnProperty.call($SM.get('stores') || {}, item) || (Path.outfit || {})[item] > 0;
   },
-  materialSources: function(item) {
+  materialSourceRows: function(item) {
     var seen = $SM.get('game.materialSourcesSeen') || [];
     return (Events.Encounters || []).filter(function(event) {
       var scene = event.scenes.start;
@@ -15,22 +15,94 @@ var CampGuide = {
     }).map(function(event) {
       var scene = event.scenes.start, drop = scene.loot[item];
       var areas = {'spider demon spawn':'距庄园 11～20 格的平原', 'water demon':'距庄园 11～20 格的森林', 'thunder demon':'距庄园超过 20 格的森林'};
-      return _(scene.enemyName || scene.enemy) + (areas[scene.enemy] ? '（' + areas[scene.enemy] + '）' : '') + '：' + drop.min + '～' + Math.max(drop.min, drop.max - 1) + '，' + Math.round(drop.chance * 100) + '%';
+      return {enemy:scene.enemy, name:_(scene.enemyName || scene.enemy), area:areas[scene.enemy] || '',
+        min:drop.min, max:Math.max(drop.min,drop.max-1), chance:Math.round(drop.chance*100)};
     });
   },
-  showMaterialSources: function() {
-    if (Events.activeEvent()) return;
-    var text = ['仅列出已持有过的材料和已遭遇的野外敌人；数量为基础掉落，不含周目加成。旧存档未记录过的敌人需再次遭遇后显示。'];
-    ['scales','teeth','cloth'].filter(CampGuide.knownMaterial).forEach(function(item) {
-      var sources = CampGuide.materialSources(item);
-      text.push(_(item) + '：' + (sources.length ? sources.join('；') : '尚无已记录的野外来源。'));
-      if ($SM.get('game.buildings.trap', true) > 0) text.push('陷阱：有概率获得，诱饵可增加收获次数。');
-      if (Room.buyUnlocked(item)) text.push('交易站：已解锁购买，可在家中查看当前价格。');
-      if ($SM.get('features.location.spaceShip')) text.push(item === 'scales' ? '无限城：普通战、精英、Boss 保底；宝箱额外提供。' : item === 'teeth' ? '无限城：普通战概率掉落，精英与 Boss 保底。' : '无限城：10 层起普通战概率掉落，精英与 Boss 保底。');
+  materialSources: function(item) {
+    return CampGuide.materialSourceRows(item).map(function(row) {
+      return row.name + (row.area ? '（' + row.area + '）' : '') + '：' + row.min + '～' + row.max + '，' + row.chance + '%';
     });
-    if (text.length === 1) text.push('尚未发现鳞片、牙齿或布料。');
-    Events.startEvent({title:'材料获取途径', scenes:{start:{text:text,buttons:{close:{text:_('close'),nextScene:'end'}}}}});
-    Events.eventPanel().addClass('productionOverview');
+  },
+  materialGuide: function(item) {
+    if (['scales','teeth','cloth'].indexOf(item) < 0 || !CampGuide.knownMaterial(item)) return null;
+    var stock = ($SM.get('stores') || {})[item], home = [];
+    if ($SM.get('game.buildings.trap',true) > 0) home.push({name:'检查陷阱', condition:'已建造陷阱', detail:'概率获得；诱饵可增加收获次数。'});
+    if (Room.buyUnlocked(item)) home.push({name:'交易站购买', condition:'已解锁购买', detail:'消耗庄园库存；当前价格请在交易站查看。'});
+    var castle = $SM.get('features.location.spaceShip') ? {
+      scales:'普通战、精英与 Boss 保底掉落；宝箱额外提供。',
+      teeth:'普通战概率掉落；精英与 Boss 保底掉落。',
+      cloth:'10 层起普通战概率掉落；精英与 Boss 保底掉落。'
+    }[item] : null;
+    return {item:item, name:_(item), stock:Number.isFinite(stock) ? Math.max(0,stock) : 0,
+      castle:castle, wild:CampGuide.materialSourceRows(item), home:home};
+  },
+  showMaterialSources: function() {
+    if (Events.activeEvent()) return false;
+    Events.startEvent({title:'材料获取途径', materialSourceGuide:true,
+      scenes:{start:{text:[],buttons:{close:{text:_('close'),nextScene:'end'}}}}}, {width:'580px'});
+    var event = Events.activeEvent(), panel = Events.eventPanel().addClass('materialSources');
+    var desc = panel.find('#description'), items = ['scales','teeth','cloth'].filter(CampGuide.knownMaterial);
+    $('<p>').addClass('materialSourceIntro').text('先选你需要的材料，再看来源、地点和获取条件。').appendTo(desc);
+    if (!items.length) {
+      $('<p>').addClass('materialSourceEmpty').text('尚未发现鳞片、牙齿或布料。获取过材料后，这里会显示它的已知来源。').appendTo(desc);
+    } else {
+      var tabs = $('<div>').addClass('materialSourceTabs').attr({role:'group','aria-label':'选择材料'}).appendTo(desc);
+      items.forEach(function(item) {
+        $('<button>').attr({type:'button','data-material':item,'aria-pressed':'false','aria-controls':'materialSourceBody'})
+          .text(_(item)).on('click',function() {
+            if (Events.activeEvent() !== event || event.ending) return;
+            CampGuide.renderMaterialSources(item,panel);
+          }).appendTo(tabs);
+      });
+      $('<div>').attr('id','materialSourceBody').appendTo(desc);
+      CampGuide.renderMaterialSources(items[0],panel);
+    }
+    var rules = $('<details>').addClass('materialSourceRules').appendTo(desc);
+    $('<summary>').text('显示范围与掉落说明').appendTo(rules);
+    $('<p>').text('只展示已发现材料、已解锁途径和已遭遇的野外敌人。数量与概率为基础掉落，不含周目加成；旧存档未记录的敌人需要再次遭遇后显示。').appendTo(rules);
+    return true;
+  },
+  renderMaterialSources: function(item,panel) {
+    var event = Events.activeEvent(), guide = CampGuide.materialGuide(item);
+    if (!event || !event.materialSourceGuide || event.ending || !guide || !panel || panel[0] !== Events.eventPanel()[0]) return false;
+    panel.find('.materialSourceTabs button').each(function() {
+      $(this).attr('aria-pressed',String($(this).attr('data-material') === item));
+    });
+    var body = panel.find('#materialSourceBody').empty().scrollTop(0);
+    var heading = $('<div>').addClass('materialSourceHeading').appendTo(body);
+    $('<h2>').text(guide.name).appendTo(heading);
+    $('<span>').text('庄园库存：' + guide.stock).appendTo(heading);
+    var section = function(title,tag) {
+      var card = $('<section>').addClass('materialSourceSection').appendTo(body);
+      var header = $('<div>').addClass('materialSourceSectionHeader').appendTo(card);
+      $('<h3>').text(title).appendTo(header);
+      $('<span>').addClass('materialSourceTag').text(tag).appendTo(header);
+      return card;
+    };
+    if (guide.castle) {
+      var castle = section('无限城','已解锁');
+      $('<p>').addClass('materialSourceYield').text(guide.castle).appendTo(castle);
+      $('<p>').addClass('materialSourceDetail').text('出征前准备补给；保底指材料掉落，不代表战斗没有风险。').appendTo(castle);
+    }
+    var wild = section('野外探索',guide.wild.length ? '已记录 ' + guide.wild.length + ' 种敌人' : '尚无记录');
+    if (!guide.wild.length) $('<p>').addClass('materialSourceDetail').text('尚无已记录的野外来源；遭遇相关敌人后会在这里显示。').appendTo(wild);
+    guide.wild.forEach(function(source) {
+      var row = $('<div>').addClass('materialSourceRow').appendTo(wild);
+      $('<h4>').text(source.name).appendTo(row);
+      if (source.area) $('<p>').addClass('materialSourceLocation').text('地点：' + source.area).appendTo(row);
+      $('<p>').addClass('materialSourceYield').text('基础掉落：' + source.min + '～' + source.max + ' · ' +
+        (source.chance === 100 ? '必掉' : '概率 ' + source.chance + '%')).appendTo(row);
+    });
+    if (guide.home.length) {
+      var home = section('庄园补给','无需远征');
+      guide.home.forEach(function(source) {
+        var row = $('<div>').addClass('materialSourceRow').appendTo(home);
+        $('<h4>').text(source.name).appendTo(row);
+        $('<p>').addClass('materialSourceDetail').text(source.condition + ' · ' + source.detail).appendTo(row);
+      });
+    }
+    return true;
   },
   routeMaterials: function(type, floor) {
     if (['battle','elite','boss','treasure'].indexOf(type) < 0) return '';

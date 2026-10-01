@@ -449,14 +449,14 @@ var Room = {
 		'scales': {
 			type: 'good',
 			cost: function () {
-				return { fur: 150 };
+				return { fur: 15 };
 			},
 			audio: AudioLibrary.BUY_SCALES
 		},
 		'teeth': {
 			type: 'good',
 			cost: function () {
-				return { fur: 300 };
+				return { fur: 30 };
 			},
 			audio: AudioLibrary.BUY_TEETH
 		},
@@ -464,7 +464,7 @@ var Room = {
 			type: 'good',
 			cost: function () {
 				return {
-					'fur': 150,
+					'fur': 15,
 					'scales': 50
 				};
 			},
@@ -474,7 +474,7 @@ var Room = {
 			type: 'good',
 			cost: function () {
 				return {
-					'fur': 200,
+					'fur': 20,
 					'teeth': 50
 				};
 			},
@@ -484,7 +484,7 @@ var Room = {
 			type: 'good',
 			cost: function () {
 				return {
-					'fur': 300,
+					'fur': 30,
 					'scales': 50,
 					'teeth': 50
 				};
@@ -552,7 +552,7 @@ var Room = {
 			type: 'good',
 			cost: function () {
 				return {
-					'fur': 1500,
+					'fur': 150,
 					'scales': 250,
 					'teeth': 100
 				};
@@ -564,7 +564,7 @@ var Room = {
 			maximum: 1,
 			cost: function () {
 				return {
-					fur: 400,
+					fur: 40,
 					scales: 20,
 					teeth: 10
 				};
@@ -1434,6 +1434,12 @@ var Room = {
 		for (var k in Room.Craftables) {
 			var craftable = Room.Craftables[k];
 			var max = $SM.num(k, craftable) + 1 > craftable.maximum;
+			// Completed permanent upgrades and one-off buildings no longer need a crafting slot.
+			if (max && (craftable.type === 'upgrade' || (craftable.type === 'building' && craftable.maximum === 1))) {
+				if (craftable.button) craftable.button.remove();
+				craftable.button = null;
+				continue;
+			}
 			if (craftable.button == null) {
 				if (Room.craftUnlocked(k)) {
 					var loc = Room.needsWorkshop(craftable.type) ? craftSection : buildSection;
@@ -1508,7 +1514,7 @@ var Room = {
 		if (cNeedsAppend && craftSection.children().length > 0) {
 			craftSection.appendTo('div#roomPanel').animate({ opacity: 1 }, 300, 'linear');
 		}
-		if (bNeedsAppend && buildSection.children().length > 0) {
+		if (bNeedsAppend && buySection.children().length > 0) {
 			buySection.appendTo('div#roomPanel').animate({ opacity: 1 }, 300, 'linear');
 		}
 	},

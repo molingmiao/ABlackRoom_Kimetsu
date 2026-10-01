@@ -19,7 +19,7 @@ assert.equal(c.State.stores['cured meat'],20,'exact boundary runs');
 assert.equal(c.State.stores.iron,2);
 c.State.game.productionReserves={};c.State.income['iron miner'].timeLeft=0;
 sm.collectIncome();assert.equal(c.State.stores['cured meat'],18,'zero or missing reserves preserve old behavior');
-reset({wood:10,meat:10,'cured meat':0},{wood:9},{charcutier:{delay:10,stores:{wood:-5,meat:-5,'cured meat':1}}});
+reset({wood:10,meat:10,'cured meat':0},{wood:9},{charcutier:{delay:10,stores:{wood:-5,meat:-2,'cured meat':1}}});
 sm.collectIncome();assert.deepEqual(plain(c.State.stores),{wood:10,meat:10,'cured meat':0},'one protected input blocks all deductions');
 reset({'cured meat':22,iron:0,coal:0},{'cured meat':20},{...miners(),'coal miner':{delay:10,stores:{'cured meat':-2,coal:2}}});
 sm.collectIncome();assert.equal(c.State.stores['cured meat'],20);assert.equal(c.State.stores.coal,0,'competing jobs share one real remaining balance');

@@ -200,6 +200,7 @@ Events.Global = [
 		isAvailable: function() {
 			return (Engine.activeModule == Room || Engine.activeModule == Outside)
 				&& $SM.get('game.buildings["workshop"]', true) >= 1
+				&& (!window.EarlyGame || EarlyGame.storyPrerequisite('smiths'))
 				&& !$SM.get('game.swordsmithVillageDone');
 		},
 		scenes: {
@@ -400,21 +401,22 @@ Events.Global = [
 		title: _('The Pillars Convene'),
 		isAvailable: function() {
 			var bps = $SM.get('character.blueprints');
-			var hasAnyBp = bps && Object.keys(bps).length > 0;
+			var hasAnyBp = bps && Object.keys(bps).some(function(key) { return !!bps[key]; });
 			return Engine.activeModule == Room
 				&& hasAnyBp
+				&& (!window.EarlyGame || EarlyGame.storyPrerequisite('pillars'))
 				&& !$SM.get('game.pillarConvocationDone');
 		},
 		scenes: {
 			'start': {
 				text: [
 					_('the gate creaks open all morning long. one by one they arrive.'),
-					_('Tomioka — silent. Rengoku — radiant. Kanroji — flushed. Iguro — coiled.'),
-					_('Tokito, Uzui, Himejima, Shinazugawa, and Kocho behind them. all nine of the Hashira, here.'),
+					'富冈沉默地坐下，甘露寺与伊黑随后抵达。时透、悲鸣屿、不死川和胡蝶也来到庄园。',
+					'已经退役的宇髓带来游郭的情报。炼狱的席位空着，案头放着他留下的训练札。',
 					_('"the corps marches on the demon king at the next moonless night," Himejima rumbles.'),
 					_('"until then, train with one of us. choose."')
 				],
-				notification: _('all nine Hashira have gathered at the wisteria estate.'),
+				notification: '仍能前来的柱齐聚紫藤庄园，为最终决战作准备。',
 				blink: true,
 				buttons: {
 					'choose': {
@@ -435,7 +437,7 @@ Events.Global = [
 				],
 				buttons: {
 					'flame': {
-						text: _('炎柱・煉獄: train in fierce strikes'),
+						text: '炎柱遗志：依训练札习猛烈一击',
 						cost: { 'cured meat': 50, 'torch': 1 },
 						available: function() { return !$SM.hasPerk('slash mastery'); },
 						onChoose: function() { $SM.addPerk('slash mastery'); },
@@ -480,6 +482,11 @@ Events.Global = [
 						},
 						nextScene: { 1: 'thanks' }
 					},
+					'review': {
+						text: '温习已学呼吸，协助队士训练',
+						cost: { 'cured meat': 50, 'torch': 1 },
+						nextScene: { 1: 'thanks' }
+					},
 					'leave': {
 						text: _('bow and decline'),
 						onLoad: function() { $SM.set('game.pillarConvocationDone', true); },
@@ -512,7 +519,8 @@ Events.Global = [
 		title: _('The Pleasure District'),
 		isAvailable: function() {
 			return (Engine.activeModule == Room || Engine.activeModule == Outside)
-				&& $SM.get('character.cityCleared')
+				&& ($SM.get('game.cityCleared') || $SM.get('character.cityCleared'))
+				&& (!window.EarlyGame || EarlyGame.storyPrerequisite('district'))
 				&& !$SM.get('game.yoshiwaraDone');
 		},
 		scenes: {

@@ -20,7 +20,8 @@ var World = {
     BATTLEFIELD: 'F',
     SWAMP: 'M',
     CACHE: 'U',
-    EXECUTIONER: 'X'
+    EXECUTIONER: 'X',
+    MUGEN_TRAIN: 'T'
   },
   TILE_PROBS: {},
   LANDMARKS: {},
@@ -149,6 +150,7 @@ var World = {
     World.LANDMARKS[World.TILE.BATTLEFIELD] = { num: 5, minRadius: 18, maxRadius: World.RADIUS * 1.5, scene: 'battlefield', label:  _('A&nbsp;Battlefield')};
     World.LANDMARKS[World.TILE.SWAMP] = { num: 1, minRadius: 15, maxRadius: World.RADIUS * 1.5, scene: 'swamp', label:  _('A&nbsp;Murky&nbsp;Swamp')};
     World.LANDMARKS[World.TILE.EXECUTIONER] = { num: 1, minRadius: 28, maxRadius: 28, scene: 'executioner', 'label': _('A&nbsp;Derailed&nbsp;Train')};
+    World.LANDMARKS[World.TILE.MUGEN_TRAIN] = { num: 1, minRadius: 18, maxRadius: 18, scene: 'mugenTrain', label: '无限列车站台' };
 
     // Only add the cache if there is prestige data
     if($SM.get('previous.stores')) {
@@ -173,6 +175,9 @@ var World = {
       $SM.set('game.world.map', map);
       $SM.set('features.executioner', true);
     }
+
+    // Patch older maps in place: never regenerate exploration or overwrite landmarks.
+    World.ensureCampaignLandmarks();
 
     // Create the World panel
     this.panel = $('<div>').attr('id', "worldPanel").addClass('location').appendTo('#outerSlider');
@@ -1125,7 +1130,7 @@ var World = {
   finishExpeditionReport: function(outcome,reason) {
     if (!window.ExpeditionReport || !World.state) return null;
     var unlocks = [];
-    var flags = {ironmine:'铁矿供应',coalmine:'煤矿供应',sulphurmine:'硫磺矿供应',ship:'无限城入口',executioner:'制造器'};
+    var flags = {ironmine:'铁矿供应',coalmine:'煤矿供应',sulphurmine:'硫磺矿供应',ship:'无限城入口',executioner:'制造器',mugentrain:'无限列车支援完成'};
     Object.keys(flags).forEach(function(key) {
       if (outcome === 'return' && World.state[key] && !(World._expeditionFlags || {})[key]) unlocks.push(flags[key]);
     });
@@ -1299,7 +1304,7 @@ var World = {
     World.drawMap();
     World._expeditionFlags = {};
     World._expeditionBlueprints = $.extend({},$SM.get('character.blueprints') || {});
-    ['ironmine','coalmine','sulphurmine','ship','executioner'].forEach(function(key) {World._expeditionFlags[key] = !!World.state[key];});
+    ['ironmine','coalmine','sulphurmine','ship','executioner','mugentrain'].forEach(function(key) {World._expeditionFlags[key] = !!World.state[key];});
     if (window.ExpeditionReport) ExpeditionReport.begin({outfit:Path.outfit || {},map:World.state.map,mask:World.state.mask,equipped:Path.getLoadoutEquipment()});
     World.setTitle();
     AudioEngine.playBackgroundMusic(AudioLibrary.MUSIC_WORLD);
@@ -1315,6 +1320,34 @@ var World = {
 
   copyPos: function(pos) {
     return [pos[0], pos[1]];
+  },
+
+  ensureCampaignLandmarks: function() {
+    var map = $SM.get('game.world.map');
+    if (!Array.isArray(map) || !map.length) return false;
+    if (map.some(function(row) { return Array.isArray(row) && row.some(function(cell) {
+      return typeof cell === 'string' && cell.charAt(0) === World.TILE.MUGEN_TRAIN;
+    }); })) return false;
+    var candidates = [], fallback = [];
+    map.forEach(function(row,x) {
+      if (!Array.isArray(row)) return;
+      row.forEach(function(cell,y) {
+        if (!World.isTerrain(cell)) return;
+        var distance = World.getDistance([x,y],World.VILLAGE_POS);
+        if (distance === 18) candidates.push([x,y]);
+        else if (distance >= 5) fallback.push({position:[x,y],offset:Math.abs(distance-18)});
+      });
+    });
+    if (!candidates.length && fallback.length) {
+      var nearest = Math.min.apply(null,fallback.map(function(candidate) { return candidate.offset; }));
+      candidates = fallback.filter(function(candidate) { return candidate.offset === nearest; }).map(function(candidate) { return candidate.position; });
+    }
+    if (!candidates.length) return false;
+    var position = candidates[Math.floor(Math.random() * candidates.length)];
+    map = map.map(function(row) { return Array.isArray(row) ? row.slice() : row; });
+    map[position[0]][position[1]] = World.TILE.MUGEN_TRAIN;
+    $SM.set('game.world.map',map,true);
+    return true;
   },
 
   handleStateUpdates: function(e){

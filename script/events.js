@@ -1142,6 +1142,8 @@ var Events = {
 						try { Events._bindCombatHotkeys(); } catch (e) { /* ignore */ }
 					}
 					$('<div>').addClass('clear').appendTo(exitBtns);
+					// 战后先治疗再离开；移动现有容器，保留按钮回调和战利品快捷离开的引用。
+					exitBtns.appendTo(btns);
 
 					Events.allowLeave(takeETbtn, leaveBtn);
 				}, 1000, true);
@@ -1156,6 +1158,10 @@ var Events = {
 	},
 
 	drawDrop:function(btn) {
+		if(!(btn.data('numLeft') > 0)) {
+			$('#dropMenu').remove();
+			return;
+		}
 		var name = btn.attr('id').substring(5).replace(/-/g, ' ');
 		var needsAppend = false;
 		var weight = Path.getWeight(name);
@@ -1173,15 +1179,18 @@ var Events = {
 			}
 			for(var k in Path.outfit) {
 				if(name == k) continue;
+				var carried = Path.outfit[k];
+				if(typeof carried !== 'number' || !isFinite(carried) || carried < 1) continue;
+				carried = Math.floor(carried);
 				var itemWeight = Path.getWeight(k);
 				if(itemWeight > 0) {
 					var numToDrop = Math.ceil((weight - freeSpace) / itemWeight);
-					if(numToDrop > Path.outfit[k]) {
-						numToDrop = Path.outfit[k];
+					if(numToDrop > carried) {
+						numToDrop = carried;
 					}
 					if(numToDrop > 0) {
 						var dropRow = $('<div>').attr('id', 'drop_' + k.replace(/ /g, '-'))
-							.text(_(k) + ' x' + numToDrop)
+							.text(_(k) + ' · ' + _('pockets') + ' ' + carried + ' · ' + _('drop:').replace(/[:：]\s*$/, '') + ' ' + numToDrop)
 							.data('thing', k)
 							.data('num', numToDrop)
 							.click(Events.dropStuff)
@@ -1208,6 +1217,8 @@ var Events = {
 			btn.one("mouseleave", function() {
 				$('#dropMenu').remove();
 			});
+		} else {
+			$('#dropMenu').remove();
 		}
 	},
 
@@ -1329,9 +1340,24 @@ var Events = {
 		e.stopPropagation();
 		var btn = $(this);
 		var target = btn.closest('.button');
+		if(!target.length) return;
 		var thing = btn.data('thing');
 		var id = 'take_' + thing.replace(/ /g, '-');
-		var num = btn.data('num');
+		var carried = Path.outfit[thing];
+		var targetName = target.attr('id').substring(5).replace(/-/g, ' ');
+		var neededWeight = Path.getWeight(targetName) - Path.getFreeSpace();
+		var itemWeight = Path.getWeight(thing);
+		// Re-check the live bag, so an outdated menu cannot discard missing items.
+		if(!(target.data('numLeft') > 0) || neededWeight <= 0 || itemWeight <= 0 ||
+			typeof carried !== 'number' || !isFinite(carried) || carried < 1) {
+			Events.drawDrop(target);
+			return;
+		}
+		var num = Math.min(Math.floor(btn.data('num')), Math.floor(carried), Math.ceil(neededWeight / itemWeight));
+		if(!isFinite(num) || num < 1) {
+			Events.drawDrop(target);
+			return;
+		}
 		var lootButtons = $('#lootButtons');
 		Engine.log('dropping ' + num + ' ' + thing);
 

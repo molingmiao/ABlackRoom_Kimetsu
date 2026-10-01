@@ -50,7 +50,7 @@ sm.set('game.buildings.hut',1);assert.equal(e.firstResidentsPending(),false);
 sm.set('game.population',2);assert.match(e.task().text,/trap/);
 sm.set('game.buildings.trap',1);assert.match(e.task().text,/hunting lodge/);
 sm.set('game.buildings.lodge',1);assert.match(e.task().text,/trading post/);
-sm.set('game.buildings.trading post',1);assert.equal(e.task().cost.fur,400);
+sm.set('game.buildings.trading post',1);assert.equal(e.task().cost.fur,40);
 sm.set('stores.compass',1);assert.equal(e.task(),null);
 sm.set('stores.compass',0);sm.set('features.location.path',true);assert.equal(e.task(),null);
 assert.equal(e.gatherCooldown(60),60,'old advanced saves receive no opening boost');
@@ -70,8 +70,46 @@ for(const [id,building] of [['food','smokehouse'],['workshop','workshop'],['mine
   sm.set('game.buildings["'+building+'"]',1);
   assert.equal(e.claimMilestone(id),true);
 }
+assert.equal(e.milestones().length,20,'mainline contains mineral and story chapters before the castle');
+assert.equal(e.milestone().id,'coal','iron mine no longer jumps straight to castle');
+assert.equal(e.trainReady(),false);
+assert.equal(e.claimMilestone('coal'),false,'a visited but unreturned mine cannot pay');
+for(const [id,building] of [['coal','coal mine'],['steel','steelworks']]) {
+  sm.set('game.buildings["'+building+'"]',1);
+  assert.equal(e.claimMilestone(id),true);
+}
+sm.set('game.world.map',[['M']]);
+assert.equal(e.milestone().ready,false,'entering spider mountain is not completing it');
+c.World={state:{map:[['M!']]}};
+assert.equal(e.trainReady(),false,'temporary expedition completion cannot unlock train');
+sm.set('game.world.map',[['M!']]);
+assert.equal(e.trainReady(),true,'a safely returned old spider mountain completion is recognized');
+assert.equal(e.claimMilestone('natagumo'),true);
+assert.equal(e.milestone().id,'train');
+c.World.state.mugentrain=true;
+assert.equal(e.claimMilestone('train'),false,'temporary train win cannot pay before safe return');
+sm.set('game.world.mugentrain',true);
+assert.equal(e.claimMilestone('train'),true);
+const trainRewarded=JSON.stringify(state);
+assert.equal(e.claimMilestone('train'),false);
+assert.equal(JSON.stringify(state),trainRewarded,'train reward cannot be reclaimed after reload');
+for(const [id,building] of [['sulphur','sulphur mine'],['armoury','armoury']]) {
+  sm.set('game.buildings["'+building+'"]',1);
+  assert.equal(e.claimMilestone(id),true);
+}
+sm.set('features.location.fabricator',true);assert.equal(e.claimMilestone('wreck'),true);
+assert.equal(e.storyPrerequisite('district'),true);
+assert.equal(e.storyPrerequisite('smiths'),false);
+assert.equal(e.storyPrerequisite('pillars'),false);
+for(const [id,flag] of [['district','yoshiwaraDone'],['smiths','swordsmithVillageDone'],['pillars','pillarConvocationDone']]) {
+  assert.equal(e.claimMilestone(id),false);
+  sm.set('game.'+flag,true);
+  assert.equal(e.claimMilestone(id),true);
+}
 sm.set('features.location.spaceShip',true);assert.equal(e.claimMilestone('castle'),true);
 assert.equal(e.milestone(),null,'completed campaign does not remain on screen');
+sm.set('game.world.mugentrain',false);sm.set('game.yoshiwaraDone',false);sm.set('game.swordsmithVillageDone',false);
+for(const id of ['district','smiths','pillars']) assert.equal(e.storyPrerequisite(id),true,'old castle saves retain event availability');
 sm.set('game.buildings.hut',0);assert.equal(c.Room.Craftables.hut.cost().wood,80);
 sm.set('game.buildings.hut',1);assert.equal(c.Room.Craftables.hut.cost().wood,150,'only first shelter discounted');
 assert.equal(c.Room.Craftables.lodge.cost().wood,160);

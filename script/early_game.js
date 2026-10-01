@@ -11,6 +11,16 @@ var EarlyGame = {
       {id:'food', title:'备足远行口粮', goal:'建造熏肉房', building:'smokehouse', reward:{wood:150,leather:30,'cured meat':15}},
       {id:'workshop', title:'整备猎鬼装备', goal:'建造工坊', building:'workshop', reward:{leather:30,scales:10,'cured meat':10}},
       {id:'mine', title:'建立矿石供应', goal:'找到铁矿并安全返回，解锁铁矿工', building:'iron mine', reward:{iron:40,wood:200,'cured meat':20}},
+      {id:'coal', title:'打通煤矿', goal:'清理煤矿并安全返回，解锁煤矿工', building:'coal mine', hint:'煤矿位于距庄园 10 格处；准备好护甲、武器与返程口粮。', reward:{coal:50,iron:40,wood:350,'cured meat':20}},
+      {id:'steel', title:'锻造升级', goal:'建造炼钢场，让铁矿与煤炭转化为钢材', building:'steelworks', hint:'建成后在庄园安排炼钢工；炼钢会持续消耗铁和煤。', reward:{steel:20,leather:30,'cured meat':25}},
+      {id:'natagumo', title:'那田蜘蛛山篇', goal:'完成那田蜘蛛山的累之战与余韵，并安全返回', landmark:'M', hint:'寻找地图上的 M；完成整段剧情后再回庄园，不是仅进入山中。', reward:{medicine:6,'wisteria oil':2,'cured meat':30}},
+      {id:'train', title:'无限列车篇', goal:'支援炎柱、救援乘客，完成无限列车剧情并安全返回', flag:'game.world.mugentrain', hint:'列车站台标记为 T，通常距庄园 18 格（旧地图可能略有偏移）；先完成矿业、炼钢和蜘蛛山的准备。', reward:{cloth:25,medicine:8,'cured meat':35}},
+      {id:'sulphur', title:'取得硫磺供应', goal:'清理硫磺矿并安全返回，解锁硫磺矿工', building:'sulphur mine', hint:'硫磺矿位于距庄园 20 格处；钢制护甲和治疗物资能帮助应对连续战斗。', reward:{sulphur:25,coal:50,steel:20}},
+      {id:'armoury', title:'建立军械补给', goal:'建造军械库，形成持续的藤花弹供应', building:'armoury', hint:'安排军械工，以钢和硫磺制作弹药；别让炼钢原料断供。', reward:{'wisteria bullet':30,medicine:5,'cured meat':30}},
+      {id:'wreck', title:'列车残骸与锻造线索', goal:'探明列车残骸、带回装置，开放日轮锻造', feature:'fabricator', hint:'残骸标记为 X，距庄园 28 格；与无限列车支援任务是两个不同地点。', reward:{'demon stone':2,'solar crystal':8,'cured meat':30}},
+      {id:'district', title:'游郭篇', goal:'完成音柱的游郭救援，解决上弦之陆的威胁', flag:'game.yoshiwaraDone', hint:'清理地图上的废墟城市 Y 后回庄园，等待鎹鸦带来宇髓的委托；备好口粮、火把和藤花符。', reward:{medicine:8,'wisteria charm':3,'cured meat':40}},
+      {id:'smiths', title:'刀匠村篇', goal:'支援刀匠村，完成霞柱与玄弥的战后剧情', flag:'game.swordsmithVillageDone', hint:'完成游郭后，刀匠村的委托会在庄园出现；可选择参战或保护后方伤员。', reward:{steel:40,leather:40,'cured meat':40}},
+      {id:'pillars', title:'柱训练篇', goal:'参加柱合议，完成一位柱的训练', flag:'game.pillarConvocationDone', hint:'完成刀匠村并带回至少一张制造图纸后，回大厅迎接柱合议；训练需要口粮和火把。', reward:{medicine:10,'cured meat':60,fur:100}},
       {id:'castle', title:'通往决战之地', goal:'找到无限城入口并安全返回', feature:'spaceShip', reward:{'demon stone':2,medicine:5,'cured meat':15}}
     ];
   },
@@ -20,11 +30,35 @@ var EarlyGame = {
     var claims = $SM.get('game.campaignClaims') || {};
     var task = EarlyGame.milestones().find(function(m) {return !claims[m.id];});
     if (!task) return null;
-    task.ready = task.feature ? !!$SM.get('features.location.' + task.feature) : $SM.get('game.buildings[' + JSON.stringify(task.building) + ']',true) > 0;
+    task.ready = task.feature ? !!$SM.get('features.location.' + task.feature) : task.flag ? !!$SM.get(task.flag) :
+      task.landmark ? EarlyGame.worldChapterCleared(task.landmark) : $SM.get('game.buildings[' + JSON.stringify(task.building) + ']',true) > 0;
     if (task.population) task.ready = task.ready && $SM.get('game.population',true) > 0;
     // World exploration proves the opening milestones were passed, even after lost buildings.
     if (['cart','shelter','traps','hunters','trade'].indexOf(task.id) >= 0 && $SM.get('features.location.path')) task.ready = true;
     return task;
+  },
+  worldChapterCleared: function(tile) {
+    return ($SM.get('game.world.map') || []).some(function(row) {
+      return Array.isArray(row) && row.some(function(cell) { return cell === tile + '!'; });
+    });
+  },
+  trainReady: function() {
+    return $SM.get('game.buildings["iron mine"]',true) > 0 && $SM.get('game.buildings["coal mine"]',true) > 0
+      && $SM.get('game.buildings.steelworks',true) > 0 && EarlyGame.worldChapterCleared('M');
+  },
+  storyPrerequisite: function(id) {
+    // Already unlocked castle saves retain their original event availability.
+    if ($SM.get('game.campaignLegacyCastle') || (!$SM.get('game.campaignVersion') && $SM.get('features.location.spaceShip'))) return true;
+    if (id === 'district') return !!$SM.get('game.world.mugentrain');
+    if (id === 'smiths') return !!$SM.get('game.yoshiwaraDone');
+    if (id === 'pillars') return !!$SM.get('game.swordsmithVillageDone');
+    return false;
+  },
+  migrateCampaign: function() {
+    if ($SM.get('game.campaignVersion') === 2) return false;
+    $SM.set('game.campaignLegacyCastle',!!$SM.get('features.location.spaceShip'),true);
+    $SM.set('game.campaignVersion',2,true);
+    return true;
   },
   claimMilestone: function(id) {
     var task = EarlyGame.milestone();
@@ -39,6 +73,7 @@ var EarlyGame = {
     return true;
   },
   init: function() {
+    EarlyGame.migrateCampaign();
     if (!EarlyGame._subscribed) {
       $.Dispatch('stateUpdate').subscribe(EarlyGame.render);
       EarlyGame._subscribed = true;
@@ -147,6 +182,16 @@ var EarlyGame = {
       food:'熏肉房解锁熏肉工人，生肉加工成可恢复生命的远征口粮。',
       workshop:'工坊开启武器、护甲与携行装备制作，装备和补给仍需在备战页装配。',
       mine:'安排铁矿工维持矿石供应，为更强的装备做准备。',
+      coal:'煤矿工提供炼钢燃料；下一步把铁矿和煤炭接进炼钢链。',
+      steel:'炼钢场开启钢材生产，能打造日轮刀、钢制护甲与更强的携行装备。',
+      natagumo:'蜘蛛山的经历让你学会善用口粮与恢复；下一次任务是无限列车支援。',
+      train:'乘客获救，炎柱的嘱托留了下来；继续完善庄园供给，为上弦级的任务做准备。',
+      sulphur:'硫磺矿工提供军械原料，接下来建设军械库补齐弹药。',
+      armoury:'军械工能持续制造藤花弹；远征不再只能依靠偶然拾取弹药。',
+      wreck:'日轮锻造已经开放；继续探索残骸车厢寻找图纸，制作呼吸流派装备。',
+      district:'游郭救援告一段落；下一步帮助刀匠村保护锻造与补给。',
+      smiths:'刀匠与队士的经验为决战铺路；带回图纸后准备参加柱训练。',
+      pillars:'柱训练已完成；最后确认护甲、武器和治疗配置，再前往无限城。',
       castle:'无限城入口已开放；配置好装备与补给，再迎接逐层推进的战斗。'
     }[id] || '';
   },
@@ -181,6 +226,7 @@ var EarlyGame = {
         $('<button>').attr('type','button').addClass('guestCare').text('照料来客（木材 1）').appendTo(box).on('click',EarlyGame.tendGuest);
         $('<p>').addClass('campaignGoal').appendTo(box);
         $('<p>').addClass('campaignBenefit').appendTo(box);
+        $('<p>').addClass('campaignHint').appendTo(box);
         $('<p>').addClass('campaignReward').appendTo(box);
         $('<button>').attr('type','button').addClass('campaignClaim').appendTo(box);
         $('<div>').addClass('openingSupply').appendTo(box);
@@ -200,8 +246,9 @@ var EarlyGame = {
       box.find('.guestCareHint').toggle(care).text('大厅暖到“温暖”、林地开放后，可主动照料，也可等待自然恢复。');
       box.find('.guestCare').toggle(care).prop('disabled',!EarlyGame.canTendGuest());
       var stage = milestone ? EarlyGame.milestones().findIndex(function(m) {return m.id === milestone.id;}) + 1 : 0;
-      box.find('.campaignGoal').toggle(!!milestone).text(milestone ? '阶段主线 ' + stage + '/10 · ' + milestone.title + '：' + milestone.goal : '');
+      box.find('.campaignGoal').toggle(!!milestone).text(milestone ? '阶段主线 ' + stage + '/' + EarlyGame.milestones().length + ' · ' + milestone.title + '：' + milestone.goal : '');
       box.find('.campaignBenefit').toggle(!!milestone).text(milestone ? '完成后：' + EarlyGame.benefit(milestone.id) : '');
+      box.find('.campaignHint').toggle(!!(milestone && milestone.hint)).text(milestone && milestone.hint ? '行动提示：' + milestone.hint : '');
       box.find('.campaignReward').text(milestone ? '一次性奖励：' + EarlyGame.rewardText(milestone.reward) : '');
       box.find('.campaignClaim').toggle(!!milestone).prop('disabled',!milestone || !milestone.ready).text(milestone && milestone.ready ? '领取阶段奖励' : '目标尚未完成').off('click').on('click',function() {if (milestone) EarlyGame.claimMilestone(milestone.id);});
       var supply = box.find('.openingSupply').toggle(EarlyGame.supplyPending());
