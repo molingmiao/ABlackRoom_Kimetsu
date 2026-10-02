@@ -16,6 +16,8 @@ var Path = {
 
 	// 装备槽系统：主/副/道具 3 类 × 2 槽，同类上阵后共享冷却
 	SLOT_LIMIT: 2,
+	PERMANENT_EQUIPMENT: ['waterskin','cask','water tank','water cycle','rucksack','wagon','convoy','cargo crow','l armour','i armour','s armour','wind armour','compass'],
+	_scrapping: false,
 	WeaponCategory: {
 		primary:   ['bone yari','kou katana','nichirin katana','nichirin spear','flame blade'],
 		secondary: ['wisteria gun','nichirin gun','thunder gun','wisteria bomb'],
@@ -576,6 +578,7 @@ var Path = {
 		}
 
 		Path.updateBagSpace(currentBagCapacity);
+		Path.updatePermanentEquipmentScrap();
 		Path.updateLoadoutPanel();
 		Path.updateJourneyGuide();
 
@@ -647,20 +650,43 @@ var Path = {
 			$('.numAvailable', row).text(available);
 			Path.updateScrapButton(row, key, available);
 		});
+		Path.updatePermanentEquipmentScrap();
+	},
+	// Permanent equipment grants capacity/HP/unlocks from its first copy only.
+	// Keep that copy, and expose duplicates separately from packable supplies.
+	updatePermanentEquipmentScrap: function() {
+		var doll = $('#equipDoll');
+		if (!doll.length) return;
+		var keys = Path.PERMANENT_EQUIPMENT.filter(function(key) {return $SM.get('stores["'+key+'"]',true) > 1;});
+		var panel = doll.find('#permanentEquipmentScrap');
+		if (!keys.length) {panel.remove();return;}
+		if (!panel.length) {
+			panel = $('<details>').attr('id','permanentEquipmentScrap').appendTo(doll);
+			$('<summary>').text('回收多余永久装备').appendTo(panel);
+			$('<p>').text('每种保留 1 件；不降低已有护甲、容量或解锁。Shift + 点击可预览批量回收。').appendTo(panel);
+		}
+		panel.find('.permanentScrapRow').each(function() {if (keys.indexOf($(this).attr('key')) < 0) $(this).remove();});
+		keys.forEach(function(key) {
+			var id = 'permanent_scrap_'+key.replace(/ /g,'-'), row = panel.find('#'+id);
+			if (!row.length) {
+				row = $('<div>').attr({id:id,key:key}).addClass('permanentScrapRow').appendTo(panel);
+				$('<strong>').addClass('permanentScrapName').text(_(key)).appendTo(row);
+				$('<div>').addClass('permanentScrapStock').appendTo(row);
+			}
+			var info = Path.scrapPreview(key,1);
+			row.find('.permanentScrapStock').text('库存 '+info.have+' · 保留 '+Math.max(info.carried,info.permanent,info.equipped)+' · 可回收 '+info.available);
+			Path.updateScrapButton(row,key,info.available);
+		});
 	},
 
 	// 行初建及数量变更时同步回收入口，仅允许回收未选入背包的库存。
 	updateScrapButton: function(row, key, available) {
 		var button = row.children('.scrapBtn');
-		var scrapCost = Path.getScrapCost(key);
+		var info = Path.scrapPreview(key,1);
 		var parts = [];
-		if (scrapCost && available > 0) {
-			for (var mat in scrapCost) {
-				var rv = Math.floor(scrapCost[mat] * 0.3);
-				if (rv > 0) parts.push(_(mat) + '+' + rv);
-			}
-		}
-		if (!parts.length) {
+		Object.keys(info.refund).forEach(function(mat) {parts.push(_(mat)+'+'+info.refund[mat]);});
+		Object.keys(info.remainder).forEach(function(mat) {if (info.remainder[mat]) parts.push(_(mat)+'余料 '+info.remainder[mat]+'%');});
+		if (available <= 0 || info.available <= 0 || !Path.getScrapCost(key)) {
 			button.remove();
 			return;
 		}
@@ -676,40 +702,61 @@ var Path = {
 				Path.scrapItem(key, 1);
 			}).appendTo(row);
 		}
-		button.attr('title', '回收 1 件：' + parts.join(' ') + '；Shift + 点击预览批量回收');
+		button.attr('aria-disabled',!info.valid).toggleClass('disabled',!info.valid)
+			.attr('title',info.valid ? '回收 1 件：'+parts.join(' ')+'；余料累计到整单位自动返仓；Shift + 点击预览批量回收' : info.error+'；Shift + 点击查看');
 	},
 
 	// 从 Room.Craftables / Room.TradeGoods / Fabricator.Craftables 中取 cost
 	getScrapCost: function(key) {
-		if (window.NichirinForge && NichirinForge.items[key]) return NichirinForge.getScrapCost(key);
-		var src = (Room.Craftables && Room.Craftables[key])
-			|| (Room.TradeGoods && Room.TradeGoods[key])
-			|| (Fabricator.Craftables && Fabricator.Craftables[key]);
+		if (window.NichirinForge && Object.prototype.hasOwnProperty.call(NichirinForge.items,key)) return NichirinForge.getScrapCost(key);
+		var tables = [Room.Craftables,Room.TradeGoods,Fabricator.Craftables], src = null;
+		for (var i=0;i<tables.length;i++) if (tables[i] && Object.prototype.hasOwnProperty.call(tables[i],key)) {src=tables[i][key];break;}
 		if (!src || typeof src.cost !== 'function') return null;
-		try { return src.cost(); } catch (e) { return null; }
+		if (Path.PERMANENT_EQUIPMENT.indexOf(key) < 0 && src.type !== 'weapon' && src.type !== 'tool'
+			&& ['medicine','wisteria bullet','solar crystal','demon stone'].indexOf(key) < 0) return null;
+		try {
+			var batch = src.quantity === undefined ? 1 : src.quantity;
+			if (!Number.isSafeInteger(batch) || batch < 1) return null;
+			var original = src.cost(), cost = {};
+			if (!original || typeof original !== 'object') return null;
+			Object.keys(original).forEach(function(mat) {cost[mat]=typeof original[mat] === 'number' ? original[mat]/batch : NaN;});
+			return cost;
+		} catch (e) { return null; }
 	},
 
 	// Preview and execution use the same live stock and whole-batch rounding.
 	scrapPreview: function(key, quantity) {
-		var have = Path.loadoutCount($SM.get('stores["' + key + '"]', true));
+		var stock = $SM.get('stores["' + key + '"]'), have = Path.loadoutCount(stock);
 		var carried = Math.min(have, Path.loadoutCount((Path.outfit || {})[key]));
-		var available = Math.max(0, have - carried);
+		var permanent = have > 0 && Path.PERMANENT_EQUIPMENT.indexOf(key) >= 0 ? 1 : 0;
+		var equipped = have > 0 && Path.isEquipped(key) ? 1 : 0;
+		var available = Math.max(0, have - Math.max(carried,permanent,equipped));
 		var entered = typeof quantity === 'string' && /^\d+$/.test(quantity.trim()) ? Number(quantity.trim()) : quantity;
-		var validAmount = typeof entered === 'number' && isFinite(entered) && Math.floor(entered) === entered && entered > 0;
-		var cost = Path.getScrapCost(key), refund = {}, validCost = !!cost;
+		var validAmount = Number.isSafeInteger(entered) && entered > 0;
+		var cost = Path.getScrapCost(key), refund = {}, remainder = {}, validCost = !!cost, validInventory = true;
 		if (cost) Object.keys(cost).forEach(function(mat) {
-			if (typeof cost[mat] !== 'number' || !isFinite(cost[mat]) || cost[mat] < 0) validCost = false;
+			if (typeof cost[mat] !== 'number' || !isFinite(cost[mat]) || cost[mat] <= 0 || mat === key) validCost = false;
 			else if (validAmount && entered <= available) {
-				var value = Math.floor(cost[mat] * 0.3 * entered);
-				if (value > 0 && isFinite(value)) refund[mat] = value;
+				var old = $SM.get('game.scrapRemainders["'+mat+'"]');
+				if (old === undefined) old = 0;
+				var credit = cost[mat] * 30 * entered, rounded = Math.round(credit);
+				if (!Number.isSafeInteger(old) || old < 0 || old >= 100 || !Number.isSafeInteger(rounded) || Math.abs(rounded-credit)>0.000001 || !Number.isSafeInteger(old+rounded)) {validCost=false;return;}
+				var value = Math.floor((old+rounded)/100);
+				remainder[mat] = (old+rounded)%100;
+				if (value > 0) refund[mat] = value;
+				var materialStock = $SM.get('stores["'+mat+'"]');
+				if (materialStock === undefined) materialStock = 0;
+				if (!Number.isFinite(materialStock) || materialStock < 0 || materialStock+value > $SM.MAX_STORE) validInventory=false;
 			}
 		});
 		var error = !validAmount ? '请输入大于 0 的整数。' : entered > available ? '数量超过当前可回收库存，请重新输入。'
-			: !validCost || !Object.keys(refund).length ? '该物品目前没有可返还的材料。' : '';
-		return {have:have, carried:carried, available:available, amount:validAmount ? entered : 0, refund:refund, valid:!error, error:error};
+			: !Number.isSafeInteger(stock) || stock < 0 || stock > $SM.MAX_STORE ? '物品库存异常，无法回收。'
+			: !validCost || !Object.keys(remainder).length ? '该物品目前没有有效的回收配方或余料记录。'
+			: !validInventory ? '返还材料库存异常或将超过上限，未执行回收。' : '';
+		return {have:have,carried:carried,permanent:permanent,equipped:equipped,available:available,amount:validAmount ? entered : 0,refund:refund,remainder:remainder,valid:!error,error:error};
 	},
 	canScrap: function() {
-		return Engine.activeModule === Path && !Events.activeEvent()
+		return !Path._scrapping && Engine.activeModule === Path && !Events.activeEvent()
 			&& !$('#loadoutEditorOverlay').length && !$('#buyQuantityOverlay').length;
 	},
 	closeScrapQuantityDialog: function(restoreFocus) {
@@ -730,7 +777,7 @@ var Path = {
 		var panel = $('<div>').attr({id:'scrapQuantityPanel', role:'dialog', 'aria-modal':'true', 'aria-labelledby':'scrapQuantityTitle'}).appendTo(overlay);
 		$('<h2>').attr('id','scrapQuantityTitle').text('回收 ' + _(key)).appendTo(panel);
 		var stock = $('<div>').addClass('scrapQuantityStock').appendTo(panel);
-		$('<p>').text('只回收仓库中未装入背包的物品；已装包的数量会受到保护。').appendTo(panel);
+		$('<p>').text('只回收多余库存。背包数量、上阵武器至少 1 件、每种永久装备至少 1 件受到保护，重叠保护不重复扣除。').appendTo(panel);
 		$('<label>').attr('for','scrapQuantityInput').text('本次回收数量').appendTo(panel);
 		var input = $('<input>').attr({
 			id:'scrapQuantityInput',
@@ -743,7 +790,7 @@ var Path = {
 		}).appendTo(panel);
 		var preview = $('<div>').attr({id:'scrapQuantityRefund', 'aria-live':'polite'}).appendTo(panel);
 		var error = $('<p>').attr({id:'scrapQuantityError', role:'status'}).appendTo(panel);
-		$('<p>').addClass('scrapQuantityNote').text('返还制造材料的 30%，按本次总数量统一向下取整。回收后无法撤销。').appendTo(panel);
+		$('<p>').addClass('scrapQuantityNote').text('返还每件配方材料的 30%；不足整单位的余料按材料累计保存，攒满后自动返仓。批量产出按单件成本计算。回收后无法撤销。').appendTo(panel);
 		var actions = $('<div>').addClass('scrapQuantityActions').appendTo(panel);
 		var dialog = {overlay:overlay, trigger:trigger || document.activeElement, closed:false};
 		Path._scrapDialog = dialog;
@@ -752,7 +799,11 @@ var Path = {
 			if (!Path.canScrap()) { Path.closeScrapQuantityDialog(false); return; }
 			var info = Path.scrapPreview(key, input.val());
 			stock.empty();
-			[['仓库总数',info.have],['背包保护',info.carried],['可回收',info.available]].forEach(function(row) {
+			var protectedRows = [['仓库总数',info.have],['背包保护',info.carried]];
+			if (info.permanent) protectedRows.push(['永久保留',info.permanent]);
+			if (info.equipped) protectedRows.push(['上阵预留',info.equipped]);
+			protectedRows.push(['可回收',info.available]);
+			protectedRows.forEach(function(row) {
 				var line = $('<div>').appendTo(stock);
 				$('<span>').text(row[0]).appendTo(line);
 				$('<strong>').text(row[1]).appendTo(line);
@@ -762,10 +813,17 @@ var Path = {
 			preview.empty();
 			if (info.valid) {
 				$('<strong>').text('回收 ' + info.amount + ' 件，将返还：').appendTo(preview);
+				if (!Object.keys(info.refund).length) $('<p>').text('本次不足整单位，余料将累计保存，不会丢失。').appendTo(preview);
 				Object.keys(info.refund).forEach(function(mat) {
 					var line = $('<div>').appendTo(preview);
 					$('<span>').text(_(mat)).appendTo(line);
 					$('<strong>').text('+' + info.refund[mat]).appendTo(line);
+				});
+				Object.keys(info.remainder).forEach(function(mat) {
+					if (!info.remainder[mat]) return;
+					var line = $('<div>').appendTo(preview);
+					$('<span>').text(_(mat)+'余料（回收后）').appendTo(line);
+					$('<strong>').text(info.remainder[mat]+'%').appendTo(line);
 				});
 			}
 			ok.prop('disabled',!info.valid);
@@ -817,17 +875,20 @@ var Path = {
 		if (!Path.canScrap()) return false;
 		var info = Path.scrapPreview(key, qty === undefined ? 1 : qty);
 		if (!info.valid) return false;
-		var changes = {};
-		changes[key] = -info.amount;
-		var refundText = [];
-		for (var mat in info.refund) {
-			changes[mat] = (changes[mat] || 0) + info.refund[mat];
-			refundText.push(_(mat) + '+' + info.refund[mat]);
-		}
-		$SM.addM('stores', changes);
-		Notifications.notify(null, _('scrapped {0} {1} ({2})', info.amount, _(key), refundText.join(', ')));
-		Path.updateOutfitting();
-		return true;
+		Path._scrapping = true;
+		try {
+			var changes = {}, refundText = [];
+			changes[key] = -info.amount;
+			Object.keys(info.refund).forEach(function(mat) {changes[mat]=info.refund[mat];refundText.push(_(mat)+'+'+info.refund[mat]);});
+			Object.keys(info.remainder).forEach(function(mat) {if (info.remainder[mat]) refundText.push(_(mat)+'余料 '+info.remainder[mat]+'%');});
+			$SM.addM('stores',changes,true);
+			$SM.setM('game.scrapRemainders',info.remainder,true);
+			Engine.saveGame();
+			$SM.fireUpdate('stores');
+			Notifications.notify(null,_('scrapped {0} {1} ({2})',info.amount,_(key),refundText.join(', ')));
+			Path.updateOutfitting();
+			return true;
+		} finally {Path._scrapping = false;}
 	},
 	
 	increaseSupply: function(btn) {

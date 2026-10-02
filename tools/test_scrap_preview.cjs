@@ -105,7 +105,7 @@ const before = () => JSON.stringify(context.State);
 reset();
 const unchanged = before();
 const batch = plain(P.scrapPreview('bone yari','3'));
-assert.deepEqual(batch, {have:8,carried:1,available:7,amount:3,refund:{wood:90,teeth:4},valid:true,error:''});
+assert.deepEqual(batch, {have:8,carried:1,permanent:0,equipped:0,available:7,amount:3,refund:{wood:90,teeth:4},remainder:{wood:0,teeth:50},valid:true,error:''});
 assert.equal(batch.refund.teeth,4,'whole batch rounding must not floor each item then multiply');
 assert.equal(before(),unchanged,'preview does not change inventory or save data');
 for (const value of ['', ' ', '1.5', '3.0', 'NaN', NaN, Infinity, -1, 0, '9', 9, null, false, {}, '1e2']) {

@@ -50,7 +50,7 @@ context.Engine.activeModule = context.Room;
 active = {scenes: {}};
 assert.equal(U.show(), false, 'must not replace or stack an ongoing event');
 active = null;
-for (const id of ['scrapQuantityOverlay', 'buyQuantityOverlay', 'loadoutEditorOverlay']) {
+for (const id of ['scrapQuantityOverlay', 'buyQuantityOverlay', 'loadoutEditorOverlay', 'nichirinForgeOverlay']) {
   overlay = id;
   assert.equal(U.show(), false, 'must not stack onto a quantity dialog');
 }

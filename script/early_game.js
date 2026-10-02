@@ -20,8 +20,8 @@ var EarlyGame = {
       {id:'armoury', title:'建立军械补给', goal:'建造军械库，形成持续的藤花弹供应', building:'armoury', hint:'安排军械工，以钢和硫磺制作弹药；别让炼钢原料断供。', reward:{'wisteria bullet':30,medicine:5,'cured meat':30}},
       {id:'wreck', title:'列车残骸与锻造线索', goal:'探明列车残骸、带回装置，开放日轮锻造', feature:'fabricator', hint:'残骸标记为 X，距庄园 28 格；与无限列车支援任务是两个不同地点。', reward:{'demon stone':2,'solar crystal':8,'cured meat':30}},
       {id:'district', title:'游郭篇', goal:'在唯一的游郭完成三妻与居民救援，协助对抗上弦之陆并安全返回', flag:'game.yoshiwaraDone', hint:'游郭标记为 O（通常距庄园 15 格，旧地图可能略有偏移），只有一处；先完成无限列车。D/R 是普通旧街与市镇，不会触发游郭主线。备好武器、治疗和返程口粮。', reward:{medicine:8,'wisteria charm':3,'cured meat':40}},
-      {id:'smiths', title:'锻刀村篇', goal:'前往唯一的锻刀村 K，保护刀匠与撤离路线，协助霞柱、恋柱、炭治郎和玄弥并安全返回', flag:'game.swordsmithVillageDone', hint:'完成游郭后可进入 K（通常距庄园 22 格）；Y 是普通废城。村中有连续支援战，正篇斩首仍由队士完成；善逸和伊之助以前后方书信联络。', reward:{steel:40,leather:40,'cured meat':40}},
-      {id:'pillars', title:'柱训练篇', goal:'参加柱合议，完成一位柱的训练', flag:'game.pillarConvocationDone', hint:'完成刀匠村并带回至少一张制造图纸后，回大厅迎接柱合议；训练需要口粮和火把。', reward:{medicine:10,'cured meat':60,fur:100}},
+      {id:'smiths', title:'锻刀村篇', goal:'前往唯一的锻刀村 K，保护刀匠与撤离路线，协助霞柱、恋柱、炭治郎和玄弥并安全返回', flag:'game.swordsmithVillageDone', legacyFlag:'game.swordsmithChapterDone', hint:'完成游郭后可进入 K（通常距庄园 22 格）；Y 是普通废城。完整支援并安全返回后，固定获得藤花精油制造图纸；正篇斩首仍由队士完成。', reward:{steel:40,leather:40,'cured meat':40}},
+      {id:'pillars', title:'柱训练篇', goal:'参加柱合议，完成一位柱的训练', flag:'game.pillarConvocationDone', hint:'完整完成锻刀村 K 并安全返回，可固定取得藤花精油制造图纸。已完成刀匠村却没有任何已解锁图纸的旧队士，可在大厅主线栏补领；已有任意已解锁图纸时无需补领。随后等待柱合议，准备至少 50 份口粮和 1 支火把，实际完成训练。其它图纸仍可探索试验设施 P 获取。', reward:{medicine:10,'cured meat':60,fur:100}},
       {id:'castle', title:'通往决战之地', goal:'找到无限城入口并安全返回', feature:'spaceShip', reward:{'demon stone':2,medicine:5,'cured meat':15}}
     ];
   },
@@ -55,7 +55,7 @@ var EarlyGame = {
     if (id === 'smiths') return !!$SM.get('game.yoshiwaraDone');
     if (id === 'butterfly') return EarlyGame.worldChapterCleared('M') || !!$SM.get('game.world.mugentrain')
       || !!$SM.get('game.yoshiwaraDone') || !!$SM.get('game.swordsmithVillageDone');
-    if (id === 'pillars') return !!$SM.get('game.swordsmithVillageDone');
+    if (id === 'pillars') return !!($SM.get('game.swordsmithVillageDone') || $SM.get('game.swordsmithChapterDone'));
     return false;
   },
   migrateCampaign: function() {
@@ -73,6 +73,18 @@ var EarlyGame = {
     Engine.saveGame();
     $SM.fireUpdate('stores');
     Notifications.notify(null, _('阶段完成：') + task.title + '。' + EarlyGame.benefit(task.id));
+    EarlyGame.render();
+    return true;
+  },
+  smithBlueprintPending: function() {
+    return !!(window.Events && Events.StoryChapters && Events.StoryChapters.swordsmithBlueprintPending());
+  },
+  claimSmithBlueprint: function() {
+    if (!EarlyGame.smithBlueprintPending() || Engine.activeModule !== Room
+      || (Events.activeEvent && Events.activeEvent()) || !Events.StoryChapters.grantSwordsmithBlueprint()) return false;
+    Engine.saveGame();
+    $SM.fireUpdate('character.blueprints');
+    Notifications.notify(Room,'已补领锻刀村的藤花精油制造图纸。没有重复发放日轮刀或阶段资源；请在大厅等待柱合议，准备口粮和火把完成训练。');
     EarlyGame.render();
     return true;
   },
@@ -193,9 +205,9 @@ var EarlyGame = {
       train:'乘客获救，炎柱的嘱托留了下来；继续完善庄园供给，为上弦级的任务做准备。',
       sulphur:'硫磺矿工提供军械原料，接下来建设军械库补齐弹药。',
       armoury:'军械工能持续制造藤花弹；远征不再只能依靠偶然拾取弹药。',
-      wreck:'日轮锻造已经开放；继续探索残骸车厢寻找图纸，制作呼吸流派装备。',
+      wreck:'日轮锻造已经开放；图纸可从试验设施 P 探索带回，或完成锻刀村 K 并安全返程取得固定图纸。',
       district:'游郭救援告一段落；下一步帮助刀匠村保护锻造与补给。',
-      smiths:'刀匠与队士的经验为决战铺路；带回图纸后准备参加柱训练。',
+      smiths:'安全交付支援报告后固定获得藤花精油制造图纸；缺图纸的旧队士可在大厅补领，再准备柱训练。',
       pillars:'柱训练已完成；最后确认护甲、武器和治疗配置，再前往无限城。',
       castle:'无限城入口已开放；配置好装备与补给，再迎接逐层推进的战斗。'
     }[id] || '';
@@ -219,9 +231,10 @@ var EarlyGame = {
   render: function() {
     var task = EarlyGame.task();
     var milestone = EarlyGame.milestone();
+    var smithBlueprintPending = EarlyGame.smithBlueprintPending();
     $('#roomPanel, #outsidePanel').each(function() {
       var panel = $(this), box = panel.children('.earlyGameTask');
-      if (!task && !milestone) { box.remove(); panel.css('--early-guide-height', '0px'); return; }
+      if (!task && !milestone && !smithBlueprintPending) { box.remove(); panel.css('--early-guide-height', '0px'); return; }
       if (!box.length) {
         box = $('<details>').addClass('earlyGameTask').prop('open', true).prependTo(panel);
         $('<summary>').text(_('current estate task')).appendTo(box);
@@ -232,6 +245,8 @@ var EarlyGame = {
         $('<p>').addClass('campaignGoal').appendTo(box);
         $('<p>').addClass('campaignBenefit').appendTo(box);
         $('<p>').addClass('campaignHint').appendTo(box);
+        $('<p>').addClass('smithBlueprintHint').appendTo(box);
+        $('<button>').attr('type','button').addClass('smithBlueprintClaim').text('补领锻刀村图纸（藤花精油 · 仅一次）').appendTo(box).on('click',EarlyGame.claimSmithBlueprint);
         $('<p>').addClass('campaignReward').appendTo(box);
         $('<button>').attr('type','button').addClass('campaignClaim').appendTo(box);
         $('<div>').addClass('openingSupply').appendTo(box);
@@ -254,6 +269,9 @@ var EarlyGame = {
       box.find('.campaignGoal').toggle(!!milestone).text(milestone ? '阶段主线 ' + stage + '/' + EarlyGame.milestones().length + ' · ' + milestone.title + '：' + milestone.goal : '');
       box.find('.campaignBenefit').toggle(!!milestone).text(milestone ? '完成后：' + EarlyGame.benefit(milestone.id) : '');
       box.find('.campaignHint').toggle(!!(milestone && milestone.hint)).text(milestone && milestone.hint ? '行动提示：' + milestone.hint : '');
+      box.find('.smithBlueprintHint').toggle(smithBlueprintPending).text('刀匠村已安全完成，但尚未取得固定图纸。回大厅补领即可准备柱训练，不用重打 K，也不会重复发放武器或资源。');
+      box.find('.smithBlueprintClaim').toggle(smithBlueprintPending && panel.attr('id') === 'roomPanel')
+        .prop('disabled',Engine.activeModule !== Room || !!(Events.activeEvent && Events.activeEvent()));
       box.find('.campaignReward').text(milestone ? '一次性奖励：' + EarlyGame.rewardText(milestone.reward) : '');
       box.find('.campaignClaim').toggle(!!milestone).prop('disabled',!milestone || !milestone.ready).text(milestone && milestone.ready ? '领取阶段奖励' : '目标尚未完成').off('click').on('click',function() {if (milestone) EarlyGame.claimMilestone(milestone.id);});
       var supply = box.find('.openingSupply').toggle(EarlyGame.supplyPending());

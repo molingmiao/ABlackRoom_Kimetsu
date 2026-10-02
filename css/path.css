@@ -68,7 +68,7 @@ div.perkRow .row_key {
 	padding-top: 10px;
 	position: relative;
 	top: -10px;
-	max-height: 858px;
+	max-height: min(858px, max(160px, calc(100vh - 150px)));
 	width: 620px;
 	overflow-y: auto;
 }
@@ -138,6 +138,14 @@ div#equipDoll:before {
 	border-top: 1px solid #ccc;
 	margin: 6px 0;
 }
+#permanentEquipmentScrap { margin-top: 12px; border-top: 1px solid #888; padding-top: 8px; }
+#permanentEquipmentScrap summary { font-weight: bold; cursor: pointer; }
+#permanentEquipmentScrap p { font-size: 12px; line-height: 1.5; }
+.permanentScrapRow { position: relative; margin: 12px 0; padding-right: 44px; font-size: 12px; }
+.permanentScrapStock { margin-top: 4px; }
+.permanentScrapRow .scrapBtn { position: absolute; right: 0; top: 0; cursor: pointer; border: 1px solid #888; padding: 1px 4px; }
+.scrapBtn.disabled { opacity: .55; }
+.permanentScrapRow .scrapBtn:focus-visible { outline: 2px solid currentColor; outline-offset: 2px; }
 .outfitSep {
 	border-top: 1px dashed #bbb;
 	margin: 8px 0 4px;

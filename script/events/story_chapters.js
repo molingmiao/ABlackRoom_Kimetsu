@@ -1,5 +1,6 @@
 /** Local chapter choices never resume an expedition. Victory is committed at home. */
 Events.StoryChapters = {
+  swordsmithBlueprint: 'wisteria oil',
   definitions: {
     butterfly: {tile:'E',flag:'game.butterflyEstateDone',name:'蝶屋康复',
       required:['tanjiro','zenitsu','inosuke','escort'],perk:'total concentration'},
@@ -38,6 +39,26 @@ Events.StoryChapters = {
     World.markVisited(World.curPos[0],World.curPos[1]);
     return true;
   },
+  swordsmithBlueprintPending: function() {
+    var blueprints = $SM.get('character.blueprints') || {};
+    var hasAnyBlueprint = Object.keys(blueprints).some(function(key) {return !!blueprints[key];});
+    return !!($SM.get('game.swordsmithVillageDone') || $SM.get('game.swordsmithChapterDone'))
+      && !$SM.get('game.swordsmithBlueprintGranted')
+      && !hasAnyBlueprint;
+  },
+  grantSwordsmithBlueprint: function() {
+    var atHome = Engine.activeModule === Room && !(Events.activeEvent && Events.activeEvent());
+    var safeChapterReturn = Engine.activeModule === World && !World.dead && !!World.state
+      && World.state.swordsmith && $SM.get('game.world.map') === World.state.map;
+    if ((!atHome && !safeChapterReturn)
+      || !($SM.get('game.swordsmithVillageDone') || $SM.get('game.swordsmithChapterDone'))
+      || $SM.get('game.swordsmithBlueprintGranted')) return false;
+    // Mark first: inventory listeners or repeated return callbacks cannot issue this reward twice.
+    $SM.set('game.swordsmithBlueprintGranted',true,true);
+    var key = 'character.blueprints["' + Events.StoryChapters.swordsmithBlueprint + '"]';
+    if (!$SM.get(key)) $SM.set(key,true,true);
+    return true;
+  },
   commit: function() {
     // Only called by the safe-return path, after it publishes this very map.
     if (Engine.activeModule !== World || World.dead || !World.state
@@ -51,6 +72,9 @@ Events.StoryChapters = {
       if (definition.legacyFlag) $SM.set(definition.legacyFlag,true,true);
       if (!$SM.hasPerk(definition.perk)) $SM.addPerk(definition.perk);
       if (definition.reward && !legacyCompleted) $SM.addM('stores',definition.reward,true);
+      if (id === 'swordsmith' && Events.StoryChapters.grantSwordsmithBlueprint()) {
+        Notifications.notify(null,'锻刀村的藤花精油制造图纸已送达庄园；回大厅可迎接柱合议，仍需实际完成训练。');
+      }
       Notifications.notify(null,definition.name + '已安全交付，章节与训练已保存；阶段奖励可在庄园领取。');
       changed = true;
     });
@@ -297,11 +321,11 @@ Events.Setpieces.swordsmithVillage = {
       buttons:{report:{text:'整理刀匠与队士的支援报告',nextScene:'report'}}
     },
     report:{
-      text:['村里的锤声还会重新响起。铁穴森向你确认撤离名单，钢铁冢将注意力留给修复的刀；霞柱把这次看清敌人动作的经验交给你。','你替炭治郎把消息分别写给善逸与伊之助：他们不在这座村中，却留下了真正用得上的提醒。回信会经过隐与鎹鸦，不暴露村落的位置。','安全交付后，刀匠将日轮刀 1 把送到庄园，霞柱的见切训练也会保存。已完成旧版刀匠村的队士保留成果，不会重新领取这份固定奖励。'],
+      text:['村里的锤声还会重新响起。铁穴森向你确认撤离名单，钢铁冢将注意力留给修复的刀；霞柱把这次看清敌人动作的经验交给你。','你替炭治郎把消息分别写给善逸与伊之助：他们不在这座村中，却留下了真正用得上的提醒。回信会经过隐与鎹鸦，不暴露村落的位置。','安全交付后，刀匠将日轮刀 1 把和藤花精油制造图纸送到庄园，霞柱的见切训练也会保存。图纸只解锁制作，不免费制造物品；回大厅后可迎接柱合议，仍须准备口粮、火把并完成训练。','已完成旧版刀匠村的队士保留成果，不会重新领取日轮刀；尚无任何已解锁图纸时，可在大厅主线栏一次性补领。'],
       buttons:{finish:{text:'完成锻刀村支援，准备安全返程',nextScene:'final'}}
     },
     final:{
-      text:['锻刀村支援完成，尚未提交。请沿地图安全返回庄园，保存章节、领取训练与阶段奖励。途中失败不会保存本次完成状态，也不能暂停后下次续关。'],
+      text:['锻刀村支援完成，尚未提交。请沿地图安全返回庄园，保存章节、收取藤花精油制造图纸和训练成果，再领取阶段奖励。途中失败不会保存本次完成状态、不会授予图纸，也不能暂停后下次续关。'],
       onLoad:function(){Events.StoryChapters.finish('swordsmith');},
       buttons:{leave:{text:'回地图，安全返回庄园',nextScene:'end'}}
     }

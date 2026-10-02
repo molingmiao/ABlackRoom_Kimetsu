@@ -3,6 +3,19 @@ var UpdateNotes = window.UpdateNotes = {
   categories: ['全部', '玩法', '资源', '界面', '修复'],
   entries: [
     {
+      id: '2026-10-03-equipment-recycling', date: '2026-10-03', title: '回收全覆盖、界面整理与图纸修复',
+      items: [
+        ['修复', '所有 39 种武器均可回收', '逐项核对普通武器、控制道具与 28 把锻造日轮刀。修复旧炎之日轮刀、雷鸣枪和缚式苦无因单件返料不足 1 而没有回收按钮的问题；普通点击回收一件，Shift + 点击预览批量。'],
+        ['资源', '小额回收余料不再丢失', '仍返还单件配方材料的 30%，不足整单位的部分按材料累计保存，攒满后自动返仓。例如青鬼石 ×1 成本的装备连回收四件，共返 1 石并留下 20% 余料；刷新不丢失，分次与批量的总收益一致。'],
+        ['界面', '13 种永久装备增加副本回收入口', '在备战装备栏展开“回收多余永久装备”，可查看护甲、背包、水容器和指南针的库存／保留／可回收数量；每种保留首件，不降低已有生命、容量或丢失解锁。只有多余副本才出现入口，长列表可完整滚动。'],
+        ['修复', '装包与上阵物品都受保护', '已经装包的数量不能回收；上阵但尚未装包的武器也保留 1 件。保护重叠时按最大值计算，不重复扣除可回收数量，批量确认会再次核对当前库存。'],
+        ['修复', '修正批量产物与退款安全', '精油每次制作 5 瓶，回收按每瓶成本计算，不再按整批成本退款。装备扣除、材料返还与余料只保存一次；材料超上限、非法库存、过期确认或同步重复回调都不会消耗物品，建筑和原材料不能当装备拆解。'],
+        ['界面', '锻刀改为按钮打开弹窗', '锻刀场只保留“日轮刀锻造”按钮，概率、材料、保底和上次结果在独立弹窗查看。每次打开重新确认失败损耗；关闭、取消、Esc 或点击遮罩不花材料，离开锻刀场或开始事件自动关闭，Tab 在弹窗内操作。'],
+        ['界面', '每项修炼独立成卡', '无限城战后、围剿、守关的选择奖励及柱训练、祭坛候选都用独立边框卡片展示。突出名称、当前到下级／上限、实际升级收益、下次入城继承和呼吸联动；可点击卡内按钮或用数字键／Tab + Enter 操作，明暗主题和长列表均可读。'],
+        ['修复', '锻刀村固定图纸，旧档可补领', '修复完成锻刀村却没有图纸、无法进入柱训练的卡点。完整支援并安全返回后固定获得藤花精油制造图纸；已完成刀匠村但没有任何已解锁图纸的旧存档，在大厅当前任务栏点击“补领锻刀村图纸”即可，不必重打。只补图纸，不重复发刀或阶段资源；柱训练仍需实际完成，日／月的累计层数与守关要求不变。']
+      ]
+    },
+    {
       id: '2026-10-02-forge-demons', date: '2026-10-02', title: '流派完整展示、五类鬼术与日轮刀锻造',
       items: [
         ['修复', '后续呼吸不再被截断', '备战流派窗口统一滚动，日／月等后续流派和完整解锁条件可见；支持键盘滚动，选择后保留展开、滚动位置和焦点。不改变原有解锁条件。'],
@@ -183,7 +196,7 @@ var UpdateNotes = window.UpdateNotes = {
     if (![window.Room, window.Outside, window.Path, window.Ship, window.Fabricator].some(function(module) {
       return module && Engine.activeModule === module;
     })) return false;
-    return !document.getElementById('scrapQuantityOverlay') && !document.getElementById('buyQuantityOverlay') && !document.getElementById('loadoutEditorOverlay');
+    return !document.getElementById('scrapQuantityOverlay') && !document.getElementById('buyQuantityOverlay') && !document.getElementById('loadoutEditorOverlay') && !document.getElementById('nichirinForgeOverlay');
   },
   show: function() {
     if (!UpdateNotes.canShow()) return false;

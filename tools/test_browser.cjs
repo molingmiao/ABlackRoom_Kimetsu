@@ -729,9 +729,14 @@ async function port() {
       await new Promise(resolve => Events.endEvent(resolve));
       Space._offerTalent();
       await new Promise(resolve => setTimeout(resolve, 350));
-      const choice = document.querySelector('#talent_0').getBoundingClientRect();
-      const skip = document.querySelector('#skip').getBoundingClientRect();
-      if (choice.top < 0 || skip.bottom > innerHeight) throw Error('talent preview hides choices');
+      const panel=document.querySelector('.talentCardsEvent'),bounds=panel.getBoundingClientRect();
+      if(bounds.top<0||bounds.bottom>innerHeight)throw Error('talent preview panel is clipped');
+      for(const id of ['talent_0','skip']) {
+        const button=document.getElementById(id);button.scrollIntoView({block:'nearest'});
+        const rect=button.getBoundingClientRect();
+        if(rect.top<bounds.top||rect.bottom>bounds.bottom)throw Error('talent preview hides '+id+' after scrolling');
+      }
+      panel.scrollTop=0;
     })()`);
     const talentImage = await page('Page.captureScreenshot', {format:'png'});
     const talentOutput = path.join(profile, 'talent-preview.png');
@@ -1034,6 +1039,82 @@ async function port() {
       return checks;
     })()`);
     console.log(newStoryChecks.map(name=>'PASS: '+name).join('\n'));
+    const blueprintStateBackup = await evaluate('JSON.stringify(State)');
+    const blueprintChecks = await evaluate(`(async function() {
+      const checks=[],check=(ok,label)=>{if(!ok) throw Error(label);checks.push(label);};
+      Engine.travelTo(Room);await new Promise(resolve=>$('#locationSlider').promise().done(resolve));
+      check(!Events.activeEvent(),'old-save blueprint backfill starts at home with no story event');
+      clearTimeout(Events._eventTimeout);clearTimeout(Engine._incomeTimeout);
+      $SM.set('income',{});
+      const allClaims=Object.fromEntries(EarlyGame.milestones().filter(task=>!['pillars','castle'].includes(task.id)).map(task=>[task.id,true]));
+      const pillarEvent=Events.Global.find(event=>event.title===_('The Pillars Convene'));
+      for(const flag of ['game.swordsmithVillageDone','game.swordsmithChapterDone']) {
+        $SM.set('game.swordsmithVillageDone',false);$SM.set('game.swordsmithChapterDone',false);$SM.set(flag,true);
+        $SM.set('game.swordsmithBlueprintGranted',false);$SM.set('game.pillarConvocationDone',false);
+        $SM.set('game.campaignClaims',Object.assign({},allClaims));
+        $SM.set('character.blueprints',{'wisteria oil':false,'wind armour':null});
+        EarlyGame.render();
+        const button=document.querySelector('#roomPanel .smithBlueprintClaim');
+        check(EarlyGame.milestone().id==='pillars' && !!button && $(button).is(':visible') && !button.disabled,
+          flag+' exposes an actual enabled blueprint backfill button in the current stage task');
+        check(button.textContent.includes('补领锻刀村图纸') && !pillarEvent.isAvailable(),
+          flag+' false/null blueprints cannot silently unlock the Pillar event');
+        const before=JSON.stringify({stores:State.stores,claims:State.game.campaignClaims,perks:State.character.perks});
+        button.click();
+        check(State.character.blueprints['wisteria oil']===true && $SM.get('game.swordsmithBlueprintGranted')===true
+          && !$('#roomPanel .smithBlueprintClaim').is(':visible'),flag+' real button unlocks exactly the fixed blueprint and hides the claim');
+        check(JSON.stringify({stores:State.stores,claims:State.game.campaignClaims,perks:State.character.perks})===before,
+          flag+' backfill preserves weapons, supplies, stage claims and existing training');
+        check(!$SM.get('game.pillarConvocationDone') && pillarEvent.isAvailable(),
+          flag+' makes the actual Pillar event available without completing training');
+        const claimed=JSON.stringify(State);button.click();
+        check(!EarlyGame.claimSmithBlueprint() && JSON.stringify(State)===claimed,
+          flag+' repeated detached-button/direct claims cannot award or change anything');
+      }
+      $SM.set('character.blueprints',{'wind armour':true,'wisteria oil':false});$SM.set('game.swordsmithBlueprintGranted',false);
+      EarlyGame.render();
+      check(pillarEvent.isAvailable() && !$('#roomPanel .smithBlueprintClaim').is(':visible'),
+        'an existing usable blueprint keeps the original Pillar route without a new backfill step');
+      $SM.set('character.blueprints',{'wisteria oil':true,'wind armour':null});$SM.set('game.swordsmithBlueprintGranted',true);
+      Engine.saveGame();
+      return checks;
+    })()`);
+    console.log(blueprintChecks.map(name=>'PASS: '+name).join('\n'));
+    await page('Page.reload', {ignoreCache:true});
+    let blueprintReloadReady=false;
+    for(let i=0;i<100;i++) {
+      blueprintReloadReady=await evaluate('!!(window.Engine && Engine.activeModule && window.EarlyGame && Events.StoryChapters)');
+      if(blueprintReloadReady) break;
+      await pause(100);
+    }
+    assert.ok(blueprintReloadReady,'game did not initialize after blueprint backfill reload');
+    await pause(1100);
+    const blueprintReloadChecks=await evaluate(`(function() {
+      clearTimeout(Events._eventTimeout);clearTimeout(Engine._incomeTimeout);
+      const pillarEvent=Events.Global.find(event=>event.title===_('The Pillars Convene'));
+      if(!State.character.blueprints['wisteria oil'] || !$SM.get('game.swordsmithBlueprintGranted')) throw Error('backfill blueprint or once-only flag was lost after reload');
+      if($SM.get('game.pillarConvocationDone') || !pillarEvent.isAvailable()) throw Error('reload must preserve new-flag-only Pillar eligibility without completing training');
+      if($('#roomPanel .smithBlueprintClaim').is(':visible') || EarlyGame.claimSmithBlueprint()) throw Error('reload must not revive the completed backfill action');
+      if(State.character.blueprints['wind armour']) throw Error('null blueprint keys must stay undiscovered after reload');
+      return 'PASS: actual blueprint backfill survives reload, keeps the Pillar event available, and cannot be claimed twice.';
+    })()`);
+    console.log(blueprintReloadChecks);
+    // Restore the previous completed chapter fixture so later regression sections remain independent.
+    await evaluate('State=JSON.parse(' + JSON.stringify(blueprintStateBackup) + ');Engine.saveGame();');
+    await page('Page.reload', {ignoreCache:true});
+    let blueprintRestoreReady=false;
+    for(let i=0;i<100;i++) {
+      blueprintRestoreReady=await evaluate('!!(window.Engine && Engine.activeModule && window.EarlyGame && Events.StoryChapters)');
+      if(blueprintRestoreReady) break;
+      await pause(100);
+    }
+    assert.ok(blueprintRestoreReady,'game did not initialize after restoring chapter fixtures');
+    await pause(1100);
+    await evaluate(`(function() {
+      clearTimeout(Events._eventTimeout);clearTimeout(Engine._incomeTimeout);
+      // Reload discards line 273's manually created Ship/Space UI, which later castle cases still use.
+      if (!Ship.panel) Ship.init();
+    })()`);
     await evaluate(`(function(){
       $SM.setM('stores',{'cured meat':0,wood:10,meat:4});
       Events.startEvent({title:'蝶屋 · 剧情补料预览',storySupply:true,scenes:{start:{

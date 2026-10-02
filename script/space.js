@@ -711,6 +711,62 @@ var Space = {
 		}
 		return text;
 	},
+	talentCardData: function(id) {
+		var talent = Space.TALENTS.find(function(t) {return t.id === id;}), p = Space.talentPreview(id);
+		if (!talent || !p) return null;
+		var lines = Space.talentPreviewText(id).split('\n');
+		var val = talent.per < 1 ? Math.round(talent.per * 1000) / 10 : talent.per;
+		return {id:id,name:Space.getTalentName(id),level:p.level,next:p.next,cap:p.cap,capped:p.capped,
+			description:_(talent.descKey,val),benefits:lines.slice(0,id === 'steadyHand' ? 3 : 1),
+			inheritance:_('next descent inheritance: Lv.{0} → Lv.{1}',p.inheritBefore,p.inheritAfter),
+			signature:window.CombatStyles && CombatStyles.trainingPreview ? CombatStyles.trainingPreview(id,p.level,p.next) : ''};
+	},
+	_bindTalentChoiceButton: function(button, key) {
+		if (!button || !button.length) return;
+		button.attr({role:'button',tabindex:0}).on('keydown.talentChoice',function(e) {
+			if (e.key !== 'Enter' && e.key !== ' ') return;
+			e.preventDefault();e.stopPropagation();
+			if (!$(this).hasClass('disabled') && !$(this).data('onCooldown')) $(this).trigger('click');
+		});
+		if (key) {
+			button.attr('aria-keyshortcuts',key);
+			if (Events._tagHotkey) Events._tagHotkey(button,key);
+			else button.attr('data-hotkey',key);
+		}
+	},
+	// Move the original event buttons into their own descriptions: handlers and
+	// event/scene identity remain intact, so keyboard and pointer choose the same reward.
+	renderTalentCards: function(choices, options) {
+		options = options || {};
+		var panel = Events.eventPanel();
+		// Keep non-DOM rules/tests usable; the game always supplies a jQuery panel.
+		if (!panel || typeof panel.find !== 'function' || typeof panel.get !== 'function' ||
+			!panel.get(0) || typeof panel.get(0).querySelector !== 'function') return;
+		panel.addClass('talentChoicePreview talentCardsEvent');
+		panel.toggleClass('talentCardsDark',!!(Engine.isLightsOff && Engine.isLightsOff()));
+		var parent = options.random ? panel.find('#description') : panel.find('#exitButtons');
+		var cards = $('<div>').addClass('talentCards');
+		if (options.random) cards.appendTo(parent); else cards.prependTo(parent);
+		choices.forEach(function(choice,i) {
+			var info = Space.talentCardData(choice.id);
+			if (!info) return;
+			var card = $('<section>').addClass('talentChoiceCard').attr({'data-talent':info.id,'aria-label':info.name}).appendTo(cards);
+			var head = $('<div>').addClass('talentCardHeading').appendTo(card);
+			$('<h3>').addClass('talentCardName').text(info.name).appendTo(head);
+			$('<strong>').addClass('talentCardLevel').text('Lv.'+info.level+' → Lv.'+info.next+' / '+info.cap).appendTo(head);
+			$('<p>').addClass('talentCardDescription').text(info.description).appendTo(card);
+			var gains = $('<div>').addClass('talentCardBenefits').appendTo(card);
+			info.benefits.forEach(function(line) {$('<strong>').text(line).appendTo(gains);});
+			$('<p>').addClass('talentCardInheritance').text(info.inheritance).appendTo(card);
+			if (info.signature) $('<p>').addClass('talentCardSignature').text(info.signature).appendTo(card);
+			if (choice.button) {
+				var button = panel.find('#'+choice.button).addClass('talentCardSelect').appendTo(card);
+				Space._bindTalentChoiceButton(button,String(i+1));
+			} else $('<p>').addClass('talentCardRandom').text('随机修炼候选 · 献祭后随机提升其中一项').appendTo(card);
+		});
+		panel.find('#exitButtons > .button').each(function() {Space._bindTalentChoiceButton($(this),options.random && this.id === 'offer' ? '1' : null);});
+		if (!options.random) $('<p>').addClass('talentChoiceKeyHint').text('每张卡片独立展示升级收益。按 '+choices.map(function(choice,i) {return i+1;}).join(' / ')+' 或点击卡内按钮选择；Tab + Enter 也可操作。').prependTo(parent);
+	},
 
 	_offerTalent: function(options) {
 		options = options || {};
@@ -754,12 +810,6 @@ var Space = {
 		if (batchLeft > 1) {
 			text.push(_('the swarm leaves behind {0} more opportunities to take on a new edge.', batchLeft));
 		}
-		picks.forEach(function(t) {
-			var curLvl = Space.getTalentLevel(t.id);
-			var val = (t.per < 1) ? Math.round(t.per * 1000) / 10 : t.per;
-			text.push('• ' + Space.getTalentName(t.id) + ' Lv.' + (curLvl + 1) + ': ' + _(t.descKey, val));
-			text.push(Space.talentPreviewText(t.id));
-		});
 		Events.startEvent({
 			title: _('slayer talent'),
 			scenes: {
@@ -770,6 +820,7 @@ var Space = {
 			}
 		});
 		Events.eventPanel().addClass('talentChoicePreview');
+		Space.renderTalentCards(picks.map(function(t,i) {return {id:t.id,button:'talent_'+i};}));
 	},
 
 	_takeTalent: function(id, onDone) {
@@ -1503,7 +1554,7 @@ var Space = {
 
 	// ---- 节点：太阳咒纹祭坛（献 HP 换永久 buff：随机加一层已有天赋等级或直接补药水） ----
 	triggerShrine: function() {
-		Space.eligibleTalents();
+		var possible = Space.eligibleTalents();
 		var costHp = Math.min(Math.floor(World.getMaxHealth() * 0.3), World.health - 5);
 		var canOffer = costHp > 0;
 		Events.startEvent({
@@ -1540,6 +1591,7 @@ var Space = {
 				}
 			}
 		});
+		Space.renderTalentCards(possible.map(function(t) {return {id:t.id};}),{random:true});
 	},
 
 	// ---- 节点：柱之邂逅（免费训练一次，直接抬升一项天赋） ----
@@ -1590,6 +1642,7 @@ var Space = {
 				}
 			}
 		});
+		Space.renderTalentCards([{id:talent.id,button:'accept'}]);
 	},
 
 	// ---- MUZAN BOSS FIGHT ----

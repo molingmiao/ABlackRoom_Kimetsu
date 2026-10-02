@@ -13,7 +13,7 @@ const c = {
   Notifications:{notify(){}},AudioEngine:{playSound(){}},AudioLibrary:{CRAFT:'craft'},
   document:{documentElement:{contains(){return mounted;}},querySelector(){return modal ? {} : null;}}
 };
-c.window=c; c.$.Dispatch=()=>({publish(event){publishes.push(event.category);if(onPublish) onPublish(event);}});
+c.window=c; c.$.Dispatch=()=>({publish(event){publishes.push(event.category);if(onPublish) onPublish(event);},unsubscribe(){}});
 c.$.extend=Object.assign;
 c._.addTranslation=values=>{c.labels=values;};
 vm.createContext(c);
@@ -31,7 +31,7 @@ function reset(attempts=0,resources={'demon stone':100,steel:2000,wood:10000}) {
   c.State={stores:{...resources},features:{location:{fabricator:true}},game:{nichirinForge:{attempts}},character:{equipped:{primary:['flame blade',null]}}};
   c.Path.outfit={torch:2}; c.Engine.activeModule=c.Fabricator; c.Engine.keyLock=false;
   c.Events.eventStack=[]; checked=mounted=true; modal=false; forge._busy=false;
-  forge._context={node:{},accepted:{prop(){return checked;}}};
+  forge._context={node:{},overlay:{remove(){}},accepted:{prop(){return checked;}},closed:false};
   saves=randomCalls=0;publishes=[];onPublish=null;rolls=[];
 }
 const snapshot=()=>JSON.stringify({state:c.State,outfit:c.Path.outfit});
@@ -106,7 +106,7 @@ assert.equal(randomCalls,0,'state-manager counter cap cannot recycle a tenth gua
 reset();rolls=[.4,NaN];before=snapshot();assert.equal(perform(1),false);assert.equal(snapshot(),before);
 assert.equal(forge._busy,false,'invalid RNG releases the forge lock without paying');
 
-for(const block of ['confirmation','mount','modal','event','keyLock','location','feature','stale']) {
+for(const block of ['confirmation','mount','modal','event','keyLock','location','feature','stale','closed']) {
   reset();let context=forge._context;
   if(block==='confirmation') checked=false;
   if(block==='mount') mounted=false;
@@ -116,8 +116,13 @@ for(const block of ['confirmation','mount','modal','event','keyLock','location',
   if(block==='location') c.Engine.activeModule=c.Path;
   if(block==='feature') c.State.features.location.fabricator=false;
   if(block==='stale') context={...context};
+  if(block==='closed') context.closed=true;
   before=snapshot(); assert.equal(forge.forge(1,context),false,block);assert.equal(snapshot(),before);assert.equal(randomCalls,0);
 }
+reset();const oldContext=forge._context;before=snapshot();
+assert.equal(forge.close(false),true);assert.equal(forge._context,null);
+assert.equal(oldContext.closed,true);assert.equal(forge.forge(1,oldContext),false);
+assert.equal(snapshot(),before);assert.equal(randomCalls,0,'closing or reusing a closed modal never charges materials');
 reset();rolls=[.4,0];onPublish=()=>assert.equal(perform(1),false,'publication cannot reenter forging');
 assert.equal(perform(1),true);assert.equal(forge.attempts(),1);assert.equal(c.State.stores[key],1);
 assert.equal(forge._busy,false);onPublish=null;

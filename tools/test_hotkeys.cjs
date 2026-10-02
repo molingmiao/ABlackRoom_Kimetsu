@@ -72,7 +72,7 @@ assert.equal(attack.clicks, 4, 'typing and browser shortcuts must not attack');
 modal = false;
 press('1');
 assert.equal(background.clicks, 1);
-for (const id of ['scrapQuantityOverlay', 'buyQuantityOverlay', 'loadoutEditorOverlay']) {
+for (const id of ['scrapQuantityOverlay', 'buyQuantityOverlay', 'loadoutEditorOverlay', 'nichirinForgeOverlay']) {
   overlay = id;
   press('1');
   assert.equal(background.clicks, 1, 'planning dialogs must block background actions even with button focus');

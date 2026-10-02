@@ -364,3 +364,51 @@
 .castleRecraftShop #exitButtons .button.disabled { opacity: 0.65; }
 .castleRecraftShop #exitButtons #leave { position: sticky; bottom: 0; z-index: 1; background: white; text-align: center; font-weight: bold; }
 body.noMask .castleRecraftShop #exitButtons #leave { background: #121512; }
+
+/* Reward, shrine and Hashira cultivation previews share a single readable,
+   desktop-height scroll area. Original event buttons stay inside their cards. */
+.eventPanel.talentCardsEvent {
+	position: fixed;
+	left: 50%;
+	top: 44px;
+	transform: translateX(-50%);
+	width: 560px;
+	max-height: calc(100vh - 72px);
+	overflow-y: auto;
+	overflow-x: hidden;
+	box-sizing: border-box;
+	padding: 16px 18px;
+	color: #252822;
+	background: #fff;
+	line-height: 1.5;
+	border: 1px solid #8a8f80;
+	box-shadow: 0 8px 24px rgba(0,0,0,.35);
+}
+.eventPanel.talentCardsEvent:before { display: none; }
+.eventPanel.talentCardsEvent:after { display: none; }
+.eventPanel.talentCardsEvent .eventTitle { position: static; display: block; margin-bottom: 9px; font-size: 18px; color: inherit; background: transparent; }
+.talentCardsEvent .eventTitle:after { display: none; }
+.eventPanel.talentCardsEvent #description { min-height: 0; max-height: none; overflow: visible; white-space: normal; padding-right: 0; font-size: 12px; color: inherit; }
+.talentCardsEvent #description > div { padding-bottom: 6px; }
+.talentCardsEvent #exitButtons { display: flex; flex-direction: column; gap: 10px; }
+.talentCards { display: flex; flex-direction: column; gap: 12px; margin: 8px 0; }
+.talentChoiceCard { border: 1px solid #949c8a; border-left: 4px solid #64835d; padding: 11px 12px; background: #f5f7f1; }
+.talentCardHeading { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 5px 12px; }
+.talentCardName { font-size: 17px; margin: 0; }
+.talentCardLevel { white-space: nowrap; font-size: 13px; }
+.talentChoiceCard p { font-size: 12px; margin: 7px 0 0; }
+.talentCardBenefits { border-top: 1px dashed #a1a798; border-bottom: 1px dashed #a1a798; padding: 7px 0; margin-top: 8px; }
+.talentCardBenefits strong { display: block; font-size: 13px; }
+.talentCardInheritance { color: #485740; }
+.talentCardSignature { border-left: 2px solid #8a759d; padding-left: 7px; white-space: pre-line; }
+.talentCardRandom { font-weight: bold; }
+.talentChoiceKeyHint { font-size: 12px; margin: 5px 0 0; }
+.eventPanel.talentCardsEvent .button { float: none; box-sizing: border-box; margin: 0; width: 100% !important; padding: 8px 10px; font-size: 13px; }
+.eventPanel.talentCardsEvent .talentCardSelect { margin-top: 10px; font-weight: bold; text-align: left; }
+.talentCardsEvent .button:focus-visible { outline: 2px solid currentColor; outline-offset: 3px; }
+body.noMask .eventPanel.talentCardsEvent { color: #252822; background: #fff; }
+body.noMask .eventPanel.talentCardsEvent .button { color: inherit; background: transparent; border-color: currentColor; }
+.eventPanel.talentCardsEvent.talentCardsDark, body.noMask .eventPanel.talentCardsEvent.talentCardsDark { color: #e9e4d5; background: #1a1a1a; }
+.talentCardsDark .talentChoiceCard { border-color: #747d69; border-left-color: #9eb692; background: #252923; }
+.talentCardsDark .talentCardInheritance { color: #c2cfb7; }
+.talentCardsDark .talentCardBenefits { border-color: #707968; }

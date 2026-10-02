@@ -63,10 +63,93 @@ var NichirinForge = window.NichirinForge = {
     return {attempt:attempt,tier:tier,style:style,key:NichirinForge.key(style,tier),guaranteed:guaranteed};
   },
   canForge: function(context) {
-    return !NichirinForge._busy && context && context === NichirinForge._context &&
+    return !NichirinForge._busy && context && !context.closed && context === NichirinForge._context &&
       Engine.activeModule === Fabricator && !!$SM.get('features.location.fabricator') &&
       !Engine.keyLock && !Events.activeEvent() && document.documentElement.contains(context.node) &&
-      context.accepted.prop('checked') && !document.querySelector('#scrapQuantityOverlay, #buyQuantityOverlay, #loadoutEditorOverlay, [role="dialog"]');
+      context.accepted.prop('checked') && !document.querySelector('#scrapQuantityOverlay, #buyQuantityOverlay, #loadoutEditorOverlay, [role="dialog"]:not(#nichirinForgePanel)');
+  },
+  canOpen: function() {
+    return !NichirinForge._busy && !NichirinForge._context && Engine.activeModule === Fabricator &&
+      !!$SM.get('features.location.fabricator') && !Engine.keyLock && !Events.activeEvent() &&
+      !document.querySelector('#nichirinForgeOverlay, #scrapQuantityOverlay, #buyQuantityOverlay, #loadoutEditorOverlay, [role="dialog"]');
+  },
+  close: function(restoreFocus) {
+    var context = NichirinForge._context;
+    if (!context) return false;
+    NichirinForge._context = null;
+    context.closed = true;
+    $.Dispatch('stateUpdate').unsubscribe(context.refresh);
+    context.overlay.remove();
+    if (restoreFocus && context.trigger && document.documentElement.contains(context.trigger)) context.trigger.focus();
+    return true;
+  },
+  open: function(trigger) {
+    if (!NichirinForge.canOpen()) return false;
+    var overlay = $('<div>').attr('id','nichirinForgeOverlay');
+    var card = $('<section>').attr({id:'nichirinForgePanel',role:'dialog','aria-modal':'true',
+      'aria-labelledby':'nichirinForgeTitle','aria-describedby':'nichirinForgeOdds nichirinForgeGuarantee',tabindex:-1})
+      .addClass('nichirinForge').appendTo(overlay);
+    var heading = $('<div>').addClass('nichirinForgeHeading').appendTo(card);
+    $('<h2>').attr('id','nichirinForgeTitle').text('日轮刀锻造').appendTo(heading);
+    var closeButton = $('<button>').attr({type:'button',id:'closeNichirinForge','aria-label':'关闭日轮刀锻造'}).text('关闭').appendTo(heading);
+    var odds = $('<p>').attr('id','nichirinForgeOdds').appendTo(card);
+    $('<strong>').text('普通次数：20% 失败（材料全部消耗）').appendTo(odds);
+    $('<span>').text('、').appendTo(odds);
+    $('<strong>').addClass('weapon-tier-4').text('75% 紫色日轮刀').appendTo(odds);
+    $('<span>').text('、').appendTo(odds);
+    $('<strong>').addClass('weapon-tier-5').text('5% 金色极日轮刀').appendTo(odds);
+    $('<span>').text('。成功后等概率随机分配 14 系呼吸归属；不直接解锁该流派。').appendTo(odds);
+    var guarantee = $('<p>').attr('id','nichirinForgeGuarantee').appendTo(card);
+    $('<strong>').text('每第 10、20、30… 次必出金色').appendTo(guarantee);
+    $('<span>').text('，失败计入次数；提前随机出金不重置。所有呼吸共享保底，不因刷新而丢失。保底次覆盖普通概率。').appendTo(guarantee);
+    $('<p>').append($('<strong>').text('每次消耗：青鬼石 ×1、钢 ×20、木头 ×100。')).appendTo(card);
+    var materials = $('<p>').addClass('nichirinForgeMaterials').appendTo(card);
+    var stats = $('<p>').appendTo(card);
+    $('<strong>').addClass('weapon-tier-4').text('紫刀 12 伤害（匹配 +15%）').appendTo(stats);
+    $('<span>').text('／').appendTo(stats);
+    $('<strong>').addClass('weapon-tier-5').text('极刀 18 伤害（匹配 +25%）').appendTo(stats);
+    $('<span>').text('，均 2 秒间隔／重 5；匹配增伤仅在无限城生效，不匹配也能使用。').appendTo(stats);
+    var progress = $('<p>').addClass('nichirinForgeProgress').appendTo(card);
+    var label = $('<label>').addClass('nichirinForgeRisk').appendTo(card);
+    var accepted = $('<input>').attr({type:'checkbox',id:'forgeRiskAccepted'}).appendTo(label);
+    $('<span>').text('我确认失败不返还材料，且不会自动装备或装入背包。').appendTo(label);
+    var actions = $('<div>').addClass('nichirinForgeActions').appendTo(card);
+    var context = {node:card[0],overlay:overlay,trigger:trigger || document.activeElement,accepted:accepted,
+      materials:materials,progress:progress,closed:false,results:$('<div>').addClass('nichirinForgeResults').attr('aria-live','polite').appendTo(card)};
+    NichirinForge._context = context;
+    [1,10].forEach(function(count) {
+      $('<button>').attr({type:'button',id:'forgeNichirin'+count}).text(count === 1 ? '锻造 1 次' : '锻造 10 次（至少 1 把金色）')
+        .data('count',count).on('click',function() {NichirinForge.forge(count,context);}).appendTo(actions);
+    });
+    var footer = $('<div>').addClass('nichirinForgeFooter').appendTo(card);
+    var cancel = $('<button>').attr({type:'button',id:'cancelNichirinForge'}).text('取消').appendTo(footer);
+    var closeThis = function() {if (NichirinForge._context === context) NichirinForge.close(true);};
+    closeButton.on('click',closeThis);
+    cancel.on('click',closeThis);
+    overlay.on('click',function(event) {
+      event.stopPropagation();
+      if (event.target === overlay[0]) closeThis();
+    });
+    overlay.on('keydown',function(event) {
+      event.stopPropagation();
+      if (event.key === 'Escape') {event.preventDefault();closeThis();}
+      else if (event.key === 'Tab') {
+        var focusable = card.find('input, button').filter(function() {return !$(this).prop('disabled');}).get();
+        var index = focusable.indexOf(document.activeElement);
+        if (index < 0 || (event.shiftKey && index === 0) || (!event.shiftKey && index === focusable.length-1)) {
+          event.preventDefault();
+          focusable[event.shiftKey ? focusable.length-1 : 0].focus();
+        }
+      }
+    });
+    overlay.on('keyup',function(event) {event.stopPropagation();});
+    accepted.on('change',NichirinForge.render);
+    context.refresh = NichirinForge.render;
+    $.Dispatch('stateUpdate').subscribe(context.refresh);
+    overlay.appendTo('body');
+    NichirinForge.render();
+    card.focus();
+    return true;
   },
   forge: function(count,context) {
     if (!NichirinForge.canForge(context)) return false;
@@ -100,48 +183,27 @@ var NichirinForge = window.NichirinForge = {
   },
   render: function() {
     if (!Fabricator.panel || !Fabricator.panel.length) return;
-    var card = Fabricator.panel.find('.nichirinForge');
-    if (!card.length) {
+    if (!Fabricator.panel.find('#openNichirinForge').length) {
       var workbench = Fabricator.panel.find('.forgeWorkbench');
-      card=$('<section>').addClass('nichirinForge').prependTo(workbench.length ? workbench : Fabricator.panel);
-      $('<h3>').text('日轮刀锻造').appendTo(card);
-      var odds=$('<p>').appendTo(card);
-      $('<strong>').text('普通次数：20% 失败（材料全部消耗）').appendTo(odds);
-      $('<span>').text('、').appendTo(odds);
-      $('<strong>').addClass('weapon-tier-4').text('75% 紫色日轮刀').appendTo(odds);
-      $('<span>').text('、').appendTo(odds);
-      $('<strong>').addClass('weapon-tier-5').text('5% 金色极日轮刀').appendTo(odds);
-      $('<span>').text('。成功后等概率随机分配 14 系呼吸归属；不直接解锁该流派。').appendTo(odds);
-      var guarantee=$('<p>').appendTo(card);
-      $('<strong>').text('每第 10、20、30… 次必出金色').appendTo(guarantee);
-      $('<span>').text('，失败计入次数；提前随机出金不重置。所有呼吸共享保底，不因刷新而丢失。保底次覆盖普通概率。').appendTo(guarantee);
-      $('<p>').append($('<strong>').text('每次消耗：青鬼石 ×1、钢 ×20、木头 ×100。')).appendTo(card);
-      var stats=$('<p>').appendTo(card);
-      $('<strong>').addClass('weapon-tier-4').text('紫刀 12 伤害（匹配 +15%）').appendTo(stats);
-      $('<span>').text('／').appendTo(stats);
-      $('<strong>').addClass('weapon-tier-5').text('极刀 18 伤害（匹配 +25%）').appendTo(stats);
-      $('<span>').text('，均 2 秒间隔／重 5；匹配增伤仅在无限城生效，不匹配也能使用。').appendTo(stats);
-      var progress=$('<p>').addClass('nichirinForgeProgress').appendTo(card);
-      var label=$('<label>').addClass('nichirinForgeRisk').appendTo(card);
-      var accepted=$('<input>').attr({type:'checkbox',id:'forgeRiskAccepted'}).appendTo(label);
-      $('<span>').text('我确认失败不返还材料，且不会自动装备或装入背包。').appendTo(label);
-      var actions=$('<div>').addClass('nichirinForgeActions').appendTo(card);
-      var context={node:card[0],accepted:accepted,progress:progress,results:$('<div>').addClass('nichirinForgeResults').attr('aria-live','polite').appendTo(card)};
-      NichirinForge._context=context;
-      [1,10].forEach(function(count) {
-        $('<button>').attr({type:'button',id:'forgeNichirin'+count}).text(count===1 ? '锻造 1 次' : '锻造 10 次（至少 1 把金色）')
-          .data('count',count).on('click',function(){NichirinForge.forge(count,context);}).appendTo(actions);
-      });
-      accepted.on('change',NichirinForge.render);
+      $('<button>').attr({type:'button',id:'openNichirinForge','aria-haspopup':'dialog','aria-controls':'nichirinForgePanel'})
+        .text('日轮刀锻造').on('click',function() {NichirinForge.open(this);}).prependTo(workbench.length ? workbench : Fabricator.panel);
     }
-    var context= NichirinForge._context, attempts= NichirinForge.attempts();
+    var context = NichirinForge._context;
+    if (!context) return;
+    if (context.closed || !document.documentElement.contains(context.node) || Engine.activeModule !== Fabricator ||
+      !$SM.get('features.location.fabricator') || Engine.keyLock || Events.activeEvent()) {NichirinForge.close(false);return;}
+    var card = $(context.node), attempts = NichirinForge.attempts();
+    context.materials.text('庄园库存：' + Object.keys(NichirinForge.COST).map(function(item) {
+      var stock = NichirinForge.stock(item);
+      return _(item)+' ×'+(Number.isFinite(stock) && stock >= 0 ? stock : '异常');
+    }).join('、'));
     context.progress.text('累计锻造 ' + attempts + ' 次 · 距下次固定金色保底 ' + (10-attempts%10) + ' 次');
     card.find('.nichirinForgeActions button').each(function() {
       var plan=NichirinForge.preview($(this).data('count'));
       $(this).prop('disabled',!plan.ready || !context.accepted.prop('checked') || NichirinForge._busy)
         .attr('title',plan.ready ? '确认后立即消耗材料并锻造，不能撤销' : plan.reason);
     });
-    var results=$SM.get('game.nichirinForge.lastResults') || [], signature=JSON.stringify(results);
+    var savedResults=$SM.get('game.nichirinForge.lastResults'), results=Array.isArray(savedResults) ? savedResults.slice(-10) : [], signature=JSON.stringify(results);
     if (context.results.data('signature') !== signature) {
       context.results.data('signature',signature).empty();
       if (results.length) $('<strong>').text('上次锻造结果（已入仓）').appendTo(context.results);

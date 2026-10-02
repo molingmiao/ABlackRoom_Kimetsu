@@ -42,23 +42,49 @@ div.blueprintRow .row_key {
   padding: 0 10px 10px 0;
 }
 .forgeWorkbench:focus-visible { outline: 2px solid currentColor; outline-offset: 2px; }
-.nichirinForge {
-  width: 100%;
-  box-sizing: border-box;
-  padding: 12px;
+#openNichirinForge {
+  font: inherit;
+  color: inherit;
+  background: transparent;
   border: 1px solid currentColor;
-  margin: 0 0 20px;
+  padding: 8px 18px;
+  margin: 0 0 18px;
+  cursor: pointer;
+}
+#nichirinForgeOverlay {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0,0,0,.55);
+  z-index: 1100;
+}
+.nichirinForge {
+  width: 560px;
+  max-width: calc(100vw - 48px);
+  max-height: calc(100vh - 48px);
+  overflow-y: auto;
+  box-sizing: border-box;
+  padding: 20px;
+  border: 1px solid currentColor;
+  background: #fff;
+  color: #222;
+  box-shadow: 0 3px 14px rgba(0,0,0,.35);
   line-height: 1.6;
 }
-.nichirinForge h3 { margin: 0 0 8px; }
+.nichirinForgeHeading { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 12px; }
+.nichirinForge h2 { margin: 0; font-size: 20px; }
 .nichirinForge p { margin: 8px 0; }
 .nichirinForgeProgress { font-weight: bold; }
+.nichirinForgeMaterials { padding: 8px 10px; border: 1px solid #888; }
 .nichirinForgeRisk { display: block; margin: 12px 0; }
 .nichirinForgeRisk input { margin-right: 8px; }
 .nichirinForgeActions { display: flex; flex-wrap: wrap; gap: 10px; }
-.nichirinForgeActions button { font: inherit; background: transparent; color: inherit; border: 1px solid currentColor; padding: 7px 10px; cursor: pointer; }
-.nichirinForgeActions button:disabled { opacity: .6; cursor: default; }
-.nichirinForgeActions button:focus-visible { outline: 2px solid currentColor; outline-offset: 2px; }
+.nichirinForge button { font: inherit; background: transparent; color: inherit; border: 1px solid currentColor; padding: 7px 10px; cursor: pointer; }
+.nichirinForge button:disabled { opacity: .6; cursor: default; }
+#openNichirinForge:focus-visible, .nichirinForge :focus-visible { outline: 2px solid #b28c32; outline-offset: 2px; }
+.nichirinForgeFooter { display: flex; justify-content: flex-end; margin-top: 16px; }
 .nichirinForgeResults { margin-top: 12px; }
 .nichirinForge .weapon-tier-4 { color: #9354b9; }
 .nichirinForge .weapon-tier-5 { color: #9b7000; }
