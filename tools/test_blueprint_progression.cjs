@@ -7,6 +7,7 @@ function fixture() {
   const chain = { length: 0, each() { return this; }, removeClass() { return this; }, stop() { return this; },
     animate() { return this; }, css() { return this; }, text() { return this; }, find() { return this; } };
   let active = null;
+  const openedEvents = [];
   const c = { State: {}, _: text => text, AudioLibrary: {}, AudioEngine: { playSound() {} },
     Room: {}, Outside: {}, Path: { outfit: {}, onArrival() {} }, Events: { Setpieces: {}, _LEAVE_COOLDOWN: 1 },
     Engine: { options: {}, Perks: {}, log() {}, saveGame() {}, event() {} }, Notifications: { notify() {} },
@@ -25,9 +26,32 @@ function fixture() {
   const sm = c.$SM, world = c.World, chapter = c.Events.StoryChapters;
   c.Engine.activeModule = c.Room;
   c.Events.activeEvent = () => active;
+  c.Events.eventStack = [];
   c.Events.eventPanel = () => chain;
   c.Events.updateButtons = () => {};
   c.Events.loadScene = name => { c.Events.activeScene = name; active.scenes[name].onLoad?.(); };
+  // Replace only the DOM/fade side of event lifecycle. The entry point and buttonClick
+  // remain production code, including live affordability/perk checks and deductions.
+  c.Events.startEvent = event => {
+    openedEvents.push(event);
+    event.ending = false;
+    c.Events.eventStack.unshift(event);
+    active = event;
+    c.Engine.keyLock = true;
+    c.Engine.tabNavigation = false;
+    c.Events.loadScene('start');
+  };
+  c.Events.endEvent = (onEnd, sourceEvent) => {
+    const event = sourceEvent || active;
+    if (!event || event.ending) return;
+    event.ending = true;
+    const index = c.Events.eventStack.indexOf(event);
+    if (index >= 0) c.Events.eventStack.splice(index, 1);
+    active = c.Events.eventStack[0] || null;
+    c.Engine.keyLock = c.Events.eventStack.length > 0;
+    c.Engine.tabNavigation = !c.Engine.keyLock;
+    if (typeof onEnd === 'function') onEnd();
+  };
   c.EarlyGame.render = () => {};
   world.testMap = world._reportExpeditionSummary = world.updateTravelGuide = () => {};
   const enter = () => {
@@ -44,9 +68,15 @@ function fixture() {
     assert.equal(chapter.finish('swordsmith'), true);
   };
   const pillars = c.Events.Global.find(event => event.title === 'The Pillars Convene');
-  return { c, sm, world, chapter, enter, complete, pillars, setEvent(value) { active = value; } };
+  return { c, sm, world, chapter, enter, complete, pillars, openedEvents,
+    setEvent(value) {
+      active = value;
+      c.Events.eventStack = value ? [value] : [];
+      if (value) value.ending = false;
+    } };
 }
 const snapshot = c => JSON.stringify(c.State);
+const click = (c, id) => c.Events.buttonClick({ attr: () => id });
 
 // New K completion always has a deterministic blueprint, but only after a safe home return.
 {
@@ -167,11 +197,164 @@ for (const flag of ['game.swordsmithVillageDone', 'game.swordsmithChapterDone'])
   sm.set('game.swordsmithVillageDone', true); sm.set('character.blueprints["wisteria oil"]', true);
   assert.equal(c.EarlyGame.smithBlueprintPending(), false, 'already known fixed blueprints do not display a duplicate claim');
   sm.set('character.blueprints', { 'wind armour': true, 'wisteria oil': false, 'bind kunai': null });
-  assert.equal(c.EarlyGame.smithBlueprintPending(), false, 'any already unlocked blueprint preserves the original training path without a new claim step');
+  sm.set('game.swordsmithBlueprintGranted', true);
+  assert.equal(c.EarlyGame.smithBlueprintPending(), true, 'other blueprints and an old grant flag cannot hide a missing fixed blueprint');
+  const inventory = JSON.stringify(sm.get('stores'));
+  assert.equal(c.EarlyGame.claimSmithBlueprint(), true, 'the old flag can be repaired without rerunning K');
+  assert.equal(sm.get('character.blueprints["wisteria oil"]'), true);
+  assert.equal(sm.get('character.blueprints["wind armour"]'), true);
+  assert.equal(sm.get('character.blueprints["bind kunai"]'), null);
+  assert.equal(sm.get('game.swordsmithBlueprintGranted'), true);
+  assert.equal(JSON.stringify(sm.get('stores')), inventory, 'repairing the fixed blueprint does not duplicate equipment or supplies');
+  assert.equal(c.EarlyGame.smithBlueprintPending(), false);
   const known = snapshot(c);
   assert.equal(c.EarlyGame.claimSmithBlueprint(), false);
   assert.equal(snapshot(c), known);
   assert.match(c.EarlyGame.milestones().find(task => task.id === 'pillars').hint, /大厅主线栏补领/);
-  assert.match(c.EarlyGame.benefit('wreck'), /试验设施 P/);
+  assert.match(c.EarlyGame.benefit('wreck'), /P 只是补给驿站/);
 }
-console.log('PASS: deterministic safe-home K blueprint, explicit one-time old/new save backfill, death/reentry safety, unchanged rewards and real Pillar/Sun/Moon gates.');
+
+// The Hall's entry is deterministic, free, and respects story/location/modal guards.
+{
+  const f = fixture(), { c, sm } = f;
+  sm.set('stores', { 'cured meat': 0, meat: 500, torch: 0 });
+  sm.set('character.blueprints', { 'wind armour': true });
+  assert.equal(c.EarlyGame.startPillarTraining(), false, 'a blueprint alone cannot skip K');
+  sm.set('game.swordsmithChapterDone', true);
+  sm.set('character.blueprints', { 'wind armour': false });
+  assert.equal(c.EarlyGame.startPillarTraining(), false, 'false blueprint entries do not count');
+  sm.set('character.blueprints', {});
+  assert.equal(c.EarlyGame.startPillarTraining(), false, 'K without any real blueprint remains blocked');
+  sm.set('character.blueprints', { 'wind armour': true });
+  assert.equal(c.EarlyGame.canStartPillarTraining(), true, 'any actual blueprint retains the existing training route');
+  c.Engine.keyLock = true;
+  assert.equal(c.EarlyGame.startPillarTraining(), false);
+  c.Engine.keyLock = false;
+  c.document = { querySelector: () => ({}) };
+  assert.equal(c.EarlyGame.startPillarTraining(), false, 'an open modal cannot be overlaid by a second event');
+  delete c.document;
+  f.setEvent({ scenes: {} });
+  assert.equal(c.EarlyGame.startPillarTraining(), false, 'an active event cannot be replaced');
+  f.setEvent(null);
+  for (const location of [c.World, c.Outside]) {
+    c.Engine.activeModule = location;
+    assert.equal(c.EarlyGame.startPillarTraining(), false, 'training is only opened in the Hall');
+  }
+  c.Engine.activeModule = c.Room;
+  assert.equal(f.openedEvents.length, 0, 'blocked attempts never call startEvent');
+  const before = snapshot(c);
+  const originalRandom = c.Math.random;
+  c.Math.random = () => { throw new Error('opening training must not wait for or roll a random event'); };
+  assert.equal(c.EarlyGame.startPillarTraining(), true);
+  c.Math.random = originalRandom;
+  assert.equal(snapshot(c), before, 'opening the council is free, even with no training materials');
+  assert.equal(f.openedEvents[0], f.pillars);
+  assert.equal(c.Events.activeEvent(), f.pillars);
+  assert.equal(c.Events.activeScene, 'start');
+  assert.equal(c.Events.eventStack.length, 1);
+  assert.equal(c.Engine.keyLock, true);
+  assert.equal(c.EarlyGame.startPillarTraining(), false, 'rapid repeated clicks cannot double-open');
+  assert.equal(f.openedEvents.length, 1);
+  click(c, 'choose');
+  assert.equal(c.Events.activeScene, 'select');
+  assert.equal(snapshot(c), before, 'entering the choice screen still does not consume resources');
+  click(c, 'review');
+  assert.equal(c.Events.activeScene, 'select');
+  assert.equal(snapshot(c), before, 'raw meat does not satisfy cured-meat training costs');
+  click(c, 'leave');
+  assert.equal(c.Events.activeEvent(), null);
+  assert.equal(c.Engine.keyLock, false);
+  assert.equal(!!sm.get('game.pillarConvocationDone'), false, 'declining is not successful training');
+  assert.equal(snapshot(c), before, 'declining is free');
+  assert.equal(c.EarlyGame.startPillarTraining(), true, 'declined training can be reopened immediately');
+  assert.equal(f.openedEvents.length, 2);
+  click(c, 'humble');
+  click(c, 'leave');
+  assert.equal(snapshot(c), before);
+}
+
+// All ordinary options cost exactly 50 cured meat and one torch; Wind costs 80.
+for (const [choice, food, perk] of [
+  ['flame', 50, 'slash mastery'], ['water', 50, 'step yushin'],
+  ['mist', 50, 'mikiri'], ['love', 50, 'breath nourish'],
+  ['serpent', 50, 'kehai dansha'], ['review', 50, null], ['wind', 80, 'fist form master']
+]) {
+  const f = fixture(), { c, sm } = f;
+  sm.set('game.swordsmithVillageDone', true);
+  sm.set('character.blueprints["wisteria oil"]', true);
+  sm.set('stores', { 'cured meat': food, torch: 1, meat: 100, steel: 8 });
+  const before = snapshot(c);
+  assert.equal(c.EarlyGame.startPillarTraining(), true);
+  assert.equal(snapshot(c), before);
+  click(c, 'choose');
+  assert.equal(snapshot(c), before);
+  sm.set('stores["cured meat"]', food - 1);
+  const lowFood = snapshot(c);
+  click(c, choice);
+  assert.equal(snapshot(c), lowFood, choice + ': one short cannot partially charge or mark completion');
+  sm.set('stores["cured meat"]', food);
+  sm.set('stores.torch', 0);
+  const missingTorch = snapshot(c);
+  click(c, choice);
+  assert.equal(snapshot(c), missingTorch, choice + ': missing torch cannot consume the food first');
+  sm.set('stores.torch', 1);
+  click(c, choice);
+  assert.equal(c.Events.activeScene, 'thanks');
+  assert.equal(sm.get('game.pillarConvocationDone'), true);
+  assert.equal(sm.get('stores["cured meat"]'), 0, choice + ': exact live food charge');
+  assert.equal(sm.get('stores.torch'), 0, choice + ': exact live torch charge');
+  assert.equal(sm.get('stores.meat'), 100);
+  assert.equal(sm.get('stores.steel'), 8);
+  if (perk) assert.equal(sm.hasPerk(perk), true);
+  if (choice === 'wind') {
+    assert.equal(sm.hasPerk('fist form one'), true);
+    assert.equal(sm.hasPerk('fist form four'), true);
+  }
+  click(c, 'rest');
+  assert.equal(c.Events.activeEvent(), null);
+  assert.equal(c.Engine.keyLock, false);
+  assert.equal(c.EarlyGame.pillarTrainingPending(), false);
+  const done = snapshot(c);
+  assert.equal(c.EarlyGame.startPillarTraining(), false, 'completed training cannot be reopened');
+  assert.equal(snapshot(c), done);
+  assert.equal(f.openedEvents.length, 1);
+}
+
+// Veteran saves that already know every offered perk still have a paid completion route.
+{
+  const f = fixture(), { c, sm } = f;
+  sm.set('game.swordsmithChapterDone', true);
+  sm.set('character.blueprints["wind armour"]', true);
+  for (const perk of ['slash mastery', 'step yushin', 'mikiri', 'breath nourish', 'kehai dansha', 'fist form master']) sm.addPerk(perk);
+  sm.set('stores', { 'cured meat': 50, torch: 1 });
+  assert.equal(c.EarlyGame.startPillarTraining(), true);
+  click(c, 'choose');
+  const before = snapshot(c);
+  click(c, 'flame');
+  assert.equal(snapshot(c), before, 'an already learned training is not charged');
+  click(c, 'review');
+  assert.equal(sm.get('game.pillarConvocationDone'), true);
+  assert.equal(sm.get('stores["cured meat"]'), 0);
+  assert.equal(sm.get('stores.torch'), 0);
+}
+
+// Existing carried light sources substitute for the torch without being consumed.
+{
+  const f = fixture(), { c, sm } = f;
+  sm.set('game.swordsmithChapterDone', true);
+  sm.set('character.blueprints["wisteria oil"]', true);
+  sm.set('stores', { 'cured meat': 50, torch: 0 });
+  c.Path.outfit['firefly orb'] = 1;
+  sm.set('outfit', c.Path.outfit);
+  assert.equal(c.EarlyGame.startPillarTraining(), true);
+  click(c, 'choose');
+  click(c, 'review');
+  assert.equal(c.Events.activeScene, 'thanks');
+  assert.equal(sm.get('game.pillarConvocationDone'), true);
+  assert.equal(sm.get('stores["cured meat"]'), 0, 'a carried orb only substitutes for the torch, not food');
+  assert.equal(sm.get('stores.torch'), 0);
+  assert.equal(c.Path.outfit['firefly orb'], 1, 'training never consumes the carried orb');
+  assert.equal(sm.get('outfit["firefly orb"]'), 1);
+}
+
+console.log('PASS: safe-home K fixed-blueprint backfill and old-flag repair; immediate free Hall training, retry/cancel/reentry guards, live 50/80 food + torch fees, unchanged real Pillar/Sun/Moon gates.');

@@ -329,9 +329,10 @@ Events.Global = [
 		},
 		audio: AudioLibrary.EVENT_MYSTERIOUS_WANDERER
 	},
-	{ /* 章 7：柱合议 + 柱训练 — 拥有任意蓝图后（玩家已探过 Ravaged Battleship）触发。
+	{ /* 章 7：柱合议 + 柱训练 — 完成刀匠村并拥有图纸后，可在大厅主动开启。
 	     九柱齐聚紫藤庄园，玩家任选一柱进行训练以补足尚缺的呼吸法。 */
 		title: _('The Pillars Convene'),
+		id: 'pillarConvocation',
 		storySupply: true,
 		isAvailable: function() {
 			var bps = $SM.get('character.blueprints');
@@ -367,7 +368,8 @@ Events.Global = [
 			'select': {
 				text: [
 					_('each Hashira beckons. each offers a distinct path.'),
-					_('choose wisely — they will not be free again until the last battle.')
+					'选择一项尚未掌握的训练，也可温习已有呼吸。暂时离开不会失去训练机会。',
+					'普通训练消耗庄园仓库中的熏肉 ×50、火把 ×1；风柱训练消耗熏肉 ×80、火把 ×1。生肉不算口粮，训练物资不用装进背包；已携带萤之珠可免火把费用。选择训练时才扣材料；暂时离开后，可回大厅再次点击“参加柱训练”，无需等待。'
 				],
 				buttons: {
 					'flame': {
@@ -423,7 +425,7 @@ Events.Global = [
 					},
 					'leave': {
 						text: _('bow and decline'),
-						onLoad: function() { $SM.set('game.pillarConvocationDone', true); },
+						onEnd: function() { if (window.EarlyGame) EarlyGame.render(); },
 						nextScene: 'end'
 					}
 				}
@@ -441,6 +443,7 @@ Events.Global = [
 				buttons: {
 					'rest': {
 						text: _('tend the hearth'),
+						onEnd: function() { if (window.EarlyGame) EarlyGame.render(); },
 						nextScene: 'end'
 					}
 				}

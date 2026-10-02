@@ -531,8 +531,8 @@ const pause = ms => new Promise(resolve => setTimeout(resolve, ms));
         Engine.travelTo(Room);await new Promise(resolve=>$('#locationSlider').promise().done(resolve));
         clearTimeout(Events._eventTimeout);clearTimeout(Engine._incomeTimeout);
         $SM.set('game.swordsmithVillageDone',true,true);$SM.set('game.swordsmithChapterDone',false,true);
-        $SM.set('game.swordsmithBlueprintGranted',false,true);$SM.set('game.pillarConvocationDone',false,true);
-        $SM.set('character.blueprints',{'wisteria oil':false,'wind armour':null},true);
+        $SM.set('game.swordsmithBlueprintGranted',true,true);$SM.set('game.pillarConvocationDone',false,true);
+        $SM.set('character.blueprints',{'wisteria oil':false,'wind armour':true},true);
         $SM.set('game.campaignClaims',Object.fromEntries(EarlyGame.milestones().filter(task=>!['pillars','castle'].includes(task.id)).map(task=>[task.id,true])),true);
         EarlyGame.render();
         await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));
@@ -554,6 +554,28 @@ const pause = ms => new Promise(resolve => setTimeout(resolve, ms));
       await nativeClick('#roomPanel .smithBlueprintClaim');
       await evaluate(`(function() {
         if(!$SM.get('character.blueprints["wisteria oil"]')||$('#roomPanel .smithBlueprintClaim').is(':visible'))throw Error('native blueprint claim did not unlock the recipe or hide the completed action');
+      })()`);
+      await nativeClick('#roomPanel .pillarTrainingStart');
+      await evaluate(`(function() {
+        if(Events.activeEvent()?.id!=='pillarConvocation'||$SM.get('game.pillarConvocationDone'))throw Error('manual training did not start or wrongly completed the task');
+      })()`);
+      await nativeClick('#choose');
+      await nativeClick('#leave');
+      await evaluate(`(async function() {
+        for(let i=0;i<100&&Events.activeEvent();i++)await new Promise(resolve=>setTimeout(resolve,25));
+        if(Events.activeEvent()||$SM.get('game.pillarConvocationDone')||document.querySelector('#roomPanel .pillarTrainingStart').disabled)throw Error('cancelled training is not immediately reopenable');
+        $SM.set('stores["cured meat"]',50);$SM.set('stores.torch',1);
+      })()`);
+      await nativeClick('#roomPanel .pillarTrainingStart');
+      await nativeClick('#choose');
+      await nativeClick('#review');
+      await evaluate(`(function() {
+        if(!$SM.get('game.pillarConvocationDone')||$SM.get('stores["cured meat"]')!==0||$SM.get('stores.torch')!==0)throw Error('manual training did not charge exact warehouse costs and complete');
+      })()`);
+      await nativeClick('#rest');
+      await evaluate(`(async function() {
+        for(let i=0;i<100&&Events.activeEvent();i++)await new Promise(resolve=>setTimeout(resolve,25));
+        if(Events.activeEvent())throw Error('training completion panel did not close');
       })()`);
       console.log('PASS: '+theme+' current-stage blueprint claim is readable, reachable at 600/938 heights, and works with native pointer input');
     }

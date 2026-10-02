@@ -3,10 +3,10 @@
 .earlyGameTask p { margin: 6px 0 0; }
 .earlyGameTaskCost { font-variant-numeric: tabular-nums; }
 .campaignGoal { font-weight: bold; }
-.campaignClaim, .smithBlueprintClaim { margin-top: 8px; padding: 4px 10px; font: inherit; color: inherit; background: transparent; border: 1px solid #888; cursor: pointer; }
-.campaignClaim:disabled, .smithBlueprintClaim:disabled { opacity: 0.55; cursor: default; }
-.smithBlueprintHint { font-weight: bold; }
-.smithBlueprintClaim:focus-visible { outline: 2px solid currentColor; outline-offset: 2px; }
+.campaignClaim, .smithBlueprintClaim, .pillarTrainingStart { margin-top: 8px; padding: 4px 10px; font: inherit; color: inherit; background: transparent; border: 1px solid #888; cursor: pointer; }
+.campaignClaim:disabled, .smithBlueprintClaim:disabled, .pillarTrainingStart:disabled { opacity: 0.55; cursor: default; }
+.smithBlueprintHint, .pillarTrainingHint { font-weight: bold; }
+.smithBlueprintClaim:focus-visible, .pillarTrainingStart:focus-visible { outline: 2px solid currentColor; outline-offset: 2px; }
 .guestCare, .openingSupply button, .openingHunters button { display: block; margin-top: 6px; padding: 4px 8px; font: inherit; text-align: left; color: inherit; background: transparent; border: 1px solid #888; cursor: pointer; }
 .guestCare:disabled, .openingHunters button:disabled { opacity: 0.55; cursor: default; }
 .openingSupply, .openingHunters { border-top: 1px dashed #888; margin-top: 10px; padding-top: 4px; }

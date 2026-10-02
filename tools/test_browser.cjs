@@ -1073,8 +1073,8 @@ async function port() {
       }
       $SM.set('character.blueprints',{'wind armour':true,'wisteria oil':false});$SM.set('game.swordsmithBlueprintGranted',false);
       EarlyGame.render();
-      check(pillarEvent.isAvailable() && !$('#roomPanel .smithBlueprintClaim').is(':visible'),
-        'an existing usable blueprint keeps the original Pillar route without a new backfill step');
+      check(pillarEvent.isAvailable() && $('#roomPanel .smithBlueprintClaim').is(':visible'),
+        'an existing usable blueprint keeps the Pillar route and no longer hides a missing fixed blueprint claim');
       $SM.set('character.blueprints',{'wisteria oil':true,'wind armour':null});$SM.set('game.swordsmithBlueprintGranted',true);
       Engine.saveGame();
       return checks;

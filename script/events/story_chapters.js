@@ -41,10 +41,8 @@ Events.StoryChapters = {
   },
   swordsmithBlueprintPending: function() {
     var blueprints = $SM.get('character.blueprints') || {};
-    var hasAnyBlueprint = Object.keys(blueprints).some(function(key) {return !!blueprints[key];});
     return !!($SM.get('game.swordsmithVillageDone') || $SM.get('game.swordsmithChapterDone'))
-      && !$SM.get('game.swordsmithBlueprintGranted')
-      && !hasAnyBlueprint;
+      && !blueprints[Events.StoryChapters.swordsmithBlueprint];
   },
   grantSwordsmithBlueprint: function() {
     var atHome = Engine.activeModule === Room && !(Events.activeEvent && Events.activeEvent());
@@ -52,7 +50,7 @@ Events.StoryChapters = {
       && World.state.swordsmith && $SM.get('game.world.map') === World.state.map;
     if ((!atHome && !safeChapterReturn)
       || !($SM.get('game.swordsmithVillageDone') || $SM.get('game.swordsmithChapterDone'))
-      || $SM.get('game.swordsmithBlueprintGranted')) return false;
+      || !Events.StoryChapters.swordsmithBlueprintPending()) return false;
     // Mark first: inventory listeners or repeated return callbacks cannot issue this reward twice.
     $SM.set('game.swordsmithBlueprintGranted',true,true);
     var key = 'character.blueprints["' + Events.StoryChapters.swordsmithBlueprint + '"]';
@@ -73,7 +71,7 @@ Events.StoryChapters = {
       if (!$SM.hasPerk(definition.perk)) $SM.addPerk(definition.perk);
       if (definition.reward && !legacyCompleted) $SM.addM('stores',definition.reward,true);
       if (id === 'swordsmith' && Events.StoryChapters.grantSwordsmithBlueprint()) {
-        Notifications.notify(null,'锻刀村的藤花精油制造图纸已送达庄园；回大厅可迎接柱合议，仍需实际完成训练。');
+        Notifications.notify(null,'锻刀村的藤花精油制造图纸已送达庄园；回大厅点击“参加柱训练”，无需等待随机事件。');
       }
       Notifications.notify(null,definition.name + '已安全交付，章节与训练已保存；阶段奖励可在庄园领取。');
       changed = true;
