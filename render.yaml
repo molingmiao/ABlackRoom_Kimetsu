@@ -1,0 +1,36 @@
+# The game is entirely client-side. Only dist/ is published; no server or database.
+services:
+  - type: web
+    runtime: static
+    name: kimetsu-game
+    branch: main
+    buildCommand: npm run build:web && npm run test:web
+    staticPublishPath: dist
+    autoDeployTrigger: commit
+    envVars:
+      - key: SKIP_INSTALL_DEPS
+        value: "true"
+      - key: NODE_VERSION
+        value: "22"
+    headers:
+      - path: /*
+        name: X-Content-Type-Options
+        value: nosniff
+      - path: /index.html
+        name: Cache-Control
+        value: no-cache
+      - path: /
+        name: Cache-Control
+        value: no-cache
+      - path: /script/*
+        name: Cache-Control
+        value: no-cache
+      - path: /css/*
+        name: Cache-Control
+        value: no-cache
+      - path: /lang/*
+        name: Cache-Control
+        value: no-cache
+      - path: /lib/*
+        name: Cache-Control
+        value: no-cache

@@ -9,6 +9,8 @@
   "scripts": {
     "start": "node dev-server.js",
     "start:nodep": "node tools/static-server.cjs",
+    "build:web": "node tools/sync-dist.cjs --web",
+    "test:web": "node tools/test_web_build.cjs",
     "lint": "eslint script dev-server.js",
     "lint:fix": "eslint script dev-server.js --fix",
     "format": "prettier --write \"script/**/*.js\" \"dev-server.js\" \"*.html\" \"css/**/*.css\"",

@@ -96,7 +96,7 @@ npm run start:nodep   # 使用 tools/static-server.cjs
 │   └── events/            # 事件剧本（遭遇 / 设点 / 营销 / 刑吏→「坠毁的无限列车」副本 / 序章 …）
 ├── css/                   # main / room / outside / path / world / ship / space / fabricator / dark
 ├── audio/                 # flac 音效（火/脚步/遭遇/地标/武器 …）
-├── img/, lib/             # 资源与第三方库（jQuery 3.7.1 本地回退等）
+├── img/, lib/             # 资源与第三方库（jQuery 3.7.1 本地加载等）
 ├── tools/                 # 构建与本地化脚本：sync-dist / build-exe / static-server / po2js / 批量汉化等
 ├── .github/workflows/deploy.yml   # 推 main 自动部署到 GitHub Pages
 └── sea-config.json        # Node SEA 打包配置（生成 wisteria-hall.exe）
@@ -121,7 +121,22 @@ npm run test:migrate  # 跑存档迁移测试
 node tools/build-exe.cjs     # 基于 sea-config.json 生成 dist/wisteria-hall.exe
 ```
 
-部署到 GitHub Pages：推送到 `main` 即自动触发 [.github/workflows/deploy.yml](./.github/workflows/deploy.yml)，先 `node tools/sync-dist.cjs` 同步并裁剪测试 UI，再用 `actions/deploy-pages` 发布 `dist/`。
+部署到 GitHub Pages：推送到 `main` 即自动触发 [.github/workflows/deploy.yml](./.github/workflows/deploy.yml)，先 `npm run build:web` 同步并裁剪测试 UI，再用 `actions/deploy-pages` 发布 `dist/`。
+
+### Render 备用入口
+
+仓库提供 [render.yaml](./render.yaml)，用于 Render Static Site，与 GitHub Pages 同时保留。连接此仓库的 `main` 分支后，使用以下配置：
+
+- Build Command：`npm run build:web && npm run test:web`
+- Publish Directory：`dist`
+- 环境变量：`SKIP_INSTALL_DEPS=true`（网页构建不需要安装依赖）
+- Auto-Deploy：提交到 `main` 时自动部署。
+
+也可在 Render 的 Blueprints 页面从本仓库读取 `render.yaml`。静态站点不需要启动命令、Express 服务或数据库；只发布 `dist`，不要发布仓库根目录。详见 [Render 静态站点文档](https://render.com/docs/static-sites)。
+
+`build:web` 会清理并重建网页专用产物，剔除旧的安装包和开发测试界面；`node tools/sync-dist.cjs` 仍保留本地可执行打包的同步方式。jQuery 与游戏必需资源全部随站点加载，不需要连接 GitHub 或外部 CDN。
+
+**迁移存档**：存档保存在当前浏览器、当前网站地址中，不会在 GitHub Pages 和 Render 之间自动共享。在旧入口的菜单里选择“导出／导入”→“导出”，复制完整存档；到新入口的相同菜单选择“导入”并粘贴。导入会替换新入口已有的存档，请先备份。之后两个入口的进度各自保存，不会自动同步。
 
 ## 本地化
 

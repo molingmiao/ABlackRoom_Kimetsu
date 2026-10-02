@@ -7,7 +7,9 @@ const net = require('node:net');
 const os = require('node:os');
 const path = require('node:path');
 const { spawn } = require('node:child_process');
-const root = path.resolve(__dirname, '..');
+const root = process.env.GAME_ASSET_ROOT
+  ? path.resolve(process.env.GAME_ASSET_ROOT)
+  : path.resolve(__dirname, '..');
 const pause = ms => new Promise(resolve => setTimeout(resolve, ms));
 async function port() {
   const server = net.createServer();

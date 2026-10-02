@@ -18,14 +18,9 @@
 	<meta itemprop="name" property="og:title" content="紫藤庄园 · A Dark Room (Demon Slayer Edition)" />
 	<link rel="shortcut icon" href="favicon.ico" />
 	<link rel="image_src" href="img/adr.png" />
-	<!-- jQuery 3.7.1：用 https + jsdelivr，失败时回退到本地 lib/jquery.min.js（也是 3.7.1）。
-	     如需调试与旧版本对比，lib/jquery-1.10.1.min.js 是保留的回滚副本。 -->
-	<script src="https://cdn.jsdelivr.net/npm/jquery@3.7.1/dist/jquery.min.js"></script>
-	<script>
-		if(!window.jQuery) {
-			document.write('<script src="lib/jquery.min.js"><\/script>')
-		}
-	</script>
+	<!-- jQuery 3.7.1 随站点本地加载，不依赖外部 CDN。
+	     lib/jquery-1.10.1.min.js 是保留的回滚副本。 -->
+	<script src="lib/jquery.min.js"></script>
 	<script src="lib/jquery.color-2.2.0.min.js"></script>
 	<script src="lib/jquery.event.move.js"></script>
 	<script src="lib/jquery.event.swipe.js"></script>
