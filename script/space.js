@@ -220,7 +220,7 @@ var Space = {
 		var _talents = Space.TALENTS.filter(function(t) { return Space.getTalentLevel(t.id) > 0; });
 		if (_talents.length) {
 			var talBar = $('<div>').addClass('floorTalents').appendTo(hdr);
-			$('<span>').addClass('talentLabel').text(_('talents:') + ' ').appendTo(talBar);
+			$('<span>').addClass('talentLabel').text(_('talents:') + ' ' + _('level limit Lv.{0}', Space.getTalentCap()) + ' ').appendTo(talBar);
 			_talents.forEach(function(t) {
 				$('<span>').addClass('talentChip').text(_(t.nameKey) + ' Lv.' + Space.getTalentLevel(t.id)).appendTo(talBar);
 			});
@@ -400,12 +400,12 @@ var Space = {
 	},
 	collectConfiguredLoot: function() {
 		var event = Events.activeEvent(), scene = event && event.scenes[Events.activeScene];
-		if (Engine.activeModule !== Space || !Events.won || !scene || !scene.configuredPickup || scene.pickupCompleted) return;
+		if (Engine.activeModule !== Space || !Events.won || !event || event.ending || !scene || !scene.configuredPickup || scene.pickupCompleted) return;
 		scene.pickupCompleted = true;
 		var profile = Path.getLoadout('castle');
 		if (profile) {
 			var loot = {}, buttons = {};
-			$('#lootButtons .lootRow').each(function() {
+			$('#lootButtons', event.eventPanel).children('.lootRow').each(function() {
 				var key = $(this).data('item'), button = $(this).children('.lootTake').first();
 				if (key) { loot[key] = button.data('numLeft') || 0; buttons[key] = button; }
 			});
@@ -417,8 +417,19 @@ var Space = {
 		}
 		Space._collectRemainingLoot();
 	},
+	_hasRemainingLoot: function() {
+		var event = Events.activeEvent(), scene = event && event.scenes[Events.activeScene];
+		if (Engine.activeModule !== Space || !Events.won || !event || event.ending || !scene || !scene.combat) return false;
+		var remaining = false;
+		$('#lootButtons', event.eventPanel).children('.lootRow').each(function() {
+			if ($(this).children('.lootTake').first().data('numLeft') > 0) remaining = true;
+		});
+		return remaining;
+	},
 	_collectRemainingLoot: function() {
-		var rows = $('#lootButtons .lootRow');
+		var event = Events.activeEvent(), scene = event && event.scenes[Events.activeScene];
+		if (Engine.activeModule !== Space || !Events.won || !event || event.ending || !scene || !scene.combat) return;
+		var rows = $('#lootButtons', event.eventPanel).children('.lootRow');
 		if (!rows.length) return;
 		var collected = [];
 		rows.each(function() {
@@ -427,14 +438,40 @@ var Space = {
 			var numLeft = take.data('numLeft') || 0;
 			if (name && numLeft > 0) {
 				take.data('numLeft', 0); // A repeated completion callback must not duplicate warehouse rewards.
+				// Remove empty rows like manual pickup does; later drops can create fresh enabled buttons.
+				$(this).remove();
 				$SM.add('stores["' + name + '"]', numLeft);
 				if (window.CastleReport) CastleReport.recordMaterial('banked', name, numLeft);
 				collected.push(_(name) + '+' + numLeft);
 			}
 		});
+		Events.setTakeAll($('#lootButtons', event.eventPanel));
 		if (collected.length) {
 			Notifications.notify(null, _('the support corps sends the rest back to the wisteria estate: {0}', collected.join(', ')));
 		}
+	},
+	// Every castle victory has an explicit bank-only action; leaving still banks unclaimed loot.
+	// Manual pickups remain in the backpack, and banking again can send newly dropped items home.
+	_configureBattleLoot: function(scene, finishKey, onEnd) {
+		scene.configuredPickup = true;
+		var original = scene.buttons, buttons = {
+			bankLoot: {
+				text: _('send remaining loot home only'),
+				available: Space._hasRemainingLoot,
+				onChoose: Space._collectRemainingLoot
+			},
+			collectConfigured: {
+				text: _('refill from loot and continue'), cooldown: Events._LEAVE_COOLDOWN,
+				available: function() { return !!Path.getLoadout('castle'); },
+				onChoose: Space.collectConfiguredLoot, onEnd: onEnd, nextScene: 'end'
+			}
+		};
+		Object.keys(original).forEach(function(key) { if (key !== finishKey) buttons[key] = original[key]; });
+		original[finishKey].text = _('send loot home and {0}', original[finishKey].text);
+		buttons[finishKey] = original[finishKey];
+		scene.buttons = buttons;
+		scene.deathMessage += ' ' + _('loot refill uses your saved castle targets and free bag space, never home stock or equipment changes. remaining loot goes home.');
+		scene.deathMessage += ' ' + _('manually taken loot stays in your backpack until you return. send remaining loot home without leaving this screen.');
 	},
 
 	// 由按钮 onEnd 调用：战利品已收集、战斗事件已关闭，再发放天赋。
@@ -449,16 +486,42 @@ var Space = {
 	TALENTS: [
 		{ id: 'hardBody',   nameKey: 'hardened body',   maxLevel: 20, per: 5,    descKey: '+{0} max hp per level' },
 		{ id: 'sharpEdge',  nameKey: 'sharpened edge',  maxLevel: 20, per: 0.04, descKey: '+{0}% weapon damage per level' },
-		{ id: 'ironWall',   nameKey: 'iron wall',       maxLevel: 20, per: 0.015, descKey: '+{0}% damage reduction per level (cap 30%)' },
+		{ id: 'ironWall',   nameKey: 'iron wall',       maxLevel: 20, per: 0.015, descKey: '+{0}% damage reduction per level; diminishing gains after Lv.20' },
 		{ id: 'bloodDrink', nameKey: 'blood drinker',   maxLevel: 20, per: 0.01, descKey: '+{0}% lifesteal per level' },
 		{ id: 'steadyHand', nameKey: 'steady hand',     maxLevel: 20, per: 0.01, descKey: '+{0}% hit chance per level' },
-		{ id: 'swiftBlade', nameKey: 'swift blade',     maxLevel: 20, per: 0.015, descKey: '-{0}% weapon cooldown per level (cap 30%)' }
+		{ id: 'swiftBlade', nameKey: 'swift blade',     maxLevel: 20, per: 0.015, descKey: '-{0}% weapon cooldown per level; diminishing gains after Lv.20' }
 	],
-	getTalentLevel: function(id) { return $SM.get('character.infinityTalents["' + id + '"]', true) || 0; },
+	// maxLevel above describes the original tier, not the persistent, shared ceiling.
+	getTalentCap: function() {
+		var cap = $SM.get('game.castleMeta.talentCap');
+		return Number.isSafeInteger(cap) && cap >= 20 ? cap - ((cap - 20) % 5) : 20;
+	},
+	getTalentLevel: function(id) {
+		var level = $SM.get('character.infinityTalents["' + id + '"]', true);
+		return Number.isSafeInteger(level) ? Math.max(0, level) : 0;
+	},
+	maybeBreakthroughTalents: function() {
+		var before = Space.getTalentCap(), cap = before;
+		// Do not combine historical peaks from separate descents to unlock a tier.
+		var minimum = Math.min.apply(null, Space.TALENTS.map(function(t) { return Space.getTalentLevel(t.id); }));
+		if (minimum >= before) {
+			var next = 20 + (Math.floor((minimum - 20) / 5) + 1) * 5;
+			if (Number.isSafeInteger(next)) cap = next;
+		}
+		if (cap !== before) {
+			$SM.set('game.castleMeta.talentCap', cap, true);
+			Notifications.notify(null, _('all talents mastered: level limit {0} → {1}. future descents keep this limit.', before, cap));
+		}
+		return cap;
+	},
+	eligibleTalents: function() {
+		var cap = Space.maybeBreakthroughTalents();
+		return Space.TALENTS.filter(function(t) { return Space.getTalentLevel(t.id) < cap; });
+	},
 	setTalentLevel: function(id, lvl) {
 		var talent = Space.TALENTS.find(function(t) { return t.id === id; });
-		if (!talent) return;
-		lvl = Math.max(0, Math.min(talent.maxLevel, lvl));
+		if (!talent || !Number.isSafeInteger(lvl)) return false;
+		lvl = Math.max(0, Math.min(Space.getTalentCap(), lvl));
 		var gainedHp = id === 'hardBody' ? Math.max(0, lvl - Space.getTalentLevel(id)) * talent.per : 0;
 		$SM.set('character.infinityTalents["' + id + '"]', lvl, true);
 		if (gainedHp > 0 && Engine.activeModule === Space) {
@@ -467,6 +530,8 @@ var Space = {
 		// 记录跨 run 最高等级（元进程），用于下次入城起始等级授予
 		var meta = $SM.get('game.castleMeta.peakTalent') || {};
 		if ((meta[id] || 0) < lvl) { meta[id] = lvl; $SM.set('game.castleMeta.peakTalent', meta, true); }
+		Space.maybeBreakthroughTalents();
+		return true;
 	},
 	clearTalents: function() { $SM.set('character.infinityTalents', {}, true); },
 	// ---- 元进程（跨 run 永久累积） ----
@@ -522,17 +587,22 @@ var Space = {
 	//   3→+1, 6→+2, 10→+3, 15→+5, 20→+8
 	_grantStartingTalents: function() {
 		var meta = $SM.get('game.castleMeta.peakTalent') || {};
+		// An older save may have completed the original tier before ceilings existed.
+		// Honor its actual six run levels before clearing them; never infer this from mixed peaks.
+		Space.maybeBreakthroughTalents();
 		Space.clearTalents();
 		Space.TALENTS.forEach(function(t) {
 			var grant = Space.getStartingTalentLevel(t.id, meta[t.id] || 0);
 			if (grant > 0) {
-				$SM.set('character.infinityTalents["' + t.id + '"]', Math.min(t.maxLevel, grant), true);
+				$SM.set('character.infinityTalents["' + t.id + '"]', grant, true);
 			}
 		});
 	},
 	getStartingTalentLevel: function(id, peak) {
 		if (typeof peak !== 'number') peak = ($SM.get('game.castleMeta.peakTalent') || {})[id] || 0;
-		return peak >= 20 ? 8 : peak >= 15 ? 5 : peak >= 10 ? 3 : peak >= 6 ? 2 : peak >= 3 ? 1 : 0;
+		if (!Number.isFinite(peak)) return 0;
+		var grant = peak >= 20 ? Math.floor(peak * 0.4) : peak >= 15 ? 5 : peak >= 10 ? 3 : peak >= 6 ? 2 : peak >= 3 ? 1 : 0;
+		return Math.max(0, Math.min(Space.getTalentCap(), grant));
 	},
 	// 探索者赐福：所有地标类型探索过 → 入城 +15% max HP（原 5%，杯水车薪）
 	hasExplorerBoon: function() {
@@ -553,17 +623,24 @@ var Space = {
 		}
 		return bonus;
 	},
-	getDamageMult: function() {
+	getDamageMult: function(level) {
 		// 快刀术（本 run） × 累计层数永久增伤（跨 run）
-		return (1 + Space.getTalentLevel('sharpEdge') * 0.04) * (1 + Space.getPermanentDmgMult());
+		var sharpLevel = typeof level === 'number' ? level : Space.getTalentLevel('sharpEdge');
+		return (1 + sharpLevel * 0.04) * (1 + Space.getPermanentDmgMult()) * Space.getSteadyHandDamageMult();
 	},
-	getDamageReduction: function() {
-		// 铁壁（本 run，上限 30%）+ 累计层数永久减伤（跨 run），合计硬上限在 damage() 里 50%
-		return Math.min(0.30, Space.getTalentLevel('ironWall') * 0.015);
+	getDamageReduction: function(level) {
+		var lvl = typeof level === 'number' ? level : Space.getTalentLevel('ironWall');
+		// Preserve the original 0–20 curve. Later tiers approach 40%, never invulnerability.
+		var overflow = Math.max(0, lvl - 20);
+		return Math.min(20, lvl) * 0.015 + 0.10 * overflow / (overflow + 20);
 	},
-	getCooldownMult: function() { return 1 - Math.min(0.30, Space.getTalentLevel('swiftBlade') * 0.015); },
-	getLifestealPct: function() {
-		var base = Space.getTalentLevel('bloodDrink') * 0.01;
+	getCooldownMult: function(level) {
+		var lvl = typeof level === 'number' ? level : Space.getTalentLevel('swiftBlade');
+		var overflow = Math.max(0, lvl - 20);
+		return 1 - Math.min(20, lvl) * 0.015 - 0.30 * overflow / (overflow + 20);
+	},
+	getLifestealPct: function(level) {
+		var base = (typeof level === 'number' ? level : Space.getTalentLevel('bloodDrink')) * 0.01;
 		// 呼吸法加成：水/炎/雷各 +5%，累计
 		var perkBonus = 0;
 		try {
@@ -571,27 +648,41 @@ var Space = {
 			if ($SM.hasPerk('flame breath I')) perkBonus += 0.05;
 			if ($SM.hasPerk('thunder breath I')) perkBonus += 0.05;
 		} catch (e) { /* ignore */ }
-		return Math.min(0.25, base + perkBonus);
+		var total = base + perkBonus, overflow = Math.max(0, total - 0.25);
+		// Formerly capped at 25% even before Lv.20 with breath perks. Keep every upgrade useful.
+		return Math.min(0.25, total) + 0.15 * overflow / (overflow + 0.15);
 	},
 	getAccuracyBonus: function() { return Space.getTalentLevel('steadyHand') * 0.01; },
+	getTalentHitChance: function(level) {
+		var lvl = typeof level === 'number' ? level : Space.getTalentLevel('steadyHand');
+		var hit = Number.isFinite(World.BASE_HIT_CHANCE) ? World.BASE_HIT_CHANCE : 0.8;
+		if ($SM.hasPerk('mikiri')) hit += 0.1;
+		return hit + lvl * 0.01;
+	},
+	getSteadyHandDamageMult: function(level) {
+		// Hit chance cannot exceed 100%; each excess percentage point instead adds 1% weapon damage.
+		return 1 + Math.max(0, Space.getTalentHitChance(level) - 1);
+	},
 	talentPreview: function(id) {
 		var talent = Space.TALENTS.find(function(t) {return t.id === id;});
 		if (!talent) return null;
-		var level = Space.getTalentLevel(id), next = Math.min(talent.maxLevel, level + 1), before, after, metric;
+		var level = Space.getTalentLevel(id), next = Math.min(Space.getTalentCap(), level + 1), before, after, metric;
 		var values = function(lvl) {
 			switch (id) {
 			case 'hardBody': return World.getMaxHealth() + Space.getMaxHpBonus(lvl) - Space.getMaxHpBonus();
-			case 'sharpEdge': return (1 + lvl * talent.per) * (1 + Space.getPermanentDmgMult());
-			case 'ironWall': return Math.min(0.30, lvl * talent.per);
-			case 'bloodDrink': return Math.min(0.25, Space.getLifestealPct() + (lvl - level) * talent.per);
-			case 'steadyHand': return lvl * talent.per;
-			case 'swiftBlade': return 1 - Math.min(0.30, lvl * talent.per);
+			case 'sharpEdge': return Space.getDamageMult(lvl);
+			case 'ironWall': return Space.getDamageReduction(lvl);
+			case 'bloodDrink': return Space.getLifestealPct(lvl);
+			case 'steadyHand': return Math.min(1, Space.getTalentHitChance(lvl));
+			case 'swiftBlade': return Space.getCooldownMult(lvl);
 			}
 		};
-		metric = {hardBody:'maximum health',sharpEdge:'castle weapon damage multiplier',ironWall:'talent damage reduction',bloodDrink:'total castle lifesteal',steadyHand:'talent accuracy bonus',swiftBlade:'talent cooldown multiplier'}[id];
+		metric = {hardBody:'maximum health',sharpEdge:'castle weapon damage multiplier',ironWall:'talent damage reduction',bloodDrink:'total castle lifesteal',steadyHand:'castle hit chance',swiftBlade:'talent cooldown multiplier'}[id];
 		before = values(level); after = values(next);
 		var peak = ($SM.get('game.castleMeta.peakTalent') || {})[id] || 0;
-		return {level:level,next:next,metric:metric,before:before,after:after,capped:Math.abs(after-before)<0.000001,
+		return {level:level,next:next,cap:Space.getTalentCap(),metric:metric,before:before,after:after,capped:next === level,
+			damageBefore:id === 'steadyHand' ? Space.getSteadyHandDamageMult(level) : null,
+			damageAfter:id === 'steadyHand' ? Space.getSteadyHandDamageMult(next) : null,
 			inheritBefore:Space.getStartingTalentLevel(id,peak),inheritAfter:Space.getStartingTalentLevel(id,Math.max(peak,next))};
 	},
 	talentPreviewText: function(id) {
@@ -603,7 +694,11 @@ var Space = {
 			return (Math.round(value*1000)/10) + '%';
 		};
 		var text = _(p.metric) + ': ' + format(p.before) + ' → ' + format(p.after);
-		if (p.capped) text += ' · ' + _('effect already capped; no immediate gain');
+		if (p.capped) text += ' · ' + _('this talent is already at the current level limit.');
+		if (id === 'steadyHand') {
+			text += '\n' + _('excess accuracy weapon damage multiplier') + ': ×' + (Math.round(p.damageBefore * 1000) / 1000) + ' → ×' + (Math.round(p.damageAfter * 1000) / 1000);
+			text += '\n' + _('excess hit chance becomes weapon damage instead of being wasted.');
+		}
 		text += '\n' + _('next descent inheritance: Lv.{0} → Lv.{1}', p.inheritBefore, p.inheritAfter);
 		return text;
 	},
@@ -613,7 +708,7 @@ var Space = {
 		var batchLeft = (typeof options.batchLeft === 'number') ? Math.max(0, options.batchLeft) : 1;
 		var onComplete = typeof options.onComplete === 'function' ? options.onComplete : function() { Space.afterNode(); };
 		if (Space.done || batchLeft === 0) { if (!Space.done) onComplete(); return; }
-		var pool = Space.TALENTS.filter(function(t) { return Space.getTalentLevel(t.id) < t.maxLevel; });
+		var pool = Space.eligibleTalents(), cap = Space.getTalentCap();
 		if (pool.length === 0) { onComplete(); return; }
 		pool.sort(function() { return Math.random() - 0.5; });
 		var picks = pool.slice(0, Math.min(3, pool.length));
@@ -628,7 +723,7 @@ var Space = {
 		};
 		picks.forEach(function(t, i) {
 			var curLvl = Space.getTalentLevel(t.id);
-			var label = _(t.nameKey) + ' Lv.' + (curLvl + 1) + '/' + t.maxLevel;
+			var label = _(t.nameKey) + ' Lv.' + (curLvl + 1) + '/' + cap;
 			buttons['talent_' + i] = {
 				text: label,
 				onChoose: (function(tid) { return function() { Space._takeTalent(tid, function() {}); }; })(t.id),
@@ -643,6 +738,8 @@ var Space = {
 		};
 
 		var text = [_('the demon fades. faint red motes drift toward you — pick one to absorb.')];
+		text.push(_('talent limit: Lv.{0}; all six talents at the limit unlock +5 levels.', cap));
+		text.push(_('bounded bonuses keep growing with diminishing returns beyond their former safety limits.'));
 		text.push(_('previews show only the named bonuses, not final damage or hit chance. enemy defenses, other effects and rounding still apply.'));
 		if (batchLeft > 1) {
 			text.push(_('the swarm leaves behind {0} more opportunities to take on a new edge.', batchLeft));
@@ -666,15 +763,17 @@ var Space = {
 	},
 
 	_takeTalent: function(id, onDone) {
+		var t = Space.eligibleTalents().find(function(x) { return x.id === id; });
+		if (!t) return false;
 		var curLvl = Space.getTalentLevel(id);
 		Space.setTalentLevel(id, curLvl + 1);
-		var t = Space.TALENTS.find(function(x) { return x.id === id; });
 		Notifications.notify(null, _('you take up {0} (now Lv.{1})', _(t.nameKey), curLvl + 1));
 		if (typeof onDone === 'function') {
 			onDone();
 		} else {
 			Space.afterNode();
 		}
+		return true;
 	},
 
 	// ---- 节点：战斗 ----
@@ -839,16 +938,7 @@ var Space = {
 			}
 		};
 		// 精英附带 1 项血鬼术（弹药不够时更易重伤）
-		if (!isElite) {
-			scene.configuredPickup = true;
-			scene.buttons.continue.text = _('send loot home and continue');
-			scene.buttons.collectConfigured = {
-				text: _('refill from loot and continue'), cooldown: Events._LEAVE_COOLDOWN,
-				available: function() { return !!Path.getLoadout('castle'); },
-				onChoose: Space.collectConfiguredLoot, onEnd: Space.afterBattle, nextScene: 'end'
-			};
-			scene.deathMessage += ' ' + _('loot refill uses your saved castle targets and free bag space, never home stock or equipment changes. remaining loot goes home.');
-		}
+		Space._configureBattleLoot(scene, 'continue', Space.afterBattle);
 		if (isElite) scene.telegraphAttacks = Space._pickBloodArts(1, e.dmg);
 		Events.startEvent({ title: titleText, scenes: { 'start': scene } });
 	},
@@ -926,7 +1016,7 @@ var Space = {
 		if (!b) { Space.afterNode(); return; }
 		b = Space._applyPotion(b);
 		var loot = Space._bossLoot(Space.currentFloor);
-		Events.startEvent({
+		var event = {
 			title: _(b.enemy),
 			scenes: {
 				'start': {
@@ -952,7 +1042,7 @@ var Space = {
 							nextScene: 'end'
 						},
 						'recraft': {
-							text: _('recraft supplies'),
+							text: _('send loot home and recraft supplies'),
 							onChoose: Space._collectRemainingLoot,
 							nextScene: 'recraft'
 						}
@@ -960,7 +1050,9 @@ var Space = {
 				},
 				'recraft': Space._bossRecraftScene()
 			}
-		});
+		};
+		Space._configureBattleLoot(event.scenes.start, 'continue', Space._afterBossBattle);
+		Events.startEvent(event);
 	},
 
 	// ---- 10 层 boss 后的补给重铸：用家里的材料换到背包中的药品/弹药/辅助道具 ----
@@ -978,17 +1070,52 @@ var Space = {
 			{ item: 'wisteria bomb', cost: { 'scales': 12, 'steel': 6, 'sulphur': 5 } },
 			{ item: 'kusarigama', cost: { 'steel': 8, 'iron': 5, 'cloth': 3 } },
 			{ item: 'bind kunai', cost: { 'teeth': 10, 'steel': 5, 'cloth': 2 } },
-			{ item: 'torch', cost: { 'wood': 4, 'sulphur': 2 } }
+			{ item: 'torch', cost: { 'wood': 4, 'sulphur': 2 } },
+			// 日轮铳与雷之铳共用的消耗弹药，不应遗漏在楼层补给之外。
+			{ item: 'solar crystal', cost: { 'scales': 6, 'teeth': 6 } },
+			{ item: 'wisteria charm', cost: { 'teeth': 6, 'cloth': 2 } }
 		];
 	},
 
+	_recraftUnlocked: function(item) {
+		// 城中基础补给保持开放；高阶锻造工具仍须见过实物或解锁蓝图。
+		var craftable = typeof Fabricator !== 'undefined' && Fabricator.Craftables[item];
+		if (!craftable || !craftable.blueprintRequired) return true;
+		return !!$SM.get('character.blueprints["' + item + '"]') ||
+			typeof $SM.get('stores["' + item + '"]') !== 'undefined' ||
+			Object.prototype.hasOwnProperty.call(Path.outfit || {}, item);
+	},
+
+	_recraftPreview: function(item, cost) {
+		var missing = [], materials = [], valid = !!cost && Object.keys(cost).length > 0;
+		Object.keys(cost || {}).forEach(function(key) {
+			var required = cost[key], have = $SM.get('stores["' + key + '"]', true) || 0;
+			if (!Number.isSafeInteger(required) || required <= 0) valid = false;
+			materials.push(_('{0} {1}/{2}', _(key), have, required));
+			if (!Engine.options.testerMode && have < required) missing.push(_('{0} ×{1}', _(key), required - have));
+		});
+		var free = Path.getFreeSpace(), weight = Path.getWeight(item);
+		var count = (Path.outfit || {})[item] || 0;
+		if (!isFinite(free) || !isFinite(weight) || weight <= 0 || !Number.isSafeInteger(count) || count < 0 || count >= Number.MAX_SAFE_INTEGER) valid = false;
+		var reason = !Space._recraftUnlocked(item) ? _('blueprint not unlocked') :
+			!valid ? _('invalid supply quantity') :
+			free + 0.000001 < weight ? _('backpack has no room for this supply') :
+			missing.length ? _('estate materials missing: {0}', missing.join('、')) : '';
+		return { available: !reason, reason: reason, materials: materials, count: count, free: free, weight: weight };
+	},
+
+	_recraftButtonText: function(option, preview) {
+		return _('{0} +1 (backpack: {1})', _(option.item), preview.count) + '\n' +
+			_('estate materials (owned/needed): {0}', preview.materials.join('、')) +
+			(preview.reason ? '\n' + preview.reason : '');
+	},
+
 	_recraftToBackpack: function(item, cost) {
-		for (var k in cost) {
-			var have = $SM.get('stores["' + k + '"]', true) || 0;
-			if (have < cost[k]) {
-				Notifications.notify(null, _('not enough {0}.', _(k)));
-				return false;
-			}
+		// 最终复核在扣款之前完成，容量不足或已失去材料不会白白花费。
+		var preview = Space._recraftPreview(item, cost);
+		if (!preview.available) {
+			Notifications.notify(null, preview.reason);
+			return false;
 		}
 		if (!Engine.options.testerMode) {
 			var storeMod = {};
@@ -1010,7 +1137,15 @@ var Space = {
 		var buttons = {};
 		options.forEach(function(o, idx) {
 			buttons['recraft_' + idx] = {
-				text: _('{0} ({1})', _(o.item), Space._formatCost(o.cost)),
+				text: Space._recraftButtonText(o, Space._recraftPreview(o.item, o.cost)),
+				available: function() {
+					var preview = Space._recraftPreview(o.item, o.cost);
+					var label = Space._recraftButtonText(o, preview);
+					buttons['recraft_' + idx].text = label;
+					// stateUpdate 会重新检查 available，因此库存与负重提示可实时刷新。
+					$('#recraft_' + idx, Events.eventPanel()).text(label);
+					return preview.available;
+				},
 				onChoose: function() {
 					Space._recraftToBackpack(o.item, o.cost);
 				},
@@ -1024,9 +1159,14 @@ var Space = {
 		};
 		// 在 Boss 事件内切换场景，避免新事件被原按钮的 end 逻辑关闭。
 		return {
+			onLoad: function() {
+				Events.eventPanel().addClass('castleRecraftShop');
+				Events.eventPanel().find('.eventTitle').text(_('guardian supply shop'));
+			},
 			text: [
 				_('the floor boss falls. on a nearby crate, a merchant grins and offers to rebuild your kit.'),
-				_('use the materials from your estate to make fresh consumables and tools for this descent.')
+				_('use the materials from your estate to make fresh consumables and tools for this descent.'),
+				_('the complete supply list stays visible. unavailable supplies show missing materials, blueprint requirements or backpack limits.')
 			],
 			buttons: buttons
 		};
@@ -1293,6 +1433,7 @@ var Space = {
 				}
 			}
 		};
+		Space._configureBattleLoot(scene, 'next', scene.buttons.next.onEnd);
 		if (e.isElite) scene.telegraphAttacks = Space._pickBloodArts(1, e.dmg);
 		Events.startEvent({ title: _('demon ambush') + ' \u2014 ' + (Space._ambushRemaining + 1) + '/?', scenes: { 'start': scene } });
 	},
@@ -1343,6 +1484,7 @@ var Space = {
 
 	// ---- 节点：太阳咒纹祭坛（献 HP 换永久 buff：随机加一层已有天赋等级或直接补药水） ----
 	triggerShrine: function() {
+		Space.eligibleTalents();
 		var costHp = Math.min(Math.floor(World.getMaxHealth() * 0.3), World.health - 5);
 		var canOffer = costHp > 0;
 		Events.startEvent({
@@ -1358,10 +1500,10 @@ var Space = {
 							text: _('offer {0} hp', costHp),
 							onChoose: function() {
 								if (!canOffer) return;
-								World.setHp(Math.max(1, World.health - costHp));
 								// 随机加一层天赋（若已有则升一级）
-								var eligible = Space.TALENTS.filter(function(t) { return Space.getTalentLevel(t.id) < t.maxLevel; });
+								var eligible = Space.eligibleTalents();
 								if (eligible.length) {
+									World.setHp(Math.max(1, World.health - costHp));
 									var pick = eligible[Math.floor(Math.random() * eligible.length)];
 									Space.setTalentLevel(pick.id, Space.getTalentLevel(pick.id) + 1);
 									Notifications.notify(null, _('the mark burns into your arm: {0} Lv.{1}', _(pick.nameKey), Space.getTalentLevel(pick.id)));
@@ -1391,6 +1533,9 @@ var Space = {
 			{ nameKey: 'Wind Hashira \u2014 Sanemi', talent: 'bloodDrink' },
 			{ nameKey: 'Stone Hashira \u2014 Himejima', talent: 'ironWall' }
 		];
+		var eligible = Space.eligibleTalents().map(function(t) { return t.id; });
+		pillars = pillars.filter(function(p) { return eligible.indexOf(p.talent) !== -1; });
+		if (!pillars.length) { Space.afterNode(); return; }
 		var p = pillars[Math.floor(Math.random() * pillars.length)];
 		var talent = Space.TALENTS.find(function(t) { return t.id === p.talent; });
 		Events.startEvent({
@@ -1406,7 +1551,7 @@ var Space = {
 							text: _('accept the lesson'),
 							onChoose: function() {
 								var cur = Space.getTalentLevel(p.talent);
-								if (cur < talent.maxLevel) {
+								if (cur < Space.getTalentCap()) {
 									Space.setTalentLevel(p.talent, cur + 1);
 									Notifications.notify(null, _('{0} teaches you the way: {1} Lv.{2}', _(p.nameKey), _(talent.nameKey), cur + 1));
 								} else {

@@ -521,10 +521,8 @@ async function port() {
       Space.currentFloor = 10;
       Space.triggerBossFight();
       Events.clearTimeouts();
-      Events.won = true;
-      Events.fought = true;
-      $('#buttons').empty();
-      Events.drawLoot(Events.activeEvent().scenes.start.loot);
+      Events.dotDamage($('#enemy'), 999999, 'test finishing strike');
+      await until(() => Events.won && $('#recraft').length === 1 && $('#lootButtons .lootRow').length > 0);
       const earnedScales = $('#lootButtons .lootRow').filter(function() {return $(this).data('item') === 'scales';}).find('.lootTake').data('numLeft');
       check(earnedScales >= 20 && earnedScales <= 30, 'real boss loot renders guaranteed scales');
       const scalesBeforeLoot = $SM.get('stores.scales', true);
@@ -532,13 +530,9 @@ async function port() {
       const packedScalesBefore = Path.outfit.scales || 0;
       Events.getLoot($('#lootButtons .lootRow').filter(function() {return $(this).data('item') === 'scales';}).find('.lootTake'));
       check(Path.outfit.scales === packedScalesBefore + 1 && $SM.get('stores.scales') === scalesBeforeLoot, 'manual loot is packed without a duplicate warehouse credit');
-      Space._collectRemainingLoot();
-      Space._collectRemainingLoot();
-      check($SM.get('stores.scales') === scalesBeforeLoot + earnedScales - 1, 'support corps transfers scales to warehouse exactly once');
-      $('<div id="exitButtons">').appendTo('#buttons');
-      Events.drawButtons(Events.activeEvent().scenes.start);
       $('#recraft').trigger('click');
       check(Events.activeScene === 'recraft' && $('#recraft_0').length === 1, 'boss supply scene visible');
+      check($SM.get('stores.scales') === scalesBeforeLoot + earnedScales - 1, 'real boss victory button banks only remaining loot before the shop replaces the scene');
       const beforePurchase = Path.outfit.medicine;
       const scalesBeforePurchase = $SM.get('stores.scales');
       $('#recraft_0').trigger('click'); $('#recraft_0').trigger('click');
@@ -1108,13 +1102,14 @@ async function port() {
       const checks=[],check=(condition,name)=>{if(!condition) throw Error(name);checks.push(name);};
       $SM.set('game.buildings["trading post"]',1);
       $SM.setM('stores',{scales:100,teeth:60,medicine:0});Room.updateBuildButtons();
-      const trigger=Room.buttons.medicine[0],before=JSON.stringify(State);
+      // The real trade button may mark itself seen on its first click; opening never spends inventory.
+      const trigger=Room.TradeGoods.medicine.button[0],before=JSON.stringify($SM.get('stores'));
       trigger.dispatchEvent(new MouseEvent('click',{shiftKey:true,bubbles:true}));
       check($('#buyQuantityPanel').attr('role')==='dialog' && $('#buyQuantityInput').val()==='1','real Shift purchase opens a budget dialog defaulting to one item');
       $('#buyQuantityInput').val('3').trigger('input');
       const budget=Room.buyPreview('medicine','3');
       check(budget.valid && budget.materials.some(row=>row.key==='scales' && row.cost===60 && row.remaining===40) && budget.materials.some(row=>row.key==='teeth' && row.cost===36 && row.remaining===24),'budget previews all real recipe costs and remaining warehouse quantities');
-      check(JSON.stringify(State)===before,'reading or editing purchase budget does not spend materials');
+      check(JSON.stringify($SM.get('stores'))===before,'reading or editing purchase budget does not spend materials');
       $('#buyQuantityInput').val('').trigger('input');
       check($('.buyQuantityOk').prop('disabled') && $('#buyQuantityError').text().length>0,'empty purchase input never means buy the maximum');
       $('#buyQuantityInput').val('3').trigger('input');
@@ -1151,6 +1146,107 @@ async function port() {
       if($('#buyQuantityOverlay').length || JSON.stringify($SM.get('stores'))!==JSON.stringify(JSON.parse(before).stores)) throw Error('leaving the trading room must close the purchase draft without spending');
     })()`);
     console.log('PASS: actual purchase Escape and leaving trading discard the budget without spending.');
+    const castleFixChecks = await evaluate(`(async function() {
+      const checks = [], check = (condition, name) => { if (!condition) throw Error(name); checks.push(name); };
+      const until = async predicate => {
+        for (let i = 0; i < 120; i++) { if (predicate()) return; await new Promise(resolve => setTimeout(resolve, 25)); }
+        throw Error('castle regression transition timed out');
+      };
+      const finish = async id => {
+        const owner = Events.activeEvent();
+        Button.clearCooldown($(id)); $(id).trigger('click');
+        await until(() => Events.activeEvent() !== owner);
+      };
+      const win = async () => {
+        Events.clearTimeouts(); Events.dotDamage($('#enemy'), 999999, 'test finishing strike');
+        await until(() => Events.won && $('#bankLoot').length === 1);
+      };
+      Engine.activeModule = Space; World.dead = false; Space.onArrival();
+      $('#outerSlider').css('top', '-910px');
+      Path.outfit = {'nichirin katana': 1}; $SM.set('outfit', Path.outfit);
+      $SM.setM('stores', {convoy:1, scales:1000, teeth:1000, cloth:100, steel:100, iron:100, sulphur:100, meat:100, wood:100});
+      Space.currentFloor = 20; Space.triggerBossFight(); await win();
+      const scaleRow = $('#lootButtons .lootRow').filter(function() { return $(this).data('item') === 'scales'; });
+      const total = scaleRow.find('.lootTake').data('numLeft'), bankBefore = $SM.get('stores.scales');
+      Events.getLoot(scaleRow.find('.lootTake'));
+      const bagBeforeBank = JSON.stringify(Path.outfit), boss = Events.activeEvent();
+      $('#bankLoot').trigger('click');
+      check(Events.activeEvent() === boss && Events.activeScene === 'start' && JSON.stringify(Path.outfit) === bagBeforeBank,
+        'real boss bank-only action stays in settlement and preserves manually packed loot');
+      check($SM.get('stores.scales') === bankBefore + total - 1 && !$('#lootButtons .lootRow').length,
+        'real boss bank-only action credits only unclaimed materials and clears the ground rows');
+      const banked = $SM.get('stores.scales'); Space._collectRemainingLoot();
+      check($SM.get('stores.scales') === banked, 'repeated bank callbacks never duplicate boss materials');
+      $('#recraft').trigger('click');
+      check(Events.eventPanel().find('.eventTitle').text() === '守关补给商店' && $('#exitButtons [id^="recraft_"]').length === 12,
+        'guardian shop has a Chinese title and all twelve supply rows');
+      check($('#recraft_10').text().includes('太阳结晶') && $('#recraft_11').text().includes('藤花符'),
+        'guardian shop explicitly includes solar ammunition and wisteria charms');
+      const solarBefore = Path.outfit['solar crystal'] || 0, teethBefore = $SM.get('stores.teeth'), scalesBefore = $SM.get('stores.scales');
+      $('#recraft_10').trigger('click');
+      check(Path.outfit['solar crystal'] === solarBefore + 1 && $SM.get('stores.teeth') === teethBefore - 6 && $SM.get('stores.scales') === scalesBefore - 6,
+        'actual solar purchase consumes the displayed estate recipe and adds one crystal to the pack');
+      const normalBag = {...Path.outfit};
+      Path.outfit = {'cured meat': Path.getCapacity()}; $SM.set('outfit', Path.outfit); Events.updateButtons();
+      const fullBefore = JSON.stringify([Path.outfit, $SM.get('stores')]); $('#recraft_10').trigger('click');
+      check($('#recraft_10').hasClass('disabled') && $('#recraft_10').text().includes('背包容量不足') && JSON.stringify([Path.outfit, $SM.get('stores')]) === fullBefore,
+        'full pack keeps solar supplies visible but blocks spending with an explicit capacity warning');
+      Path.outfit = normalBag; $SM.set('outfit', Path.outfit); Events.updateButtons();
+      await finish('#leave'); await finish('#skip'); await finish('#skip');
+      Space.currentFloor = 12; Space.triggerAmbush();
+      const count = Space._pendingAmbushTalentChoices, startStock = $SM.get('stores.scales'); let expected = 0;
+      for (let i = 0; i < count; i++) {
+        await win();
+        expected += $('#lootButtons .lootRow').filter(function() { return $(this).data('item') === 'scales'; }).find('.lootTake').data('numLeft');
+        await finish('#next');
+        check($SM.get('stores.scales') === startStock + expected, 'actual ambush victory ' + (i + 1) + ' banks materials before the next enemy or resupply scene');
+      }
+      await finish('#continue');
+      for (let i = 0; i < count; i++) await finish('#skip');
+      check(Space.currentFloor === 13 && !Events.activeEvent(), 'ambush resupply and all talent rewards advance only one floor');
+      $SM.set('game.castleMeta.talentCap', 20);
+      Space.TALENTS.forEach(t => $SM.set('character.infinityTalents["' + t.id + '"]', t.id === 'swiftBlade' ? 19 : 20));
+      Space._offerTalent({onComplete: function() {}});
+      check($('#exitButtons [id^="talent_"]').length === 1 && $('#talent_0').text().includes('20/20'),
+        'with five capped talents the real reward offers only the remaining unfinished talent');
+      await finish('#talent_0');
+      check(Space.getTalentCap() === 25 && Space.getTalentLevel('swiftBlade') === 20, 'the final level unlocks the shared twenty-five cap without wasting a reward');
+      Space.TALENTS.forEach(t => Space.setTalentLevel(t.id, 25));
+      check(Space.getTalentCap() === 30, 'all six twenty-five-level talents unlock the shared thirty cap');
+      const peakBefore = JSON.stringify($SM.get('game.castleMeta.peakTalent'));
+      Space.clearTalents(); Space._grantStartingTalents();
+      check(Space.getTalentCap() === 30 && Space.TALENTS.every(t => Space.getTalentLevel(t.id) === 10) && JSON.stringify($SM.get('game.castleMeta.peakTalent')) === peakBefore,
+        'new descent retains the unlocked ceiling and inherits forty percent without rewriting historical peaks');
+      Space.setTalentLevel('steadyHand', 25);
+      check(Space.getSteadyHandDamageMult() > 1 && Space.talentPreviewText('steadyHand').includes('命中溢出'),
+        'real talent preview shows extra weapon damage instead of wasting hit chance over one hundred percent');
+      Space._offerTalent({onComplete: function() {}});
+      check(Events.eventPanel().text().includes('当前天赋上限 Lv.30') && !Events.eventPanel().text().includes('bounded bonuses'),
+        'breakthrough guidance and benefit descriptions load their Chinese translations');
+      await until(() => Number(getComputedStyle(Events.eventPanel()[0]).opacity) > 0.99);
+      return checks;
+    })()`);
+    console.log(castleFixChecks.map(name => 'PASS: ' + name).join('\n'));
+    const breakthroughShot = await page('Page.captureScreenshot', {format:'png'});
+    fs.writeFileSync(path.join(profile, 'talent-breakthrough.png'), Buffer.from(breakthroughShot.data, 'base64'));
+    console.log('SCREENSHOT: ' + path.join(profile, 'talent-breakthrough.png'));
+    await evaluate(`(async function() {
+      await new Promise(resolve => Events.endEvent(resolve));
+      Space.currentFloor = 30; Space.triggerBossFight(); Events.clearTimeouts();
+      Events.dotDamage($('#enemy'),999999,'test finishing strike');
+      for (let i=0; i<120 && !$('#recraft').length; i++) await new Promise(resolve=>setTimeout(resolve,25));
+      $('#recraft').trigger('click');
+      await new Promise(resolve=>setTimeout(resolve,250));
+      const list=document.querySelector('#exitButtons'),leave=document.querySelector('#leave').getBoundingClientRect();
+      if (list.scrollHeight<=list.clientHeight || leave.top<0 || leave.bottom>innerHeight) throw Error('complete shop must scroll with leave visible');
+      if (document.querySelector('#recraft_0').getBoundingClientRect().width < list.clientWidth * 0.9) throw Error('shop rows must use the full list width');
+      list.scrollTop=list.scrollHeight;
+      if (document.querySelector('#leave').getBoundingClientRect().bottom>innerHeight) throw Error('shop bottom cannot hide its leave action');
+      list.scrollTop=0;
+    })()`);
+    const shopShot=await page('Page.captureScreenshot',{format:'png'});
+    fs.writeFileSync(path.join(profile,'guardian-shop.png'),Buffer.from(shopShot.data,'base64'));
+    console.log('SCREENSHOT: '+path.join(profile,'guardian-shop.png'));
     assert.deepEqual(errors, [], 'uncaught browser exceptions');
   } finally {
     if (call && socket?.readyState === WebSocket.OPEN) {

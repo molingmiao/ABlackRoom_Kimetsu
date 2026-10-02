@@ -13,5 +13,34 @@ _.addTranslation({
   '-{0}% weapon cooldown per level (cap 30%)': '每级武器冷却 -{0}%（上限 30%）',
   'sharpen your blade (30 wood, +1 damage for the next battle)': '磨刀（30 木头，下一场战斗每次攻击伤害 +1）',
   'view last castle report': '查看上次无限城战报',
-  'next battle: sharpened blade (+1 damage per hit)': '磨刀已就绪：下一场战斗每次攻击伤害 +1'
+  'next battle: sharpened blade (+1 damage per hit)': '磨刀已就绪：下一场战斗每次攻击伤害 +1',
+  'recraft supplies': '楼层补给',
+  'guardian supply shop': '守关补给商店',
+  'the floor boss falls. on a nearby crate, a merchant grins and offers to rebuild your kit.': '守关鬼已倒下，后援商人赶来，为你补充接下来的战斗物资。',
+  'use the materials from your estate to make fresh consumables and tools for this descent.': '扣除家中仓库材料，补给直接进入当前背包。不会使用背包中的材料，也不会自动寄回家。',
+  'the complete supply list stays visible. unavailable supplies show missing materials, blueprint requirements or backpack limits.': '完整补给列表保留显示；灰色商品会注明缺少的家中材料、蓝图要求或背包容量限制。',
+  'blueprint not unlocked': '尚未解锁对应蓝图',
+  'invalid supply quantity': '物品数量或容量异常，无法购买',
+  'backpack has no room for this supply': '背包容量不足，无法携带这份补给',
+  'estate materials missing: {0}': '家中材料不足：{0}',
+  '{0} +1 (backpack: {1})': '{0} +1（背包已有 {1}）',
+  'estate materials (owned/needed): {0}': '家中材料（现有/所需）：{0}',
+  'crafted {0}.': '补充了{0}。'
+});
+
+_.addTranslation({
+  'send remaining loot home only': '仅将剩余战利品送回仓库',
+  'send loot home and {0}': '送回余料并{0}',
+  'send loot home and recraft supplies': '送回余料并进入补给商店',
+  'manually taken loot stays in your backpack until you return. send remaining loot home without leaving this screen.': '手动带走的物品留在背包，返程时才入库。可先将剩余战利品送回仓库，不离开本次结算。',
+  'level limit Lv.{0}': '等级上限 Lv.{0}',
+  'castle hit chance': '无限城命中率',
+  'all talents mastered: level limit {0} → {1}. future descents keep this limit.': '所有天赋已满级：共同上限 {0} → {1}。下次入城保留已解锁上限。',
+  '+{0}% damage reduction per level; diminishing gains after Lv.20': '每级减伤 +{0}%；20 级之后继续提升，增幅递减',
+  '-{0}% weapon cooldown per level; diminishing gains after Lv.20': '每级武器冷却 -{0}%；20 级之后继续缩短，增幅递减',
+  'this talent is already at the current level limit.': '此天赋已达到当前等级上限',
+  'excess accuracy weapon damage multiplier': '命中溢出转化的武器伤害倍率',
+  'excess hit chance becomes weapon damage instead of being wasted.': '超过 100% 的命中部分转为武器伤害加成，不会白白浪费。',
+  'talent limit: Lv.{0}; all six talents at the limit unlock +5 levels.': '当前天赋上限 Lv.{0}；六项天赋全部满级后，共同上限增加 5 级。',
+  'bounded bonuses keep growing with diminishing returns beyond their former safety limits.': '减伤、冷却与吸血突破旧上限后仍有收益，增幅递减，避免无敌或负冷却。'
 });

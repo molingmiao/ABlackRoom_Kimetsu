@@ -34,7 +34,7 @@ for (const category of U.categories.slice(1)) {
 assert.equal(U.filteredEntries('不存在').length, 0);
 const notes = JSON.stringify(U.entries);
 for (const text of ['20 个阶段', '硫磺矿', '无限列车', '150 → 15', '300 → 30', '2 个肉 + 5 块木头',
-  '现有／所需', '日轮刀回收', '永久升级', '背包弹药', '生产保留库存', '材料账本', '疗伤', '归途', '流派', '每十层', '批量购买预算', '直接编辑配置目标']) {
+  '现有／所需', '日轮刀回收', '永久升级', '背包弹药', '生产保留库存', '材料账本', '疗伤', '归途', '流派', '每十层', '批量购买预算', '直接编辑配置目标', '战后返仓入口', '太阳结晶', '天赋共同突破', '25 级继承 10 级']) {
   assert.ok(notes.includes(text), 'recent update missing: ' + text);
 }
 for (const module of [context.Room, context.Outside, context.Path, context.Ship, context.Fabricator]) {

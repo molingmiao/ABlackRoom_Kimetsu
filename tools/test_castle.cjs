@@ -32,7 +32,9 @@ function fixture() {
   };
   const ctx = { $, $SM: sm, _: (s, ...args) => s.replace(/\{(\d+)\}/g, (_, n) => args[n]),
     Engine: { options: {}, event() {}, log() {}, setInterval() {}, activeModule: null },
-    Path: { outfit: state.outfit }, Notifications: { notify() {} }, AudioEngine: { stopEventMusic() {}, playSound() {} }, AudioLibrary: {},
+    Path: { outfit: state.outfit, getLoadout: () => null, getWeight: () => 1,
+      getFreeSpace: () => 50 - Object.values(state.outfit).reduce((sum, count) => sum + count, 0) },
+    Notifications: { notify() {} }, AudioEngine: { stopEventMusic() {}, playSound() {} }, AudioLibrary: {},
     setTimeout() { throw Error('reward flow must use event completion, not a guessed timeout'); },
     clearInterval() {}, clearTimeout() {},
     World: { health: 40, getMaxHealth() { return 85 + ctx.Space.getMaxHpBonus(); }, setHp(hp) { this.health = hp; },
@@ -224,7 +226,7 @@ for (const count of [3, 4, 5]) {
   sm.set('character.infinityTalents.bloodDrink',10);
   for(const perk of ['water breath I','flame breath I','thunder breath I']) sm.set('character.perks["'+perk+'"]',true);
   let p=c.Space.talentPreview('bloodDrink');
-  assert.equal(p.before,0.25);assert.equal(p.after,0.25);assert.equal(p.capped,true);
+  assert.equal(p.before,0.25);assert.ok(p.after>p.before);assert.equal(p.capped,false);
   sm.set('character.infinityTalents.hardBody',2);
   sm.set('game.castleMeta.peakTalent.hardBody',2);
   sm.set('game.castleMeta.perfectExploration',true);

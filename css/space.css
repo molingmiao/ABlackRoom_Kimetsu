@@ -354,3 +354,13 @@
 	margin: 0 auto;
 	opacity: 0;
 }
+
+/* 守关后援补给：全列表可滚动，离开始终在列表末尾。 */
+.eventPanel.castleRecraftShop { width: 460px; box-sizing: border-box; }
+.castleRecraftShop #description { min-height: 0; font-size: 14px; line-height: 1.4; }
+.castleRecraftShop #description > div { padding-bottom: 8px; }
+.castleRecraftShop #exitButtons { max-height: 48vh; overflow-y: auto; padding-right: 8px; }
+.castleRecraftShop #exitButtons .button { float: none; width: 100% !important; box-sizing: border-box; margin: 0 0 8px; padding: 8px 10px; white-space: pre-line; text-align: left; line-height: 1.5; font-size: 14px; }
+.castleRecraftShop #exitButtons .button.disabled { opacity: 0.65; }
+.castleRecraftShop #exitButtons #leave { position: sticky; bottom: 0; z-index: 1; background: white; text-align: center; font-weight: bold; }
+body.noMask .castleRecraftShop #exitButtons #leave { background: #121512; }

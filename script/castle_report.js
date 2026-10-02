@@ -87,9 +87,8 @@ var CastleReport = {
   },
   _inherited: function(id, peak) {
     if (Space.getStartingTalentLevel) return Space.getStartingTalentLevel(id, peak);
-    var grant = peak >= 20 ? 8 : peak >= 15 ? 5 : peak >= 10 ? 3 : peak >= 6 ? 2 : peak >= 3 ? 1 : 0;
-    var talent = (Space.TALENTS || []).filter(function(t) { return t.id === id; })[0];
-    return talent ? Math.min(talent.maxLevel, grant) : grant;
+    var grant = peak >= 20 ? Math.floor(peak * 0.4) : peak >= 15 ? 5 : peak >= 10 ? 3 : peak >= 6 ? 2 : peak >= 3 ? 1 : 0;
+    return Space.getTalentCap ? Math.min(Space.getTalentCap(), grant) : grant;
   },
   finish: function(outcome) {
     var run = CastleReport._touch();
