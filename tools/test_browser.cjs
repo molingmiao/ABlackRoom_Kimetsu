@@ -854,7 +854,7 @@ async function port() {
       savedMap[30][31]='M!';
       $SM.set('game.world.map',savedMap);
       check(savedMap.flat().filter(cell=>cell.charAt(0)==='T').length===1,'world initialization adds exactly one train station');
-      check(EarlyGame.milestones().length===20 && EarlyGame.trainReady(),'twenty-stage mainline recognizes safely returned mining and mountain progress');
+      check(EarlyGame.milestones().length===21 && EarlyGame.trainReady(),'expanded mainline preserves train access without forcing optional rehabilitation');
       $SM.setM('stores',{'nichirin katana':1,'cured meat':20,medicine:5});
       Path.outfit={'nichirin katana':1,'cured meat':5,medicine:2};$SM.set('outfit',Path.outfit);
       check(Path.embark(),'train mission uses a normal charged expedition');
@@ -945,6 +945,115 @@ async function port() {
       return checks;
     })()`);
     console.log(districtChecks.map(name=>'PASS: '+name).join('\n'));
+    const newStoryChecks=await evaluate(`(async function() {
+      const checks=[],check=(ok,label)=>{if(!ok) throw Error(label);checks.push(label);};
+      const until=async fn=>{for(let i=0;i<180&&!fn();i++) await new Promise(resolve=>setTimeout(resolve,30));if(!fn()) throw Error('new chapter flow timeout: '+Events.activeScene);};
+      await new Promise(resolve=>$('#outerSlider').promise().done(resolve));
+      $SM.setM('game.buildings',{workshop:1,smokehouse:1});
+      $SM.set('game.butterflyEstateDone',false);
+      $SM.setM('stores',{'nichirin katana':1,'cured meat':10,medicine:3,wood:10,meat:4,cloth:1,torch:0});
+      Path.outfit={'nichirin katana':1,'cured meat':2};$SM.set('outfit',Path.outfit);
+      check(Path.embark(),'new story uses ordinary expedition departure');
+      const locations={};World.state.map.forEach((row,x)=>row.forEach((cell,y)=>{if(['E','K'].includes(cell[0])) locations[cell[0]]=[x,y];}));
+      check(World.state.map.flat().filter(cell=>cell[0]==='E').length===1 && World.state.map.flat().filter(cell=>cell[0]==='K').length===1,
+        'real generated world has unique butterfly estate and swordsmith village');
+      World.curPos=locations.E;World.doSpace();$('#enter').trigger('click');
+      $SM.set('stores["cured meat"]',0);
+      Path.outfit={'nichirin katana':1,fur:Path.getCapacity()-5};$SM.set('outfit',Path.outfit);World.updateSupplies();Events.updateButtons();
+      check(Events.activeScene==='aoi' && $('#meal').hasClass('disabled') && $('.storySupplyAction').prop('disabled'),
+        'real chapter renders a capacity-blocked commission instead of silently overfilling the bag');
+      const before=JSON.stringify({stores:State.stores,outfit:Path.outfit});
+      StoryCrafting.refresh();check(JSON.stringify({stores:State.stores,outfit:Path.outfit})===before,'story supply preview is read-only');
+      Path.outfit.fur-=2;Events.updateButtons();
+      check(!$('.storySupplyAction').prop('disabled') && $('.storySupplyDetails').text().includes('消耗庄园材料') && $('.storySupplyTitle').length===1,
+        'commission shows actual ingredients with a bold choice heading');
+      $('.storySupplyAction').trigger('click');
+      check(Path.outfit['cured meat']===2 && $SM.get('stores.wood')===0 && $SM.get('stores.meat')===0 && !$('#meal').hasClass('disabled'),
+        'actual commission crafts two portions from four meat and ten wood then enables the original story action');
+      check(Events.activeScene==='aoi','commission never auto-selects the story response');
+      $('#meal').trigger('click');check(Path.outfit['cured meat']===0 && Events.activeScene==='meal','original story submission charges the crafted goods once');
+      $('#listen').trigger('click');$('#train').trigger('click');
+      check($('#report').hasClass('disabled'),'butterfly joint report waits for all three companions');
+      $('#tanjiro').trigger('click');$('#steady').trigger('click');$('#back').trigger('click');
+      $('#zenitsu').trigger('click');$('#listen').trigger('click');$('#back').trigger('click');
+      $('#inosuke').trigger('click');$('#lead').trigger('click');$('#back').trigger('click');
+      check(!$('#report').hasClass('disabled'),'all three actual companion activities unlock the herb escort');
+      $('#report').trigger('click');$('#pack').trigger('click');$('#day').trigger('click');$('#guard').trigger('click');
+      check(Events.activeScene==='escort' && !$('.storySupplyAction').length,'live support combat never provides manor commissions');
+      Events.clearTimeouts();Events.dotDamage($('#enemy'),9999,'regression finishing strike');
+      await until(()=>Events.fought && $('#check').length);Button.clearCooldown($('#check'));$('#check').trigger('click');
+      $('#rest').trigger('click');$('#friends').trigger('click');$('#finish').trigger('click');
+      check(World.state.butterfly && !$SM.get('game.butterflyEstateDone'),'whole rehabilitation chapter remains temporary until safe return');
+      $('#leave').trigger('click');await until(()=>!Events.activeEvent());
+      check(World.goHome() && $SM.get('game.butterflyEstateDone') && $SM.hasPerk('total concentration'),
+        'actual safe return commits rehabilitation and one-time concentration training');
+      check(ExpeditionReport.latest().unlocks.includes('蝶屋康复训练完成'),'rehabilitation is reported in the real expedition outcome');
+      await new Promise(resolve=>$('#outerSlider').promise().done(resolve));
+
+      $SM.set('game.swordsmithVillageDone',true);$SM.set('game.swordsmithChapterDone',false);
+      $SM.setM('stores',{'nichirin katana':3,'cured meat':30,medicine:5});
+      Path.outfit={'nichirin katana':1,'cured meat':10,medicine:2};$SM.set('outfit',Path.outfit);
+      check(Path.embark(),'legacy smith players may embark for the new full chapter');
+      World.curPos=locations.K;World.doSpace();
+      check(!$('#enter').hasClass('disabled'),'legacy smith completion preserves eligibility for the new K chapter');
+      $('#enter').trigger('click');$('#visit').trigger('click');
+      $('#forge').trigger('click');$('#window').trigger('click');$('#back').trigger('click');
+      $('#kotetsu').trigger('click');$('#observe').trigger('click');$('#back').trigger('click');
+      $('#letters').trigger('click');$('#read').trigger('click');$('#next').trigger('click');$('#back').trigger('click');
+      check(!$('#ready').hasClass('disabled'),'village preparation includes forging, Kotetsu and both absent companions letters');
+      $('#ready').trigger('click');$('#guard').trigger('click');
+      const win=async(scene,next)=>{
+        check(Events.activeScene===scene && $('#enemy').length===1,'swordsmith '+scene+' uses actual support combat');
+        Events.clearTimeouts();Events.dotDamage($('#enemy'),9999,'regression finishing strike');
+        await until(()=>Events.fought && $('#'+next).length);Button.clearCooldown($('#'+next));$('#'+next).trigger('click');
+      };
+      await win('fish','rescue');$('#cover').trigger('click');$('#cover').trigger('click');
+      await win('gale','meet');$('#rear').trigger('click');await win('wood','signal');
+      $('#care').trigger('click');$('#carry').trigger('click');$('#report').trigger('click');$('#finish').trigger('click');
+      check(World.state.swordsmith && !$SM.get('game.swordsmithChapterDone') && $SM.get('game.swordsmithVillageDone'),
+        'new village completion is temporary while legacy progress remains intact');
+      $('#leave').trigger('click');await until(()=>!Events.activeEvent());
+      check(World.goHome() && $SM.get('game.swordsmithChapterDone') && $SM.get('stores["nichirin katana"]')===3,
+        'safe-return new village completion never grants legacy smiths a second fixed sword');
+      check(ExpeditionReport.latest().unlocks.includes('锻刀村支援完成'),'village completion appears in expedition feedback');
+      await new Promise(resolve=>$('#outerSlider').promise().done(resolve));
+
+      Engine.travelTo(Room);await new Promise(resolve=>$('#locationSlider').promise().done(resolve));
+      $SM.remove('game.companionInteractions');Engine.keyLock=false;
+      check(Events.Companions.event.isAvailable(),'appropriate local-time letters are actually eligible at home');
+      const flags=JSON.stringify({train:$SM.get('game.world.mugentrain'),district:$SM.get('game.yoshiwaraDone'),smith:$SM.get('game.swordsmithVillageDone')});
+      Events.startEvent(Events.Companions.event);
+      check(Events.eventPanel().text().includes('本地时段') && $('#reply0').length===1 && $('#reply1').length===1,
+        'real trio dialogue displays local time and two response choices');
+      $('#reply0').trigger('click');
+      check(Events.eventPanel().text().includes('首次交流补给已放入庄园仓库'),'actual trio response grants its first small reward');
+      check(JSON.stringify({train:$SM.get('game.world.mugentrain'),district:$SM.get('game.yoshiwaraDone'),smith:$SM.get('game.swordsmithVillageDone')})===flags,
+        'random letters never complete mainline chapters');
+      $('#leave').trigger('click');await until(()=>!Events.activeEvent());
+      check(!Events.Companions.event.isAvailable(),'actual letter completion respects its cooldown');
+      return checks;
+    })()`);
+    console.log(newStoryChecks.map(name=>'PASS: '+name).join('\n'));
+    await evaluate(`(function(){
+      $SM.setM('stores',{'cured meat':0,wood:10,meat:4});
+      Events.startEvent({title:'蝶屋 · 剧情补料预览',storySupply:true,scenes:{start:{
+        text:['神崎葵请你为康复中的队士准备餐食。没有熏肉成品时，可以委托庄园按现有配方代制，再交付这次互动。'],
+        buttons:{meal:{text:'准备 2 份熏肉，陪伤者吃饭',cost:{'cured meat':2}},leave:{text:'暂不提交，回去整备',nextScene:'end'}}
+      }}});
+      Events.eventPanel().addClass('storySupplyTest');
+    })()`);
+    await checkDialogTheme('.storySupplyTest', false);
+    const supplyDay=await page('Page.captureScreenshot',{format:'png'});
+    fs.writeFileSync(path.join(profile,'story-supplies.png'),Buffer.from(supplyDay.data,'base64'));
+    console.log('SCREENSHOT: '+path.join(profile,'story-supplies.png'));
+    await checkDialogTheme('.storySupplyTest', true);
+    const supplyNight=await page('Page.captureScreenshot',{format:'png'});
+    fs.writeFileSync(path.join(profile,'story-supplies-dark.png'),Buffer.from(supplyNight.data,'base64'));
+    console.log('SCREENSHOT: '+path.join(profile,'story-supplies-dark.png'));
+    await evaluate(`(async function(){
+      await new Promise(resolve=>Events.endEvent(resolve));
+      Engine.travelTo(Path);await new Promise(resolve=>$('#locationSlider').promise().done(resolve));
+    })()`);
     const noticeChecks = await evaluate(`(async function() {
       const checks = [];
       const check = (condition, name) => { if (!condition) throw Error(name); checks.push(name); };

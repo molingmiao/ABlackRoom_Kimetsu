@@ -194,112 +194,45 @@ Events.Global = [
 		},
 		audio: AudioLibrary.EVENT_THIEF
 	},
-	{ /* 章 4：刀匠村事件 — workshop 建成后触发一次。
-	     紫藤家族分部视角：玩家不是柱，是后方支援；霞柱·无一郎与不死川玄弥并肩。 */
+	{ /* The estate briefing opens the real K chapter; no remote instant victory. */
 		title: _('Smith Village Under Siege'),
+		storySupply: true,
 		isAvailable: function() {
 			return (Engine.activeModule == Room || Engine.activeModule == Outside)
 				&& $SM.get('game.buildings["workshop"]', true) >= 1
 				&& (!window.EarlyGame || EarlyGame.storyPrerequisite('smiths'))
-				&& !$SM.get('game.swordsmithVillageDone');
+				&& !$SM.get('game.swordsmithVillageDone') && !$SM.get('game.swordsmithBriefed');
 		},
 		scenes: {
 			'start': {
 				text: [
-					_('a wounded crow lands on the windowsill, ink-black wings limp.'),
-					_('its message: the village of swordsmiths is under attack by an upper moon.'),
-					_('two pillars are already on their way. they would value any aid.')
+					'鎹鸦送来刀匠村的补给委托。游郭之后，炭治郎要修复损坏的日轮刀，你也能沿鬼杀队安排的隐秘路线前往支援。',
+					'真正的锻刀村在地图上标记为 K，只有一处。Y 是普通废城，不是刀匠村；进入 K 才能推进完整章节。',
+					'霞柱、恋柱与玄弥将守住正面战线。你的任务是护送刀匠、保护锻造与撤离通道，带上足够的治疗和返程口粮。'
 				],
-				notification: _('a crow brings word: the smithing village burns.'),
+				notification: '锻刀村 K 的委托送到庄园；请先整备，再在地图上接下支援任务。',
 				blink: true,
 				buttons: {
 					'depart': {
-						text: _('depart at once'),
-						cost: { 'cured meat': 20, 'torch': 2 },
-						nextScene: { 1: 'arrive' }
+						text: '收下路线，查看任务说明',
+						nextScene: 'briefing'
 					},
 					'refuse': {
-						text: _('the path is too long'),
-						notification: _('the crow flies onward, silent.'),
-						onLoad: function() { $SM.set('game.swordsmithVillageDone', true); },
+						text: '稍后再准备',
 						nextScene: 'end'
 					}
 				}
 			},
-			'arrive': {
+			'briefing': {
 				text: [
-					_('by the time you arrive, the village square is ash and screams.'),
-					_('a teal-haired pillar moves like mist between the rubble — the Mist Hashira, Tokito.'),
-					_('a one-eyed slayer eats demon flesh in the corner, breathing hard. Shinazugawa Genya.')
+					'锻刀村通常距庄园 22 格，旧地图会补到最近的空地。隐会沿着调换路线接应，地图只是任务入口，不意味着暴露刀匠的真实地址。',
+					'善逸与伊之助正在别处执行任务，他们会以前后方书信联络，不会被安排到原作未参战的村中。炭治郎、祢豆子、玄弥、霞柱和恋柱在村内与你联动。',
+					'完成村落救援后请安全返回庄园：这时才保存章节、获得日轮刀与见切训练。仅阅读委托或拒绝支援都不会完成主线。'
 				],
-				notification: _('the Mist Pillar and the demon-eater make their stand.'),
-				buttons: {
-					'fight': {
-						text: _('join the fight'),
-						nextScene: { 1: 'combat' }
-					},
-					'support': {
-						text: _('hold the rear lines'),
-						notification: _('you guard the wounded smiths while the pillars cut through the swarm.'),
-						nextScene: { 1: 'aftermath' }
-					}
-				}
-			},
-			'combat': {
-				combat: true,
-				enemy: 'upper four clone',
-				enemyName: _('upper moon four · clone'),
-				deathMessage: _("one of half-dome's clones dissolves into wisteria-purple mist."),
-				chara: '肆',
-				damage: 8,
-				hit: 0.85,
-				attackDelay: 2,
-				health: 35,
-				ranged: false,
-				loot: {
-					'teeth': { min: 5, max: 10, chance: 1 },
-					'scales': { min: 3, max: 6, chance: 0.8 },
-					'wisteria charm': { min: 1, max: 2, chance: 0.5 }
-				},
-				notification: _("one of half-dome's clones — the wrath of upper moon four — turns on you."),
+				onLoad: function() { $SM.set('game.swordsmithBriefed',true); },
 				buttons: {
 					'leave': {
-						text: _('press on'),
-						nextScene: { 1: 'aftermath' }
-					}
-				}
-			},
-			'aftermath': {
-				text: [
-					_("by dawn the village is silent. the true demon — half-dome's core — has fled."),
-					_('an elderly smith emerges from a forge, a freshly tempered blade across his arms.'),
-					_('"this one bathed all night in wisteria oil. tested against the upper moon. take it."')
-				],
-				notification: _('the smith offers you a freshly-bathed nichirin blade.'),
-				onLoad: function() {
-					$SM.add('stores["nichirin katana"]', 1);
-					$SM.set('game.swordsmithVillageDone', true);
-				},
-				buttons: {
-					'gratitude': {
-						text: _('bow in gratitude'),
-						nextScene: { 1: 'pillar_reward' }
-					}
-				}
-			},
-			'pillar_reward': {
-				text: [
-					_('the Mist Pillar wipes blood from his brow, gazing distantly.'),
-					_('"i remembered something just now. i\'ll teach you what i can — about seeing through it all."'),
-					_('he traces a line in the air. you feel something settle behind your eyes.')
-				],
-				notification: _('the Mist Pillar shares the rudiments of mikiri with you.'),
-				onLoad: function() {
-					if (!$SM.hasPerk('mikiri')) { $SM.addPerk('mikiri'); }
-				},
-				buttons: {
-					'leave': {
-						text: _('return home'),
+						text: '回备战页，准备前往 K',
 						nextScene: 'end'
 					}
 				}
@@ -399,6 +332,7 @@ Events.Global = [
 	{ /* 章 7：柱合议 + 柱训练 — 拥有任意蓝图后（玩家已探过 Ravaged Battleship）触发。
 	     九柱齐聚紫藤庄园，玩家任选一柱进行训练以补足尚缺的呼吸法。 */
 		title: _('The Pillars Convene'),
+		storySupply: true,
 		isAvailable: function() {
 			var bps = $SM.get('character.blueprints');
 			var hasAnyBp = bps && Object.keys(bps).some(function(key) { return !!bps[key]; });

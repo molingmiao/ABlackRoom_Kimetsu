@@ -10,6 +10,7 @@ const gameGlobals = {
 	Engine: 'writable',
 	Room: 'writable',
 	EarlyGame: 'writable',
+	StoryCrafting: 'writable',
 	CampGuide: 'writable',
 	Outside: 'writable',
 	Path: 'writable',

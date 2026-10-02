@@ -1,6 +1,7 @@
 /** World chapters commit only with the temporary map on a safe return. */
 Events.Setpieces.mugenTrain = {
   title: '无限列车',
+  storySupply: true,
   scenes: {
     start: {
       text: [
@@ -23,12 +24,49 @@ Events.Setpieces.mugenTrain = {
       text: [
         '车轮的节奏渐渐变成了熟悉的脚步声。已经逝去的人站在温暖的屋里，招呼你留下。',
         '这是血鬼术编织的梦。你记起仍在等待救援的乘客，稳住呼吸，抓住梦境里那一处不合常理的裂隙。',
-        '惊醒时，血肉触手已经爬上车厢。炭治郎他们向车头赶去；你必须守住后面的乘客。'
+        '惊醒时，血肉触手已经爬上车厢。炭治郎与伊之助向车头寻找要害，善逸在睡梦中仍护住祢豆子与近旁乘客；你必须守住后面的车厢。'
       ],
       buttons: {
         defend: {text: '守住乘客所在的车厢', nextScene: 'flesh'},
+        coordinate: {text: '先与三人组对齐救援分工', nextScene: 'trioPlan'},
         leave: {text: '撤离车厢，放弃本次任务', nextScene: 'end'}
       }
+    },
+    trioPlan: {
+      text: [
+        '炭治郎把伤员所在车厢指给你，伊之助敲着车头方向的地板确认鬼的要害。善逸没有醒来，却已经挡住扑向近旁乘客的触手。',
+        '不是所有人都该挤向车头。你可以先听清后方的呼救，也可以按炭治郎留下的标记包扎自己，再留下守住撤离通道。',
+        '包扎只恢复你实际损失的生命，需要消耗 1 份药剂；没有药也能完成相同救援，不会跳过实时战斗。'
+      ],
+      buttons: {
+        listen: {text:'按善逸守住的方向寻找呼救者',nextScene:'trioListening'},
+        route: {text:'按伊之助标出的缺口安排撤离',nextScene:'trioRoute'},
+        dress: {text:'按炭治郎的提示包扎伤口（药剂 ×1，恢复 10 生命）',cost:{medicine:1},
+          available:function(){return World.health < World.getMaxHealth();},
+          onChoose:function(){Events.restoreHealth(10,'medicine');},nextScene:'trioDressing'},
+        leave: {text:'撤离车厢，放弃本次任务',nextScene:'end'}
+      }
+    },
+    trioListening: {
+      text: [
+        '顺着善逸护住的一侧，你听到座椅下面微弱的呼救。你先叫出躲藏的人，再让能行走的乘客带上孩子。',
+        '炭治郎与伊之助继续寻找车头的要害。你留在后方，让他们不必在追击时回头担心这节车厢。'
+      ],
+      buttons:{defend:{text:'守住刚找到的乘客',nextScene:'flesh'},leave:{text:'撤离车厢，放弃本次任务',nextScene:'end'}}
+    },
+    trioRoute: {
+      text: [
+        '伊之助撞开的狭窄缺口不适合所有乘客。你照着他留下的方向，撬开另一道能让伤员平稳通过的车门。',
+        '三人的追击和你的救援并不争夺同一个终点：有人切断要害，也要有人守住那些无法奔跑的人。'
+      ],
+      buttons:{defend:{text:'守住伤员撤离的车门',nextScene:'flesh'},leave:{text:'撤离车厢，放弃本次任务',nextScene:'end'}}
+    },
+    trioDressing: {
+      text: [
+        '你按炭治郎的示意压住伤口，再把剩余绑带塞进容易拿到的位置。药剂已使用，治疗不会超过你的生命上限。',
+        '善逸挡住前方回卷的触手，伊之助向车头跃去。你带着乘客退到下一节车厢，准备守住他们。'
+      ],
+      buttons:{defend:{text:'完成包扎，守住乘客',nextScene:'flesh'},leave:{text:'撤离车厢，放弃本次任务',nextScene:'end'}}
     },
     flesh: {
       combat: true,
@@ -151,6 +189,7 @@ Events.Yoshiwara = {
 
 Events.Setpieces.town = {
   title:'游郭 · 灯影下的救援',
+  storySupply:true,
   scenes:{
     start:{
       text:[
@@ -168,7 +207,8 @@ Events.Setpieces.town = {
       text:[
         '宇髓将三处花楼的位置摊在案上。卷绪、须磨和雏鹤分别留下过暗号，如今联络同时中断，不能把其中任何一个人当成可放弃的线索。',
         '炭治郎他们负责正面潜入。你从后巷探查房屋与撤离路线，见到受困者就优先救人；遇到无法处理的鬼，立刻示警。',
-        '你可以决定调查顺序，但必须找齐三人的去向，才能摸清血带真正藏人的地方。'
+        '你可以决定调查顺序，但必须找齐三人的去向，才能摸清血带真正藏人的地方。',
+        '炭治郎请你留下能让获救者识别的方向；善逸约定听到异样先传位置；伊之助坚持找到地下入口就留记号。三人的手段不同，却都给你的后方救援留了接口。'
       ],
       buttons:{search:{text:'开始后巷调查',nextScene:'search'},leave:{text:'撤回地图，本次救援未完成',nextScene:'end'}}
     },
@@ -181,9 +221,44 @@ Events.Setpieces.town = {
         makio:{text:'追查卷绪留下的绳结',available:function(){return !Events.Yoshiwara.found('makio');},nextScene:'makio'},
         suma:{text:'询问须磨所在花楼的侍女',available:function(){return !Events.Yoshiwara.found('suma');},nextScene:'suma'},
         hinatsuru:{text:'沿药香寻找雏鹤的暗号',available:function(){return !Events.Yoshiwara.found('hinatsuru');},nextScene:'hinatsuru'},
+        signals:{text:'核对三人组留下的接应暗号',nextScene:'trioSignals'},
         assemble:{text:'拼合三份线索，寻找带穴入口',available:Events.Yoshiwara.searchedAll,nextScene:'cellar'},
         leave:{text:'返回地图，本次救援未完成',nextScene:'end'}
       }
+    },
+    trioSignals:{
+      text:[
+        '你翻开出发前约好的暗号纸：炭治郎负责指出危险来自哪里，善逸负责把微弱的呼救带出墙外，伊之助负责标出地下能走的路。',
+        '暗号只能帮助你判断撤离与接应，不能代替三妻的真实去向。你仍须亲自调查卷绪、须磨和雏鹤，才能打开带穴救援。'
+      ],
+      buttons:{
+        smell:{text:'辨认炭治郎留在后巷的撤离箭头',nextScene:'trioTanjiro'},
+        listen:{text:'核对善逸约定的“方向、人数、危险”口令',nextScene:'trioZenitsu'},
+        passage:{text:'辨认伊之助标出的地下入口方向',nextScene:'trioInosuke'},
+        back:{text:'收好暗号，继续三妻调查',nextScene:'search'},
+        leave:{text:'返回地图，本次救援未完成',nextScene:'end'}
+      }
+    },
+    trioTanjiro:{
+      text:[
+        '炭治郎没有让你循着他去追上弦，而是把通向外街的箭头留给走不快的人。你沿标记确认了门与后巷，知道获救者该往哪里去。',
+        '判断气味是他的本领，守住一条每个人都能使用的撤离路，是你现在能完成的事。'
+      ],
+      buttons:{back:{text:'记住撤离方向，继续调查',nextScene:'search'},leave:{text:'返回地图，本次救援未完成',nextScene:'end'}}
+    },
+    trioZenitsu:{
+      text:[
+        '你把善逸留下的提示重新读了一遍：先报方向，再报人数，最后报是否有人无法行走。声音再小，也要有能接到它的人。',
+        '你约好后方接应的回声，不把每一声动静都当成催促队友冲进危险的命令。'
+      ],
+      buttons:{back:{text:'留好接应口令，继续调查',nextScene:'search'},leave:{text:'返回地图，本次救援未完成',nextScene:'end'}}
+    },
+    trioInosuke:{
+      text:[
+        '墙脚的刻痕又粗又急，是伊之助约好的标记：下面有空间，入口却未必容得下所有人。',
+        '你没有把一条能让他挤过去的路当成所有人的出口，而是在旁边补上了伤员需要更宽通道的提醒。'
+      ],
+      buttons:{back:{text:'记住入口与伤员路线，继续调查',nextScene:'search'},leave:{text:'返回地图，本次救援未完成',nextScene:'end'}}
     },
     makio:{
       text:[

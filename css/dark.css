@@ -22,11 +22,12 @@ div#saveNotify {
 	background-color: #272823;
 }
 
-/* Read-only guides must follow the theme instead of inheriting white modal backgrounds. */
+/* Guides and story commissions follow the theme instead of white modal backgrounds. */
 .eventPanel.expeditionReport,
 .eventPanel.materialSources,
 .eventPanel.productionOverview,
-.eventPanel.updateNotes {
+.eventPanel.updateNotes,
+.eventPanel.storySupplyEvent {
 	background-color: #272823;
 	color: #EEE;
 }

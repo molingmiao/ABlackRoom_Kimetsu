@@ -23,7 +23,9 @@ var World = {
     SWAMP: 'M',
     CACHE: 'U',
     EXECUTIONER: 'X',
-    MUGEN_TRAIN: 'T'
+    MUGEN_TRAIN: 'T',
+    SWORDSMITH_VILLAGE: 'K',
+    BUTTERFLY_ESTATE: 'E'
   },
   TILE_PROBS: {},
   LANDMARKS: {},
@@ -155,6 +157,8 @@ var World = {
     World.LANDMARKS[World.TILE.SWAMP] = { num: 1, minRadius: 15, maxRadius: World.RADIUS * 1.5, scene: 'swamp', label:  _('A&nbsp;Murky&nbsp;Swamp')};
     World.LANDMARKS[World.TILE.EXECUTIONER] = { num: 1, minRadius: 28, maxRadius: 28, scene: 'executioner', 'label': _('A&nbsp;Derailed&nbsp;Train')};
     World.LANDMARKS[World.TILE.MUGEN_TRAIN] = { num: 1, minRadius: 18, maxRadius: 18, scene: 'mugenTrain', label: '无限列车站台' };
+    World.LANDMARKS[World.TILE.SWORDSMITH_VILLAGE] = { num: 1, minRadius: 22, maxRadius: 22, scene: 'swordsmithVillage', label: '锻刀村（唯一地点）' };
+    World.LANDMARKS[World.TILE.BUTTERFLY_ESTATE] = { num: 1, minRadius: 12, maxRadius: 12, scene: 'butterflyEstate', label: '蝶屋 · 康复训练' };
 
     // Only add the cache if there is prestige data
     if($SM.get('previous.stores')) {
@@ -183,6 +187,7 @@ var World = {
     // Patch older maps in place: never regenerate exploration or overwrite landmarks.
     World.ensureCampaignLandmarks();
     World.ensureDistrictLandmarks();
+    World.ensureStoryLandmarks();
 
     // Create the World panel
     this.panel = $('<div>').attr('id', "worldPanel").addClass('location').appendTo('#outerSlider');
@@ -642,7 +647,8 @@ var World = {
     }
     // D/R are variants of the old ordinary towns, not extra requirements that
     // may not exist on a cleared legacy map. Unique O and story T still count.
-    var optional = [World.TILE.OUTPOST,World.TILE.ROAD_TOWN,World.TILE.MARKET_TOWN];
+    var optional = [World.TILE.OUTPOST,World.TILE.ROAD_TOWN,World.TILE.MARKET_TOWN,
+      World.TILE.SWORDSMITH_VILLAGE,World.TILE.BUTTERFLY_ESTATE];
     var need = Object.keys(World.LANDMARKS).filter(function(key) {return optional.indexOf(key) < 0;});
     if (!need.every(function(key) {return !!visited[key];}) || $SM.get('game.castleMeta.perfectExploration',true)) return false;
     $SM.set('game.castleMeta.perfectExploration',true,true);
@@ -1091,6 +1097,7 @@ var World = {
     // Home safe! Commit the changes.
     $SM.setM('game.world', World.state);
     if (window.Events && Events.Yoshiwara) Events.Yoshiwara.commit();
+    if (window.Events && Events.StoryChapters) Events.StoryChapters.commit();
     World.testMap();
 
     if(World.state.sulphurmine && $SM.get('game.buildings["sulphur mine"]', true) === 0) {
@@ -1141,7 +1148,7 @@ var World = {
   finishExpeditionReport: function(outcome,reason) {
     if (!window.ExpeditionReport || !World.state) return null;
     var unlocks = [];
-    var flags = {ironmine:'铁矿供应',coalmine:'煤矿供应',sulphurmine:'硫磺矿供应',ship:'无限城入口',executioner:'制造器',mugentrain:'无限列车支援完成',yoshiwara:'游郭救援完成'};
+    var flags = {ironmine:'铁矿供应',coalmine:'煤矿供应',sulphurmine:'硫磺矿供应',ship:'无限城入口',executioner:'制造器',mugentrain:'无限列车支援完成',yoshiwara:'游郭救援完成',swordsmith:'锻刀村支援完成',butterfly:'蝶屋康复训练完成'};
     Object.keys(flags).forEach(function(key) {
       if (outcome === 'return' && World.state[key] && !(World._expeditionFlags || {})[key]) unlocks.push(flags[key]);
     });
@@ -1315,7 +1322,7 @@ var World = {
     World.drawMap();
     World._expeditionFlags = {};
     World._expeditionBlueprints = $.extend({},$SM.get('character.blueprints') || {});
-    ['ironmine','coalmine','sulphurmine','ship','executioner','mugentrain','yoshiwara'].forEach(function(key) {World._expeditionFlags[key] = !!World.state[key];});
+    ['ironmine','coalmine','sulphurmine','ship','executioner','mugentrain','yoshiwara','swordsmith','butterfly'].forEach(function(key) {World._expeditionFlags[key] = !!World.state[key];});
     if (window.ExpeditionReport) ExpeditionReport.begin({outfit:Path.outfit || {},map:World.state.map,mask:World.state.mask,equipped:Path.getLoadoutEquipment()});
     World.setTitle();
     AudioEngine.playBackgroundMusic(AudioLibrary.MUSIC_WORLD);
@@ -1331,6 +1338,45 @@ var World = {
 
   copyPos: function(pos) {
     return [pos[0], pos[1]];
+  },
+
+  // New story sites are added only on free terrain. Discovery, supply outposts
+  // and earned exploration rewards survive. Old smith briefings keep their
+  // rewards and unlocks, while their owners can still play the new full chapter.
+  ensureStoryLandmarks: function() {
+    var original = $SM.get('game.world.map');
+    if (!Array.isArray(original) || !original.length) return false;
+    var map = original.map(function(row) {return Array.isArray(row) ? row.slice() : row;});
+    var changed = false;
+    [
+      {tile:World.TILE.SWORDSMITH_VILLAGE,radius:22,flag:'game.swordsmithChapterDone'},
+      {tile:World.TILE.BUTTERFLY_ESTATE,radius:12,flag:'game.butterflyEstateDone'}
+    ].forEach(function(site) {
+      if (site.tile === World.TILE.SWORDSMITH_VILLAGE && $SM.get('game.world.swordsmith')) {
+        if (!$SM.get(site.flag)) {$SM.set(site.flag,true,true);changed = true;}
+        if (!$SM.get('game.swordsmithVillageDone')) {$SM.set('game.swordsmithVillageDone',true,true);changed = true;}
+      }
+      var present = false, candidates = [];
+      map.forEach(function(row,x) {
+        if (!Array.isArray(row)) return;
+        row.forEach(function(cell,y) {
+          if (typeof cell === 'string' && cell.charAt(0) === site.tile) {
+            present = true;
+            if (cell === site.tile && $SM.get(site.flag)) {row[y] = site.tile + '!';changed = true;}
+          }
+          if (World.isTerrain(cell) && World.getDistance([x,y]) >= 5) {
+            candidates.push({x:x,y:y,offset:Math.abs(World.getDistance([x,y])-site.radius)});
+          }
+        });
+      });
+      if (present || !candidates.length) return;
+      candidates.sort(function(a,b) {return a.offset-b.offset || a.x-b.x || a.y-b.y;});
+      var location = candidates[0];
+      map[location.x][location.y] = site.tile + ($SM.get(site.flag) ? '!' : '');
+      changed = true;
+    });
+    if (changed) $SM.set('game.world.map',map,true);
+    return changed;
   },
 
   ensureCampaignLandmarks: function() {

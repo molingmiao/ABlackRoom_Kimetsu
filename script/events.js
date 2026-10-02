@@ -76,6 +76,7 @@ var Events = {
 	activeScene: null,
 
 	loadScene: function(name) {
+		Events.sceneVersion = (Events.sceneVersion || 0) + 1;
 		Engine.log('loading scene: ' + name);
 		Events.activeScene = name;
 		var scene = Events.activeEvent().scenes[name];
@@ -1490,12 +1491,7 @@ var Events = {
 		var btnsList = [];
 		for(var id in scene.buttons) {
 			var info = scene.buttons[id];
-			const cost = {
-				...info.cost
-			};
-			if (Path.outfit && Path.outfit['firefly orb']) {
-				delete cost.torch;
-			}
+			var cost = Events.getChoiceCost(info);
 			var b = new Button.Button({
 				id,
 				text: info.text,
@@ -1503,6 +1499,7 @@ var Events = {
 				click: Events.buttonClick,
 				cooldown: info.cooldown
 			}).appendTo(btns);
+			b.data('storyChoiceContext', {event: Events.activeEvent(), scene: scene, info: info, version: Events.sceneVersion});
 			if(typeof info.available == 'function' && !info.available()) {
 				Button.setDisabled(b, true);
 			}
@@ -1514,6 +1511,11 @@ var Events = {
 
 		Events.updateButtons();
 		return (btnsList.length == 1) ? btnsList[0] : false;
+	},
+	getChoiceCost: function(info) {
+		var cost = Object.assign({}, info.cost || {});
+		if (Path.outfit && Path.outfit['firefly orb']) delete cost.torch;
+		return cost;
 	},
 
 	getQuantity: function(store) {
@@ -1528,19 +1530,16 @@ var Events = {
 	},
 
 	updateButtons: function() {
-		var btns = Events.activeEvent().scenes[Events.activeScene].buttons;
+		var event = Events.activeEvent(), scene = event && event.scenes[Events.activeScene];
+		if (!scene) return;
+		var btns = scene.buttons;
 		for(var bId in btns) {
 			var b = btns[bId];
 			var btnEl = $('#'+bId, Events.eventPanel());
 			if(typeof b.available == 'function' && !b.available()) {
 				Button.setDisabled(btnEl, true);
 			} else if(b.cost && !Engine.options.testerMode) {
-				const cost = {
-					...b.cost
-				};
-				if (Path.outfit && Path.outfit['firefly orb']) {
-					delete cost.torch;
-				}
+				var cost = Events.getChoiceCost(b);
 				var disabled = false;
 				for(var store in cost) {
 					var num = Events.getQuantity(store);
@@ -1555,32 +1554,38 @@ var Events = {
 				Button.setDisabled(btnEl, false);
 			}
 		}
+		if (window.StoryCrafting) StoryCrafting.refresh();
 	},
 
 	buttonClick: function(btn) {
+		if (Events._resolvingChoice) return;
 		var sourceEvent = Events.activeEvent();
 		if (!sourceEvent || sourceEvent.ending) return;
-		var info = sourceEvent.scenes[Events.activeScene].buttons[btn.attr('id')];
+		var scene = sourceEvent.scenes[Events.activeScene];
+		var info = scene && scene.buttons && scene.buttons[btn.attr('id')];
+		if (!info || (typeof info.available === 'function' && !info.available())) return;
+		var context = typeof btn.data === 'function' && btn.data('storyChoiceContext');
+		if (context && (context.event !== sourceEvent || context.scene !== scene || context.info !== info || context.version !== Events.sceneVersion)) return;
+		Events._resolvingChoice = true;
+		try {
 		// Cost
 		var costMod = {};
 		if(info.cost && !Engine.options.testerMode) {
-			const cost = {
-				...info.cost
-			};
-			if (Path.outfit && Path.outfit['firefly orb']) {
-				delete cost.torch;
-			}
+			var cost = Events.getChoiceCost(info);
+			// Validate every cost first; a later missing item must not consume earlier water/HP.
 			for(var store in cost) {
 				var num = Events.getQuantity(store);
-				if(num < cost[store]) {
+				if(!Number.isFinite(cost[store]) || cost[store] < 0 || num < cost[store]) {
 					// Too expensive
 					return;
 				}
+			}
+			for(store in cost) {
 				if (store === 'water') {
 					World.setWater(World.water - cost[store]);
 				}
 				else if (store === 'hp') {
-					World.setHp(World.hp - cost[store]);
+					World.setHp(World.health - cost[store]);
 				}
 				else {
 					costMod[store] = -cost[store];
@@ -1590,6 +1595,7 @@ var Events = {
 				for(var k in costMod) {
 					Path.outfit[k] += costMod[k];
 				}
+				$SM.set('outfit', Path.outfit, true);
 				World.updateSupplies();
 			} else {
 				$SM.addM('stores', costMod);
@@ -1651,6 +1657,9 @@ var Events = {
 				Engine.log('ERROR: no suitable scene found');
 				Events.endEvent();
 			}
+		}
+		} finally {
+			Events._resolvingChoice = false;
 		}
 	},
 
@@ -1757,6 +1766,7 @@ var Events = {
 		Events.eventStack.unshift(event);
 		if (window.FieldTreatment) FieldTreatment.update();
 		event.eventPanel = $('<div>').attr('id', 'event').addClass('eventPanel').css('opacity', '0');
+		if (event.storySupply) event.eventPanel.addClass('storySupplyEvent');
 		if(options != null && options.width != null) {
 			Events.eventPanel().css('width', options.width);
 		}

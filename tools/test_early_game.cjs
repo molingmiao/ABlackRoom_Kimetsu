@@ -70,7 +70,7 @@ for(const [id,building] of [['food','smokehouse'],['workshop','workshop'],['mine
   sm.set('game.buildings["'+building+'"]',1);
   assert.equal(e.claimMilestone(id),true);
 }
-assert.equal(e.milestones().length,20,'mainline contains mineral and story chapters before the castle');
+assert.equal(e.milestones().length,21,'mainline includes butterfly rehabilitation alongside mineral and story chapters');
 assert.equal(e.milestone().id,'coal','iron mine no longer jumps straight to castle');
 assert.equal(e.trainReady(),false);
 assert.equal(e.claimMilestone('coal'),false,'a visited but unreturned mine cannot pay');
@@ -85,6 +85,11 @@ assert.equal(e.trainReady(),false,'temporary expedition completion cannot unlock
 sm.set('game.world.map',[['M!']]);
 assert.equal(e.trainReady(),true,'a safely returned old spider mountain completion is recognized');
 assert.equal(e.claimMilestone('natagumo'),true);
+assert.equal(e.milestone().id,'butterfly');
+c.World.state.butterfly=true;
+assert.equal(e.claimMilestone('butterfly'),false,'temporary rehabilitation does not unlock a manor reward');
+sm.set('game.butterflyEstateDone',true);
+assert.equal(e.claimMilestone('butterfly'),true);
 assert.equal(e.milestone().id,'train');
 c.World.state.mugentrain=true;
 assert.equal(e.claimMilestone('train'),false,'temporary train win cannot pay before safe return');

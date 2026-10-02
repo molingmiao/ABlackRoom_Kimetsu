@@ -1,0 +1,54 @@
+.eventPanel.storySupplyEvent:after {
+	background: inherit;
+	z-index: -1;
+}
+.storySupplyEvent .eventTitle {
+	position: static;
+	margin-bottom: 12px;
+}
+.storySupplyEvent .eventTitle:after {
+	display: none;
+}
+.storySupplyEvent #description {
+	max-height: 50vh;
+	overflow-y: auto;
+	line-height: 1.7;
+	padding-right: 5px;
+}
+.storySupplies {
+	border: 1px solid currentColor;
+	padding: 10px 12px;
+	margin: 12px 0;
+	font-size: 14px;
+}
+.storySupplies .storySupplyHint {
+	font-size: 12px;
+	margin: 6px 0 12px;
+	line-height: 1.6;
+}
+.storySupplyChoice + .storySupplyChoice {
+	border-top: 1px dashed currentColor;
+	padding-top: 10px;
+	margin-top: 12px;
+}
+.storySupplies .storySupplyDetails {
+	white-space: pre-line;
+	line-height: 1.7;
+	margin: 6px 0;
+}
+.storySupplyAction {
+	background: transparent;
+	color: inherit;
+	border: 1px solid currentColor;
+	font: inherit;
+	padding: 6px 10px;
+	cursor: pointer;
+}
+.storySupplyAction:disabled {
+	opacity: .65;
+	cursor: default;
+}
+.storySupplyAction:focus-visible {
+	outline: 2px solid currentColor;
+	outline-offset: 3px;
+}
