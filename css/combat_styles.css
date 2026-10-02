@@ -4,7 +4,16 @@
 	padding: 12px;
 	border: 1px solid #888;
 	box-sizing: border-box;
+	/* The location slider clips at 910px. Scroll the whole picker, including
+	   future-form details, rather than leaving those details below that edge. */
+	max-height: min(650px, max(160px, calc(100vh - 310px)));
+	overflow-y: auto;
+	overflow-x: hidden;
+	scrollbar-gutter: stable;
+	overscroll-behavior-y: contain;
+	scroll-padding: 8px;
 }
+.castleStylePicker:focus-visible { outline: 2px dashed currentColor; outline-offset: -3px; }
 .castleStyleHeading { font-size: 15px; font-weight: bold; }
 .castleStyleHint { margin: 6px 0 12px; font-size: 12px; line-height: 1.5; }
 .castleStyleOptions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
@@ -30,7 +39,8 @@
 .castleStyleTraining { display: block; font-size: 12px; margin-top: 6px; font-weight: bold; }
 .castleStyleLocked { margin-top: 12px; }
 .castleStyleLocked summary { cursor: pointer; font-weight: bold; padding: 6px 0; }
-.castleStyleOptions { max-height: 420px; overflow-y: auto; padding: 2px; }
+.castleStyleLocked summary:focus-visible { outline: 2px dashed currentColor; outline-offset: -2px; }
+.castleStyleOptions { padding: 2px; }
 .castleStyleLock, .castleStyleChoice { margin-top: 6px; }
 .castleStyleChoice { font-weight: bold; }
 .style-technique { --form-color: #888; }

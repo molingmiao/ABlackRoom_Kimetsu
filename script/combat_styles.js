@@ -55,9 +55,19 @@ var CombatStyles = {
 
 	renderPicker: function(parent) {
 		var target = $(parent);
+		var previous = target.find('.castleStylePicker').get(0);
+		var scrollTop = previous ? previous.scrollTop || 0 : 0;
+		var expanded = false, focusedStyle = null, pickerFocused = false;
+		if (previous && typeof previous.querySelector === 'function') {
+			var previousLocked = previous.querySelector('.castleStyleLocked');
+			expanded = !!previousLocked && previousLocked.open;
+			var active = typeof document !== 'undefined' ? document.activeElement : null;
+			pickerFocused = active === previous;
+			if (active && previous.contains(active)) focusedStyle = active.getAttribute('data-style');
+		}
 		target.find('.castleStylePicker').remove();
 		var box = $('<div>').addClass('castleStylePicker').attr('role', 'group')
-			.attr('aria-label', _('castle battle form')).appendTo(target);
+			.attr('aria-label', _('castle battle form')).attr('tabindex', '0').appendTo(target);
 		$('<div>').addClass('castleStyleHeading').text(_('castle battle form') + ' · ' + CombatStyles.getName()).appendTo(box);
 		$('<p>').addClass('castleStyleHint').text(_('choose before entering. the form stays fixed until you return and only affects castle battles.')).appendTo(box);
 		$('<p>').addClass('castleStyleHint').text(_('six common cultivation levels are shared by all forms; your chosen form turns them into signature buffs. switching forms never resets cultivation.')).appendTo(box);
@@ -88,6 +98,13 @@ var CombatStyles = {
 			});
 		});
 		if (!lockedList.find('.castleStyleOption').length) locked.remove();
+		var node = box.get(0);
+		if (node && typeof node.querySelector === 'function') {
+			if (locked.get(0)) locked.get(0).open = expanded;
+			node.scrollTop = scrollTop;
+			var focus = focusedStyle ? node.querySelector('[data-style="' + focusedStyle + '"]') : pickerFocused ? node : null;
+			if (focus && !focus.disabled) focus.focus({ preventScroll: true });
+		}
 		return box;
 	},
 
@@ -158,7 +175,8 @@ var CombatStyles = {
 				fight.guardUntil = now + CombatStyles._duration(4000);
 				CombatStyles._heal(Math.max(1, Math.ceil(World.getMaxHealth() * p.waterHeal)));
 			}
-		} else if (fight.style === 'flame' && ['nichirin katana', 'nichirin spear', 'flame blade'].indexOf(weaponName) >= 0) {
+		} else if (fight.style === 'flame' && (['nichirin katana', 'nichirin spear', 'flame blade'].indexOf(weaponName) >= 0
+			|| World.Weapons[weaponName] && World.Weapons[weaponName].nichirinForged === true)) {
 			if (enemy && enemy.length && enemy.data('hp') > 0) CombatStyles._openWound(enemy, Math.max(1, Math.round(actualDamage * p.cut)));
 		} else if (fight.style === 'thunder' && CombatStyles._isMelee(weaponName)) {
 			fight.thunderReadyAt = now + CombatStyles._duration(p.thunderWait * 1000);

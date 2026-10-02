@@ -811,13 +811,17 @@ var Space = {
 			'frenzied demon', 'lower moon shadow'
 		];
 		var enemy = enemyNames[Math.min(enemyNames.length - 1, Math.floor(floor / 4))];
+		// Keep familiar demons in the encounter pool alongside the new specialists.
+		var archetype = window.DemonPatterns && Math.random() < 0.7 ? DemonPatterns.pickArchetype(floor) : null;
+		if (archetype) enemy = archetype.name;
 
 		if (isElite) {
 			hp = Math.floor(hp * 1.3);
 			dmg = Math.floor(dmg * 1.15);
-			enemy = 'elite ' + enemy;
+			enemy = archetype ? _('elite demon') + ' · ' + enemy : 'elite ' + enemy;
 		}
-		return { enemy: enemy, hp: hp, dmg: dmg, hit: hit, delay: delay, isElite: !!isElite };
+		var stats = { enemy: enemy, hp: hp, dmg: dmg, hit: hit, delay: delay, isElite: !!isElite, patternId: archetype ? archetype.id : null };
+		return window.DemonPatterns ? DemonPatterns.strengthen(stats, floor) : stats;
 	},
 
 	// ---- 药水系统：购买/开箱时立即饮下，只影响下一场战斗 ----
@@ -927,6 +931,8 @@ var Space = {
 		var titleText = isElite ? _(e.enemy) + ' ' + _('(elite)') : _(e.enemy);
 		var scene = {
 			combat: true,
+			castleElite: !!isElite,
+			castlePatternId: e.patternId,
 			enemy: e.enemy,
 			enemyName: _(e.enemy),
 			chara: '鬼',
@@ -1024,6 +1030,7 @@ var Space = {
 	triggerBossFight: function() {
 		var b = Space._bossDef(Space.currentFloor);
 		if (!b) { Space.afterNode(); return; }
+		if (window.DemonPatterns) b = DemonPatterns.strengthen(b, Space.currentFloor);
 		b = Space._applyPotion(b);
 		var loot = Space._bossLoot(Space.currentFloor);
 		var event = {
@@ -1419,6 +1426,8 @@ var Space = {
 		e = Space._applyPotion(e);
 		var scene = {
 			combat: true,
+			castleElite: !!e.isElite,
+			castlePatternId: e.patternId,
 			enemy: e.enemy,
 			enemyName: _(e.enemy),
 			chara: '\u9b3c',

@@ -138,7 +138,7 @@ var CastleReport = {
   suggestions: function(report) {
     var advice = [];
     var telegraph = report.damageSources.reduce(function(sum, item) {
-      return sum + (item.source === 'blood art' || item.source === 'bleeding' ? item.amount : 0);
+      return sum + (item.source === 'blood art' || item.source === 'blood shadow' || item.source === 'bleeding' ? item.amount : 0);
     }, 0);
     if (telegraph > 0 && telegraph >= report.damageTaken * 0.35) {
       advice.push(_('blood arts caused much of your damage. keep a control tool ready to interrupt the next warning.'));

@@ -108,6 +108,10 @@ div#notifications div.notification.notify-npc {
 .craftWeapon.weapon-tier-5 { --weapon-color: #efc65a; }
 .craftReadinessHint { color: #abc79c; }
 .craftMissing .craftReadinessHint, .craftCostMissing { color: #eeaa91; }
+.nichirinForge .weapon-tier-4 { color: #cc9ae8; }
+.nichirinForge .weapon-tier-5 { color: #efc65a; }
+.storeRow.weapon-tier-4 > .row_key { color: #cc9ae8; }
+.storeRow.weapon-tier-5 > .row_key { color: #efc65a; }
 div.button.craftReadiness > .tooltip { color: #EEE; }
 
 /* 夜间模式下战斗按钮边框颜色保持不变（高亮足够），仅调法新解锁边框 */

@@ -14,3 +14,7 @@
 .combatTelegraph progress { display: block; width: 100%; height: 8px; margin-top: 6px; accent-color: #963a32; }
 body.noMask .combatTelegraph { border-color: #db8078; }
 body.noMask .combatTelegraphRhythm.accelerated { color: #db8078; }
+.demonPatternStatus { margin: 7px 0; padding: 6px 8px; border-left: 3px solid #706681; background: rgba(112, 102, 129, .08); }
+.demonPatternGuide { line-height: 1.55; }
+.demonPatternLive { margin-top: 5px; font-weight: bold; font-variant-numeric: tabular-nums; }
+body.noMask .demonPatternStatus { border-color: #a89bc0; }

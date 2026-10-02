@@ -29,6 +29,7 @@ var CombatTelegraphs = {
     // Live warnings stay at the top of the reserved scrolling area, ahead of
     // the rhythm guide, so a boss's three techniques cannot hide a new cast.
     fight.chargeBox = $('<div>').addClass('combatTelegraphCharges').appendTo(box);
+    if (typeof DemonPatterns !== 'undefined') DemonPatterns.start(scene, box, fight);
     $('<div>').addClass('combatTelegraphHint').text(_('watch for blood arts here. a successful control hit during a warning interrupts the cast.')).appendTo(box);
     if (fight.adaptive) $('<div>').addClass('combatTelegraphAdaptation').text(_('castle demons retry faster after an interruption. warning time stays unchanged; a completed cast resets the interval.')).appendTo(box);
     scene.telegraphAttacks.forEach(function(attack, index) {
@@ -56,6 +57,7 @@ var CombatTelegraphs = {
       }
       fight.charges.forEach(function(charge) { CombatTelegraphs._update(charge); });
       fight.arts.forEach(function(art) { CombatTelegraphs._updateRhythm(art, fight); });
+      if (typeof DemonPatterns !== 'undefined') DemonPatterns.update();
     }, 100));
   },
   _schedule: function(art, fight, seconds) {
@@ -122,6 +124,10 @@ var CombatTelegraphs = {
     var details = _('base damage: {0}', attack.dmg || 0);
     if (attack.bleedSec && attack.bleedPerSec) details += ' · ' + _('on hit: bleed {0}/s for {1}s', attack.bleedPerSec, attack.bleedSec);
     if (attack.shieldBreaker) details += ' · ' + _('a shield can block this blow, but will break.');
+    if (attack.patternType === 'combo') details += ' × 3 段';
+    if (attack.patternType === 'shadow') details = '分身单次基础伤害：' + attack.dmg;
+    if (attack.patternType === 'armour') details = '持续骨甲：减伤 25%，最多 8 秒';
+    if (attack.patternHint) details += ' · ' + attack.patternHint;
     $('<div>').addClass('combatTelegraphDetails').text(details).appendTo(row);
     var charge = {
       attack: attack, art: art, row: row, endAt: Date.now() + duration * 1000 / CombatTelegraphs._scale(), duration: duration,
@@ -177,6 +183,7 @@ var CombatTelegraphs = {
     // A released technique counts even when it misses or a shield absorbs it;
     // the player defended against a real cast, rather than interrupting it.
     CombatTelegraphs._completed(charge, fight);
+    if (typeof DemonPatterns !== 'undefined' && DemonPatterns.resolve(attack, fight)) return;
     if (Math.random() > (typeof attack.hit === 'number' ? attack.hit : 1) || !(attack.dmg > 0)) {
       if (attack.missText) Notifications.notify(null, attack.missText);
       return;
@@ -210,6 +217,7 @@ var CombatTelegraphs = {
     fight.intervals.push(timer);
   },
   stop: function() {
+    if (typeof DemonPatterns !== 'undefined') DemonPatterns.stop();
     var fight = CombatTelegraphs._fight;
     if (!fight) return;
     CombatTelegraphs._fight = null;

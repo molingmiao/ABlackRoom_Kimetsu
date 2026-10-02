@@ -162,7 +162,7 @@ info.weapons.push({ key: key, uses: uses, ready: uses === null || uses > 0 });
 var ready = info.weapons.filter(function(weapon) { return weapon.ready; });
 var hasMelee = ready.some(function(weapon) { return World.Weapons[weapon.key].type === 'melee'; });
 var hasControl = ready.some(function(weapon) { return World.Weapons[weapon.key].damage === 'stun'; });
-var hasFlame = ready.some(function(weapon) { return ['nichirin katana', 'nichirin spear', 'flame blade'].indexOf(weapon.key) >= 0; });
+var hasFlame = ready.some(function(weapon) { return World.Weapons[weapon.key].nichirinForged === true || ['nichirin katana', 'nichirin spear', 'flame blade'].indexOf(weapon.key) >= 0; });
 if (info.style === 'technique' && !hasControl) info.warnings.push(_('battle technique needs a usable control weapon to create openings.'));
 if ((info.style === 'water' || info.style === 'thunder') && !hasMelee) info.warnings.push(_('this form needs an equipped melee weapon; fists and ranged attacks do not activate it.'));
 if (info.style === 'flame' && !hasFlame) info.warnings.push(_('flame form needs a nichirin katana, nichirin spear or flame blade to leave deep cuts.'));

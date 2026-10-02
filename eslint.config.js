@@ -11,6 +11,8 @@ const gameGlobals = {
 	Room: 'writable',
 	EarlyGame: 'writable',
 	StoryCrafting: 'writable',
+	NichirinForge: 'writable',
+	DemonPatterns: 'writable',
 	CampGuide: 'writable',
 	Outside: 'writable',
 	Path: 'writable',

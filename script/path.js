@@ -594,6 +594,7 @@ var Path = {
 	},
 	
 	getWeaponTier: function(key) {
+		if (World.Weapons[key] && World.Weapons[key].tier) return World.Weapons[key].tier;
 		var damage = World.Weapons[key] ? World.Weapons[key].damage : 0;
 		if (damage === 'stun') return 5;
 		return damage <= 2 ? 1 : damage <= 5 ? 2 : damage <= 8 ? 3 : damage <= 12 ? 4 : 5;
@@ -680,6 +681,7 @@ var Path = {
 
 	// 从 Room.Craftables / Room.TradeGoods / Fabricator.Craftables 中取 cost
 	getScrapCost: function(key) {
+		if (window.NichirinForge && NichirinForge.items[key]) return NichirinForge.getScrapCost(key);
 		var src = (Room.Craftables && Room.Craftables[key])
 			|| (Room.TradeGoods && Room.TradeGoods[key])
 			|| (Fabricator.Craftables && Fabricator.Craftables[key]);
@@ -921,7 +923,7 @@ var Path = {
 			'wisteria charm': { type: 'tool', desc: _('reduces hostile encounter rate; each crumbles when one is averted') },
 			'demon stone': { type: 'tool' },
 			'medicine': {type: 'tool', desc: _('restores') + ' ' + World.MEDS_HEAL + ' ' + _('hp') }
-		}, Room.Craftables, Fabricator.Craftables);
+		}, Room.Craftables, Fabricator.Craftables, window.NichirinForge ? NichirinForge.items : {});
 	},
 	// Saved preparation targets are independent of the current expedition inventory.
 	LOADOUT_NAMES: { expedition: 'expedition loadout', castle: 'infinity castle loadout' },

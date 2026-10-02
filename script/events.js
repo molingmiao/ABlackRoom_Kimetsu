@@ -106,6 +106,10 @@ var Events = {
 	},
 
 	startCombat: function(scene) {
+		if (window.DemonPatterns && window.Space && Engine.activeModule === Space && !scene._demonPatternsConfigured) {
+			DemonPatterns.configureScene(scene, Space.currentFloor, scene.castleBoss || Space.currentFloor >= 100 ? 'boss' : scene.castleElite ? 'elite' : 'normal', scene.castlePatternId);
+			scene._demonPatternsConfigured = true;
+		}
 		if (window.CampGuide && scene.enemy) CampGuide.discoverEnemy(scene.enemy);
 		Engine.event('game event', 'combat');
 		Events.fought = false;
@@ -552,7 +556,7 @@ var Events = {
 			var available = canHeal;
 			if (id === 'shld') available = true;
 			else if (id === 'beacon') available = canHeal && ($SM.get('stores["fleet beacon"]', true) || 0) > 0;
-			else if (items[id]) available = (Path.outfit[items[id]] || 0) > 0 && (id === 'use-stim' ? World.health > Events.BOOST_DAMAGE : canHeal);
+			else if (items[id]) available = (Path.outfit[items[id]] || 0) > 0 && (id === 'use-stim' ? World.health > Events.BOOST_DAMAGE : canHeal || (window.DemonPatterns && DemonPatterns.canUseMedicine(items[id])));
 			Button.setDisabled(btn, !available);
 		});
 		return canHeal;
@@ -585,7 +589,7 @@ var Events = {
 		return hp - oldHp;
 	},
 	doHeal: function(healing, cured, btn) {
-		if (World.health >= World.getMaxHealth()) return 0;
+		if (World.health >= World.getMaxHealth() && !(window.DemonPatterns && DemonPatterns.canUseMedicine(healing))) return 0;
 		if(Path.outfit[healing] > 0) {
 			Path.outfit[healing]--;
 			$SM.set('outfit["' + healing + '"]', Path.outfit[healing]);
@@ -596,6 +600,7 @@ var Events = {
 			}
 
 			var healed = Events.restoreHealth(Events.getHealingAmount(healing, cured), healing);
+			if (window.DemonPatterns) DemonPatterns.afterMedicine(healing);
 			if(Events.activeEvent() && $('#wanderer').length) {
 				var takeETbutton = Events.setTakeAll();
 				Events.canLeave(takeETbutton);
@@ -727,7 +732,9 @@ var Events = {
 				World.updateSupplies();
 			}
 			var dmg = -1;
-			if(Math.random() <= World.getHitChance()) {
+			var hitChance = World.getHitChance();
+			if (window.DemonPatterns) hitChance = DemonPatterns.modifyHitChance(hitChance);
+			if(Math.random() <= hitChance) {
 				dmg = weapon.damage;
 				if(typeof dmg == 'number') {
 					if(weapon.type == 'unarmed' && $SM.hasPerk('fist form one')) {
@@ -886,6 +893,8 @@ var Events = {
 					var weaponName = attackInfo.weaponName || 'fists';
 					dmg = dmg * Space.getDamageMult() + (Space._sharpenedBattle ? 1 : 0);
 					if (window.CombatStyles) dmg = CombatStyles.modifyAttack(weaponName, dmg);
+					if (window.NichirinForge) dmg *= window.NichirinForge.getDamageMultiplier(weaponName);
+					if (window.DemonPatterns) dmg = DemonPatterns.modifyDamage(dmg);
 					// 累积小数伤害，让低伤武器也能实际获得每一级百分比加成。
 					Events._castleDamageCarry = Events._castleDamageCarry || {};
 					var totalDamage = dmg + (Events._castleDamageCarry[weaponName] || 0);
@@ -913,6 +922,7 @@ var Events = {
 					}
 					if (inCastle && playerAttack && beforeHp > enemyHp) {
 						var actualDamage = beforeHp - enemyHp;
+						if (window.DemonPatterns) DemonPatterns.afterHit(attackInfo.weaponName || 'fists', actualDamage);
 						var lifesteal = Space.getLifestealPct();
 						if (lifesteal > 0) Events.restoreHealth(Math.max(1, Math.floor(actualDamage * lifesteal)), 'lifesteal');
 						if (window.CombatStyles) CombatStyles.afterHit(attackInfo.weaponName || 'fists', actualDamage, enemy);
@@ -953,6 +963,7 @@ var Events = {
 				msg = _('stunned');
 				enemy.data('stunned', true);
 				if (playerAttack && window.CombatTelegraphs) CombatTelegraphs.interrupt(enemy);
+				if (inCastle && playerAttack && window.DemonPatterns) DemonPatterns.afterControl();
 				if (inCastle && playerAttack && window.CombatStyles) CombatStyles.afterControl(attackInfo.weaponName, enemy);
 				setTimeout(() => enemy.data('stunned', false), Events.STUN_DURATION);
 			}
@@ -1792,6 +1803,8 @@ var Events = {
 	endEvent: function(onEnd, sourceEvent) {
 		var event = sourceEvent || Events.activeEvent();
 		if (!event || event.ending) return;
+		var currentScene = event.scenes && event.scenes[Events.activeScene];
+		if (Events.activeEvent() === event && currentScene && currentScene.combat) Events.clearTimeouts();
 		event.ending = true;
 		var panel = event.eventPanel;
 		AudioEngine.stopEventMusic();

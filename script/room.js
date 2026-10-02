@@ -1020,6 +1020,7 @@ var Room = {
 				$('div#' + row.attr('id') + ' > div.row_val', location).text(Math.floor(num));
 			}
 			if (type === 'weapon') {
+				if (World.Weapons[k] && World.Weapons[k].nichirinForged) row.addClass('weapon-tier-' + Path.getWeaponTier(k));
 				Room._updateWeaponAmmoRow(k, location);
 			}
 		}

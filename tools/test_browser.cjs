@@ -1490,6 +1490,55 @@ async function port() {
     const breathingShot=await page('Page.captureScreenshot',{format:'png'});
     fs.writeFileSync(path.join(profile,'breathing-cultivation.png'),Buffer.from(breathingShot.data,'base64'));
     console.log('SCREENSHOT: '+path.join(profile,'breathing-cultivation.png'));
+    const demonChecks=await evaluate(`(async function() {
+      const checks=[],check=(ok,label)=>{if(!ok) throw Error(label);checks.push(label);};
+      const until=async fn=>{for(let i=0;i<120&&!fn();i++) await new Promise(resolve=>setTimeout(resolve,25));if(!fn()) throw Error('demon animation timeout');};
+      const saved={damage:Space.getDamageMult,dr:Space.getDamageReduction,permanentDR:Space.getPermanentDR,lifesteal:Space.getLifestealPct};
+      Space.getDamageMult=()=>1; Space.getDamageReduction=Space.getPermanentDR=Space.getLifestealPct=()=>0;
+      const begin=async id=>{
+        if(Events.activeEvent()) await new Promise(resolve=>Events.endEvent(resolve));
+        Engine.activeModule=Ship;CombatStyles.setSelected('technique');
+        Engine.activeModule=Space;Space.done=false;Space.currentFloor=100;
+        World.setHp(World.getMaxHealth());
+        const art=DemonPatterns.makeArt(id,20);
+        Events.startEvent({title:'鬼术实战回归',scenes:{start:{combat:true,enemy:'forest demon',health:1000,damage:0,attackDelay:100,hit:0,
+          _demonPatternsConfigured:true,demonPatternIds:[id],telegraphAttacks:[art],buttons:{leave:{text:'leave',nextScene:'end'}}}}});
+        clearInterval(Events._enemyAttackTimer);(Events._specialTimers||[]).forEach(clearInterval);
+        await until(()=>!!DemonPatterns._fight);
+        CombatTelegraphs._fight.arts.forEach(row=>clearTimeout(row.timer));
+        check($('.demonPatternGuide').text().includes(DemonPatterns.TYPES.find(row=>row.id===id).hint),id+' shows its counterplay in the real combat panel');
+        return art;
+      };
+      const strike=(weapon='nichirin katana')=>{
+        const hp=$('#enemy').data('hp');Events.damage($('#wanderer'),$('#enemy'),100,World.Weapons[weapon].type,null,{weaponName:weapon});return hp-$('#enemy').data('hp');
+      };
+      try {
+        let art=await begin('armour');DemonPatterns.resolve(art,CombatTelegraphs._fight);
+        check(strike()===75&&strike()===75&&strike()===75&&strike()===100&&!DemonPatterns._fight.armour,'actual hits take 25% bone-armour reduction and break it on the third');
+        art=await begin('siphon');$('#enemy').data('hp',500);const hp=World.health;
+        DemonPatterns.resolve(art,CombatTelegraphs._fight);await until(()=>World.health<hp);
+        check($('#enemy').data('hp')===500+Math.floor((hp-World.health)*.7),'siphon heals from actual inflicted damage rather than its nominal power');
+        art=await begin('bind');const bindHp=World.health;DemonPatterns.resolve(art,CombatTelegraphs._fight);
+        await until(()=>!!DemonPatterns._fight.bind);check(World.health<bindHp&&DemonPatterns.modifyHitChance(1)===.85,'a real silk hit applies the 15-point accuracy loss');
+        World.setHp(World.getMaxHealth());Path.outfit.medicine=1;$SM.set('outfit',Path.outfit);Events.setHeal();
+        check(!$('#meds').hasClass('disabled'),'medicine remains usable at full health specifically to remove silk');
+        Events.doHeal('medicine',World.medsHeal(),$('#meds'));
+        check(Path.outfit.medicine===0&&!DemonPatterns._fight.bind&&World.health===World.getMaxHealth(),'full-health treatment consumes one medicine and actually removes silk');
+        art=await begin('shadow');DemonPatterns.resolve(art,CombatTelegraphs._fight);
+        check(!!DemonPatterns._fight.shadow,'shadow is visible before its first extra strike');strike('wisteria gun');
+        check(!DemonPatterns._fight.shadow,'one actual ranged hit dispels the clone');
+        art=await begin('combo');const comboHp=World.health;DemonPatterns.resolve(art,CombatTelegraphs._fight);
+        await until(()=>World.health<comboHp);Events.damage($('#wanderer'),$('#enemy'),'stun','ranged',null,{weaponName:'bind kunai'});
+        const after=World.health;await new Promise(resolve=>setTimeout(resolve,1700));
+        check(!DemonPatterns._fight.combo&&World.health===after,'control after the first combo hit cancels both pending real attacks');
+        await new Promise(resolve=>Events.endEvent(resolve));
+        check(!DemonPatterns._fight&&!CombatTelegraphs._fight,'end of combat removes all live demon effects and timers');
+        return checks;
+      } finally {
+        Space.getDamageMult=saved.damage;Space.getDamageReduction=saved.dr;Space.getPermanentDR=saved.permanentDR;Space.getLifestealPct=saved.lifesteal;
+      }
+    })()`);
+    console.log(demonChecks.map(name=>'PASS: '+name).join('\n'));
     assert.deepEqual(errors, [], 'uncaught browser exceptions');
   } finally {
     if (call && socket?.readyState === WebSocket.OPEN) {

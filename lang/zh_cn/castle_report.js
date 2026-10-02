@@ -19,6 +19,7 @@ _.addTranslation({
   'main sources of damage': '主要受伤来源',
   'normal attack': '普通攻击',
   'blood art': '血鬼术',
+  'blood shadow': '血影分身',
   'bleeding': '持续流血',
   'boost cost': '集中精力消耗',
   'other damage': '其他伤害',

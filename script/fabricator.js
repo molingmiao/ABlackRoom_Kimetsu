@@ -141,6 +141,10 @@ const Fabricator = {
   },
 
   updateBuildButtons: () => {
+    let workbench = Fabricator.panel.find('.forgeWorkbench');
+    if (!workbench.length) {
+      workbench = $('<div>').addClass('forgeWorkbench').attr({tabindex:0,'aria-label':'锻造与制作，内容较长时可滚动查看'}).appendTo(Fabricator.panel);
+    }
     let section = $('#fabricateButtons');
     let needsAppend = false;
     if (section.length === 0) {
@@ -149,6 +153,8 @@ const Fabricator = {
     }
 
     for (const [ key, value ] of Object.entries(Fabricator.Craftables)) {
+      // Legacy blades remain usable/recyclable, but no longer have a guaranteed exchange.
+      if (key === 'flame blade') {if (value.button) value.button.remove();value.button=null;continue;}
       const max = $SM.num(key, value) >= value.maximum;
       if (value.type === 'upgrade' && max) {
         if (value.button) value.button.remove();
@@ -179,8 +185,9 @@ const Fabricator = {
     Room.sortCraftWeaponButtons(section);
 
     if (needsAppend && section.children().length > 0) {
-      section.appendTo(Fabricator.panel).animate({ opacity: 1 }, 300, 'linear');
+      section.appendTo(workbench).animate({ opacity: 1 }, 300, 'linear');
     }
+    if (window.NichirinForge) NichirinForge.render();
   },
 
   updateBlueprints: ignoreStores => {
@@ -197,6 +204,7 @@ const Fabricator = {
 
     for (const k in $SM.get('character.blueprints')) {
       const id = 'blueprint_' + k.replace(/ /g, '-');
+      if (k === 'flame blade') {$('#' + id).remove();continue;}
       let r = $('#' + id);
       if($SM.get(`character.blueprints["${k}"]`) && r.length === 0) {
         r = $('<div>').attr('id', id).addClass('blueprintRow').appendTo(blueprints);
@@ -216,6 +224,7 @@ const Fabricator = {
   fabricate: button => {
     const thing = $(button).attr('fabricateThing');
     const craftable = Fabricator.Craftables[thing];
+    if (thing === 'flame blade' || !craftable) return false;
     const numThings = Math.max(0, $SM.get(`stores['${thing}']`, true));
 
     if (craftable.maximum <= numThings) {

@@ -34,3 +34,34 @@ div.blueprintRow {
 div.blueprintRow .row_key {
 	float: none;
 }
+.forgeWorkbench {
+  width: 430px;
+  max-height: min(850px, max(160px, calc(100vh - 140px)));
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 0 10px 10px 0;
+}
+.forgeWorkbench:focus-visible { outline: 2px solid currentColor; outline-offset: 2px; }
+.nichirinForge {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 12px;
+  border: 1px solid currentColor;
+  margin: 0 0 20px;
+  line-height: 1.6;
+}
+.nichirinForge h3 { margin: 0 0 8px; }
+.nichirinForge p { margin: 8px 0; }
+.nichirinForgeProgress { font-weight: bold; }
+.nichirinForgeRisk { display: block; margin: 12px 0; }
+.nichirinForgeRisk input { margin-right: 8px; }
+.nichirinForgeActions { display: flex; flex-wrap: wrap; gap: 10px; }
+.nichirinForgeActions button { font: inherit; background: transparent; color: inherit; border: 1px solid currentColor; padding: 7px 10px; cursor: pointer; }
+.nichirinForgeActions button:disabled { opacity: .6; cursor: default; }
+.nichirinForgeActions button:focus-visible { outline: 2px solid currentColor; outline-offset: 2px; }
+.nichirinForgeResults { margin-top: 12px; }
+.nichirinForge .weapon-tier-4 { color: #9354b9; }
+.nichirinForge .weapon-tier-5 { color: #9b7000; }
+.nichirinForgeResults .forgeFailure { font-size: 13px; }
+.storeRow.weapon-tier-4 > .row_key { color: #9354b9; font-weight: bold; }
+.storeRow.weapon-tier-5 > .row_key { color: #9b7000; font-weight: bold; }
