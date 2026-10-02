@@ -302,6 +302,15 @@
         .click(Engine.exportImport)
         .appendTo(menu);
 
+      $('<button>')
+        .attr({id: 'updateNotesButton', type: 'button', title: '查看近期更新；探索和战斗期间请先返回庄园。'})
+        .addClass('menuBtn')
+        .text('更新公告')
+        .on('click', function() {
+          if (UpdateNotes.show()) menu.removeClass('open');
+        })
+        .appendTo(menu);
+
       if(this.options.dropbox && Engine.Dropbox) {
         this.dropbox = Engine.Dropbox.init();
 
@@ -965,6 +974,7 @@
     },
     _tryHotkey: function(e) {
       if (document.getElementById('castleReportOverlay')) return false;
+      if (document.getElementById('scrapQuantityOverlay') || document.getElementById('buyQuantityOverlay')) return false;
       if (e.ctrlKey || e.altKey || e.metaKey || e.isComposing) return false;
       var key = Engine._resolveHotkey(e);
       if (!key) return false;

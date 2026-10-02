@@ -80,8 +80,12 @@ async function port() {
       for (let i = 0; i < 40 && getComputedStyle(panel).backgroundColor !== expected; i++) {
         await new Promise(resolve => setTimeout(resolve, 50));
       }
+      for (let i = 0; i < 40 && Number(getComputedStyle(panel).opacity) < 0.99; i++) {
+        await new Promise(resolve => setTimeout(resolve, 25));
+      }
       const style = getComputedStyle(panel);
       if (style.backgroundColor !== expected) throw Error('dialog theme background incorrect: ' + style.backgroundColor);
+      if (Number(style.opacity) < 0.99) throw Error('dialog did not finish its opening transition');
       const luminance = color => {
         const rgb = color.match(/\d+/g).slice(0, 3).map(value => {
           const channel = Number(value) / 255;
@@ -208,11 +212,14 @@ async function port() {
       $('#productionOverviewButton').trigger('click');
       check(Events.eventPanel().text().includes('原料不够整组'), 'production overview identifies whole-group material shortages');
       check(Events.eventPanel().text().includes('持续供需缺口') && Events.eventPanel().text().includes('当前生产方'), 'production overview explains sustained deficits and assigned sources');
+      check(Events.eventPanel().find('.productionSummary > div').length === 3 && Events.eventPanel().find('.productionBlockedRow').length > 0, 'production overview prioritizes live shortage cards and summary counts');
+      $('[data-production-fold="jobs"], [data-production-fold="job:charcutier"]').prop('open',true);
       const workerCount = $SM.get('game.workers.charcutier');
       $SM.setM('stores', {wood:100,meat:100});
       $('#refresh').trigger('click');
       check(!Events.eventPanel().text().includes('原料不够整组') && $SM.get('game.workers.charcutier') === workerCount, 'production refresh reflects new stock without reassigning workers');
       check(Events.eventPanel().text().includes('持续供需缺口'), 'restocking removes immediate shortage but not the sustained supply deficit');
+      check($('[data-production-fold="jobs"]')[0].open && $('[data-production-fold="job:charcutier"]')[0].open, 'refresh preserves both recipe-list and individual-job expansion');
       $('#reserves').trigger('click');
       const reserveSnapshot=JSON.stringify($SM.get('stores'));
       $('[data-material="wood"]').val('95');
@@ -222,6 +229,7 @@ async function port() {
       $('[data-material="meat"]').val('0');
       $('#saveProductionReserves').trigger('click');
       check($SM.getProductionReserve('wood') === 95 && Events.eventPanel().text().includes('为保留库存暂停'), 'saved reserves explain why an affordable batch is held');
+      check($('[data-production-fold="jobs"]')[0].open && $('[data-production-fold="job:charcutier"]')[0].open, 'returning from reserve settings keeps recipe sections expanded');
       check(JSON.stringify($SM.get('stores')) === reserveSnapshot, 'saving reserves never consumes inventory');
       $('#reserves').trigger('click');
       $('[data-material="wood"]').val('0');
@@ -898,6 +906,119 @@ async function port() {
       return checks;
     })()`);
     console.log(chapterChecks.map(name=>'PASS: '+name).join('\n'));
+    const noticeChecks = await evaluate(`(async function() {
+      const checks = [];
+      const check = (condition, name) => { if (!condition) throw Error(name); checks.push(name); };
+      await new Promise(resolve => $('#outerSlider').promise().done(resolve));
+      check(!Events.activeEvent(), 'completed journey leaves no event before notice reading');
+      const before = JSON.stringify(State), outfitBefore = JSON.stringify(Path.outfit);
+      $('.menuToggle').trigger('click');
+      check($('#updateNotesButton').is(':visible'), 'update announcement button is available in the menu');
+      $('#updateNotesButton').trigger('click');
+      const event = Events.activeEvent(), panel = Events.eventPanel();
+      check(panel.hasClass('updateNotes') && panel.attr('role') === 'dialog', 'menu opens the actual update announcement dialog');
+      check(panel.find('.updateNotesEntry').length === UpdateNotes.entries.length && panel.find('.updateNotesEntry[open]').length === 1, 'recent history starts with the latest batch expanded and older batches collapsed');
+      check(panel.text().includes('20 个阶段') && panel.text().includes('150 → 15') && panel.text().includes('2 个肉 + 5 块木头'), 'recent mainline and resource changes are included in the game announcement');
+      check(panel.find('li strong').length > 50, 'important update labels are bold throughout the history');
+      $('#expandUpdateNotes').trigger('click');
+      check(panel.find('.updateNotesEntry[open]').length === UpdateNotes.entries.length, 'all historical announcement batches can be expanded');
+      $('#updateNotesCategory').val('资源').trigger('change');
+      check(panel.find('li').length === UpdateNotes.filteredEntries('资源').reduce((sum, entry) => sum + entry.items.length, 0) && !panel.text().includes('菜单更新公告：'), 'category filtering displays only matching update items');
+      $('#updateNotesCategory').val('全部').trigger('change');
+      $('#collapseUpdateNotes').trigger('click');
+      check(panel.find('.updateNotesEntry[open]').length === 1, 'collapse history keeps the latest announcement readable');
+      check(!UpdateNotes.show() && Events.activeEvent() === event, 'opening twice never replaces or stacks the announcement');
+      document.body.dispatchEvent(new KeyboardEvent('keydown', {key:'1', bubbles:true}));
+      document.body.dispatchEvent(new KeyboardEvent('keyup', {key:'1', bubbles:true}));
+      check(JSON.stringify(State) === before && JSON.stringify(Path.outfit) === outfitBefore, 'reading and filtering announcements never change saves or use background supplies');
+      return checks;
+    })()`);
+    console.log(noticeChecks.map(name => 'PASS: ' + name).join('\n'));
+    await checkDialogTheme('.eventPanel.updateNotes', false);
+    const noticeDay = await page('Page.captureScreenshot', {format:'png'});
+    fs.writeFileSync(path.join(profile, 'update-notes.png'), Buffer.from(noticeDay.data, 'base64'));
+    console.log('SCREENSHOT: ' + path.join(profile, 'update-notes.png'));
+    await checkDialogTheme('.eventPanel.updateNotes', true);
+    const noticeDark = await page('Page.captureScreenshot', {format:'png'});
+    fs.writeFileSync(path.join(profile, 'update-notes-dark.png'), Buffer.from(noticeDark.data, 'base64'));
+    console.log('SCREENSHOT: ' + path.join(profile, 'update-notes-dark.png'));
+    await evaluate(`(async function() {
+      document.querySelector('#closeUpdateNotes').dispatchEvent(new KeyboardEvent('keydown', {key:'Escape', bubbles:true}));
+      for (let i=0; i<50 && Events.activeEvent(); i++) await new Promise(resolve => setTimeout(resolve,20));
+      if (Events.activeEvent() || document.activeElement.id !== 'updateNotesButton') throw Error('Escape must close notices and restore menu focus');
+      const menu=document.querySelector('.menu'), button=document.querySelector('#updateNotesButton');
+      for(let i=0;i<40 && button.getBoundingClientRect().top<menu.getBoundingClientRect().top;i++) await new Promise(resolve=>setTimeout(resolve,25));
+      if(button.getBoundingClientRect().top<menu.getBoundingClientRect().top) throw Error('restored announcement focus must stay visible in the expanded menu');
+      const module = Engine.activeModule, before = JSON.stringify(State);
+      Engine.activeModule = World;
+      if (UpdateNotes.show() || Events.activeEvent()) throw Error('notice must never pause world exploration');
+      Engine.activeModule = Space;
+      if (UpdateNotes.show() || Events.activeEvent()) throw Error('notice must never pause castle exploration');
+      Engine.activeModule = module;
+      if (JSON.stringify(State) !== before) throw Error('blocked notice changed persistent state');
+    })()`);
+    console.log('PASS: notice Escape restores focus, and active exploration cannot open a pause-like announcement.');
+    const scrapChecks = await evaluate(`(function() {
+      const checks = [], check = (condition, name) => { if (!condition) throw Error(name); checks.push(name); };
+      $SM.set('stores["bone yari"]',8);
+      Path.outfit['bone yari']=1; $SM.set('outfit',Path.outfit);
+      Path.updateOutfitting();
+      const trigger = $('#outfit_bone-yari > .scrapBtn')[0] || $('#outfitting .outfitRow[key="bone yari"] > .scrapBtn')[0];
+      check(!!trigger,'recycling row exposes the live Shift-click preview');
+      const before = JSON.stringify(State);
+      trigger.dispatchEvent(new MouseEvent('click',{shiftKey:true,bubbles:true}));
+      check($('#scrapQuantityPanel').attr('role')==='dialog' && $('.scrapQuantityStock').text().includes('背包保护1'), 'real Shift-click opens recycling preview with packed inventory protected');
+      $('#scrapQuantityInput').val('3').trigger('input');
+      check($('#scrapQuantityRefund').text().includes('+90') && $('#scrapQuantityRefund').text().includes('+4'), 'real batch preview uses whole-batch material rounding');
+      check(JSON.stringify(State)===before,'editing recycling preview does not change saves');
+      $('#scrapQuantityInput').val('1.5').trigger('input');
+      check($('.scrapQuantityOk').prop('disabled') && !$('#scrapQuantityRefund').text(), 'fractional recycling quantities disable confirmation and hide misleading refunds');
+      $('#scrapQuantityInput').val('3').trigger('input');
+      $SM.set('stores["bone yari"]',2);
+      check($('.scrapQuantityOk').prop('disabled') && $('.scrapQuantityStock').text().includes('可回收1'), 'stock changes refresh the open preview without silently shrinking the selected amount');
+      $SM.set('stores["bone yari"]',6);
+      check(!$('.scrapQuantityOk').prop('disabled'),'restocking restores a valid batch confirmation');
+      let backgroundClicks=0;
+      const background=$('<button>').attr({'data-hotkey':'1',id:'backgroundPreviewTest'}).text('test').on('click',()=>backgroundClicks++).appendTo('body');
+      $('.scrapQuantityOk').trigger('focus');
+      document.activeElement.dispatchEvent(new KeyboardEvent('keydown',{key:'1',bubbles:true}));
+      document.activeElement.dispatchEvent(new KeyboardEvent('keyup',{key:'1',bubbles:true}));
+      check(backgroundClicks===0,'quantity dialog blocks background hotkeys even when focus is on its confirmation button');
+      const module=Engine.activeModule;
+      document.activeElement.dispatchEvent(new KeyboardEvent('keyup',{key:'a',keyCode:65,which:65,bubbles:true}));
+      check(Engine.activeModule===module,'quantity dialog also prevents key-release navigation behind it');
+      background.remove();
+      const wood=$SM.get('stores.wood'),teeth=$SM.get('stores.teeth');
+      $('.scrapQuantityOk').trigger('click');
+      check($SM.get('stores["bone yari"]')===3 && Path.outfit['bone yari']===1 && $SM.get('stores.wood')===wood+90 && $SM.get('stores.teeth')===teeth+4, 'confirmed recycling charges the exact batch and preserves packed copies');
+      check(!$('#scrapQuantityOverlay').length && document.activeElement===trigger,'successful recycling closes preview and restores the triggering button');
+      trigger.dispatchEvent(new MouseEvent('click',{shiftKey:true,bubbles:true}));
+      $('#scrapQuantityInput').val('1').trigger('input');
+      return checks;
+    })()`);
+    console.log(scrapChecks.map(name=>'PASS: '+name).join('\n'));
+    const checkScrapTheme = dark => evaluate('(' + (async function(dark) {
+      if (Engine.isLightsOff()!==dark) Engine.turnLightsOff();
+      const panel=document.querySelector('#scrapQuantityPanel'), expected=dark?'rgb(39, 40, 35)':'rgb(255, 255, 255)';
+      for(let i=0;i<40 && getComputedStyle(panel).backgroundColor!==expected;i++) await new Promise(resolve=>setTimeout(resolve,25));
+      if(getComputedStyle(panel).backgroundColor!==expected) throw Error('recycling theme incorrect');
+      const box=panel.getBoundingClientRect();
+      if(box.top<0 || box.bottom>innerHeight) throw Error('recycling controls outside viewport');
+    }).toString()+')('+dark+')');
+    await checkScrapTheme(false);
+    const scrapDay=await page('Page.captureScreenshot',{format:'png'});
+    fs.writeFileSync(path.join(profile,'scrap-preview.png'),Buffer.from(scrapDay.data,'base64'));
+    console.log('SCREENSHOT: '+path.join(profile,'scrap-preview.png'));
+    await checkScrapTheme(true);
+    const scrapDark=await page('Page.captureScreenshot',{format:'png'});
+    fs.writeFileSync(path.join(profile,'scrap-preview-dark.png'),Buffer.from(scrapDark.data,'base64'));
+    console.log('SCREENSHOT: '+path.join(profile,'scrap-preview-dark.png'));
+    await evaluate(`(function() {
+      const before=JSON.stringify(State),trigger=Path._scrapDialog.trigger;
+      document.activeElement.dispatchEvent(new KeyboardEvent('keydown',{key:'Escape',bubbles:true}));
+      if($('#scrapQuantityOverlay').length || JSON.stringify(State)!==before || document.activeElement!==trigger) throw Error('cancelled recycling must not charge and must restore focus');
+    })()`);
+    console.log('PASS: actual recycling Escape cancels without consuming items.');
     assert.deepEqual(errors, [], 'uncaught browser exceptions');
   } finally {
     if (call && socket?.readyState === WebSocket.OPEN) {

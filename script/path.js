@@ -675,16 +675,18 @@ var Path = {
 			return;
 		}
 		if (!button.length) {
-			button = $('<div>').addClass('scrapBtn').text(_('scrap')).on('click', function(e) {
+			button = $('<div>').addClass('scrapBtn').attr({role:'button', tabindex:0}).text('回收').on('click keydown', function(e) {
+				if (e.type === 'keydown' && e.key !== 'Enter' && e.key !== ' ') return;
+				e.preventDefault();
 				e.stopPropagation();
 				if (e.shiftKey) {
-					Path._showScrapQuantityDialog(key);
+					Path._showScrapQuantityDialog(key, this);
 					return;
 				}
 				Path.scrapItem(key, 1);
 			}).appendTo(row);
 		}
-		button.attr('title', parts.join(' '));
+		button.attr('title', '回收 1 件：' + parts.join(' ') + '；Shift + 点击预览批量回收');
 	},
 
 	// 从 Room.Craftables / Room.TradeGoods / Fabricator.Craftables 中取 cost
@@ -696,67 +698,144 @@ var Path = {
 		try { return src.cost(); } catch (e) { return null; }
 	},
 
-	_showScrapQuantityDialog: function(key) {
-		var have = $SM.get('stores["'+key+'"]', true) || 0;
-		var carried = (Path.outfit && typeof Path.outfit[key] === 'number') ? Path.outfit[key] : 0;
-		var maxPossible = Math.max(0, have - carried);
-		if (maxPossible <= 0) return;
-		if ($('#scrapQuantityOverlay').length) {
-			$('#scrapQuantityOverlay').remove();
-		}
+	// Preview and execution use the same live stock and whole-batch rounding.
+	scrapPreview: function(key, quantity) {
+		var have = Path.loadoutCount($SM.get('stores["' + key + '"]', true));
+		var carried = Math.min(have, Path.loadoutCount((Path.outfit || {})[key]));
+		var available = Math.max(0, have - carried);
+		var entered = typeof quantity === 'string' && /^\d+$/.test(quantity.trim()) ? Number(quantity.trim()) : quantity;
+		var validAmount = typeof entered === 'number' && isFinite(entered) && Math.floor(entered) === entered && entered > 0;
+		var cost = Path.getScrapCost(key), refund = {}, validCost = !!cost;
+		if (cost) Object.keys(cost).forEach(function(mat) {
+			if (typeof cost[mat] !== 'number' || !isFinite(cost[mat]) || cost[mat] < 0) validCost = false;
+			else if (validAmount && entered <= available) {
+				var value = Math.floor(cost[mat] * 0.3 * entered);
+				if (value > 0 && isFinite(value)) refund[mat] = value;
+			}
+		});
+		var error = !validAmount ? '请输入大于 0 的整数。' : entered > available ? '数量超过当前可回收库存，请重新输入。'
+			: !validCost || !Object.keys(refund).length ? '该物品目前没有可返还的材料。' : '';
+		return {have:have, carried:carried, available:available, amount:validAmount ? entered : 0, refund:refund, valid:!error, error:error};
+	},
+	canScrap: function() {
+		return Engine.activeModule === Path && !Events.activeEvent();
+	},
+	closeScrapQuantityDialog: function(restoreFocus) {
+		var dialog = Path._scrapDialog;
+		if (!dialog) return;
+		Path._scrapDialog = null;
+		dialog.closed = true;
+		$.Dispatch('stateUpdate').unsubscribe(dialog.refresh);
+		dialog.overlay.remove();
+		if (restoreFocus && dialog.trigger && document.documentElement.contains(dialog.trigger)) dialog.trigger.focus();
+	},
+	_showScrapQuantityDialog: function(key, trigger) {
+		if (!Path.canScrap()) return false;
+		var initial = Path.scrapPreview(key, 1);
+		if (initial.available <= 0) return false;
+		Path.closeScrapQuantityDialog(false);
 		var overlay = $('<div>').attr('id', 'scrapQuantityOverlay');
-		var panel = $('<div>').attr('id', 'scrapQuantityPanel').appendTo(overlay);
-		$('<div>').addClass('buyQuantityTitle').text(_('scrap {0}', _(key))).appendTo(panel);
-		$('<div>').addClass('buyQuantityText').text(_('max recyclable: {0}', maxPossible)).appendTo(panel);
-		var input = $('<input>').addClass('buyQuantityInput').attr({
+		var panel = $('<div>').attr({id:'scrapQuantityPanel', role:'dialog', 'aria-modal':'true', 'aria-labelledby':'scrapQuantityTitle'}).appendTo(overlay);
+		$('<h2>').attr('id','scrapQuantityTitle').text('回收 ' + _(key)).appendTo(panel);
+		var stock = $('<div>').addClass('scrapQuantityStock').appendTo(panel);
+		$('<p>').text('只回收仓库中未装入背包的物品；已装包的数量会受到保护。').appendTo(panel);
+		$('<label>').attr('for','scrapQuantityInput').text('本次回收数量').appendTo(panel);
+		var input = $('<input>').attr({
+			id:'scrapQuantityInput',
 			type: 'number',
 			min: 1,
-			max: maxPossible,
-			value: maxPossible
+			step: 1,
+			max: initial.available,
+			value: initial.available,
+			'aria-describedby':'scrapQuantityError scrapQuantityRefund'
 		}).appendTo(panel);
-		var actions = $('<div>').addClass('buyQuantityActions').appendTo(panel);
-		var commit = function () {
-			var entered = parseInt(input.val(), 10);
-			if (!isFinite(entered)) entered = maxPossible;
-			entered = Math.max(1, Math.min(maxPossible, entered));
-			overlay.remove();
-			Path.scrapItem(key, entered);
+		var preview = $('<div>').attr({id:'scrapQuantityRefund', 'aria-live':'polite'}).appendTo(panel);
+		var error = $('<p>').attr({id:'scrapQuantityError', role:'status'}).appendTo(panel);
+		$('<p>').addClass('scrapQuantityNote').text('返还制造材料的 30%，按本次总数量统一向下取整。回收后无法撤销。').appendTo(panel);
+		var actions = $('<div>').addClass('scrapQuantityActions').appendTo(panel);
+		var dialog = {overlay:overlay, trigger:trigger || document.activeElement, closed:false};
+		Path._scrapDialog = dialog;
+		var refresh = dialog.refresh = function() {
+			if (dialog.closed || Path._scrapDialog !== dialog) return;
+			if (!Path.canScrap()) { Path.closeScrapQuantityDialog(false); return; }
+			var info = Path.scrapPreview(key, input.val());
+			stock.empty();
+			[['仓库总数',info.have],['背包保护',info.carried],['可回收',info.available]].forEach(function(row) {
+				var line = $('<div>').appendTo(stock);
+				$('<span>').text(row[0]).appendTo(line);
+				$('<strong>').text(row[1]).appendTo(line);
+			});
+			input.attr('max',info.available).attr('aria-invalid',!info.valid);
+			error.text(info.error);
+			preview.empty();
+			if (info.valid) {
+				$('<strong>').text('回收 ' + info.amount + ' 件，将返还：').appendTo(preview);
+				Object.keys(info.refund).forEach(function(mat) {
+					var line = $('<div>').appendTo(preview);
+					$('<span>').text(_(mat)).appendTo(line);
+					$('<strong>').text('+' + info.refund[mat]).appendTo(line);
+				});
+			}
+			ok.prop('disabled',!info.valid);
 		};
-		$('<button>').addClass('buyQuantityOk').text(_('ok')).on('click', commit).appendTo(actions);
-		$('<button>').addClass('buyQuantityCancel').text(_('cancel')).on('click', function () { overlay.remove(); }).appendTo(actions);
+		var commit = function () {
+			if (dialog.closed || Path._scrapDialog !== dialog || !document.documentElement.contains(overlay[0])) return false;
+			refresh();
+			if (dialog.closed) return false;
+			var info = Path.scrapPreview(key, input.val());
+			if (!info.valid) return false;
+			Path.closeScrapQuantityDialog(false);
+			var success = Path.scrapItem(key, info.amount);
+			if (dialog.trigger && document.documentElement.contains(dialog.trigger)) dialog.trigger.focus();
+			return success;
+		};
+		var ok = $('<button>').attr('type','button').addClass('scrapQuantityOk').text('确认回收').on('click', commit).appendTo(actions);
+		var cancelDialog = function() { if (Path._scrapDialog === dialog) Path.closeScrapQuantityDialog(true); };
+		var cancel = $('<button>').attr('type','button').text(_('cancel')).on('click', cancelDialog).appendTo(actions);
 		overlay.on('click', function (e) {
-			if (e.target === overlay[0]) overlay.remove();
+			e.stopPropagation();
+			if (e.target === overlay[0]) cancelDialog();
 		});
-		input.on('keydown', function (e) {
-			if (e.key === 'Enter') {
+		overlay.on('keydown', function (e) {
+			e.stopPropagation();
+			if (e.key === 'Escape') { e.preventDefault(); cancelDialog(); }
+			else if (e.key === 'Enter' && e.target === input[0]) {
 				e.preventDefault();
 				commit();
 			}
+			else if (e.key === 'Tab') {
+				var focusables = ok.prop('disabled') ? [input[0],cancel[0]] : [input[0],ok[0],cancel[0]];
+				var index = focusables.indexOf(document.activeElement);
+				if ((e.shiftKey && index <= 0) || (!e.shiftKey && index === focusables.length - 1)) {
+					e.preventDefault();
+					focusables[e.shiftKey ? focusables.length - 1 : 0].focus();
+				}
+			}
 		});
+		overlay.on('keyup', function(e) { e.stopPropagation(); });
+		input.on('input change', refresh);
+		$.Dispatch('stateUpdate').subscribe(refresh);
 		overlay.appendTo('body');
+		refresh();
 		input.focus().select();
+		return true;
 	},
 
 	scrapItem: function(key, qty) {
-		var have = $SM.get('stores["'+key+'"]', true);
-		if (have <= 0) return;
-		var carried = (Path.outfit && typeof Path.outfit[key] === 'number') ? Path.outfit[key] : 0;
-		var maxPossible = Math.max(0, have - carried);
-		if (maxPossible <= 0) return;
-		var amount = (typeof qty === 'number') ? Math.max(1, Math.min(maxPossible, Math.floor(qty))) : 1;
-		var costObj = Path.getScrapCost(key);
-		if (!costObj) return;
-		$SM.add('stores["'+key+'"]', -amount);
+		if (!Path.canScrap()) return false;
+		var info = Path.scrapPreview(key, qty === undefined ? 1 : qty);
+		if (!info.valid) return false;
+		var changes = {};
+		changes[key] = -info.amount;
 		var refundText = [];
-		for (var mat in costObj) {
-			var rv = Math.floor(costObj[mat] * 0.3 * amount);
-			if (rv > 0) {
-				$SM.add('stores["'+mat+'"]', rv);
-				refundText.push(_(mat) + '+' + rv);
-			}
+		for (var mat in info.refund) {
+			changes[mat] = (changes[mat] || 0) + info.refund[mat];
+			refundText.push(_(mat) + '+' + info.refund[mat]);
 		}
-		Notifications.notify(null, _('scrapped {0} {1} ({2})', amount, _(key), refundText.join(', ')));
+		$SM.addM('stores', changes);
+		Notifications.notify(null, _('scrapped {0} {1} ({2})', info.amount, _(key), refundText.join(', ')));
 		Path.updateOutfitting();
+		return true;
 	},
 	
 	increaseSupply: function(btn) {

@@ -24,10 +24,14 @@ div#saveNotify {
 
 /* Read-only guides must follow the theme instead of inheriting white modal backgrounds. */
 .eventPanel.expeditionReport,
-.eventPanel.materialSources {
+.eventPanel.materialSources,
+.eventPanel.productionOverview,
+.eventPanel.updateNotes {
 	background-color: #272823;
 	color: #EEE;
 }
+.updateNotesTools select option { color: #EEE; background: #272823; }
+#scrapQuantityPanel { background-color: #272823; color: #EEE; }
 
 .eventTitle:after {
 	background-color: #272823;

@@ -174,7 +174,7 @@ var CampGuide = {
       return row.demand - row.supply > 0.001;
     })};
   },
-  productionText: function() {
+  productionSnapshot: function() {
     var incomes = $SM.get('income') || {}, selected = {};
     Object.keys(incomes).forEach(function(key) {
       if (Outside._INCOME[key] || key === 'builder') selected[key] = incomes[key];
@@ -182,6 +182,11 @@ var CampGuide = {
     var reserves = {};
     Object.keys($SM.get('game.productionReserves') || {}).forEach(function(item) { reserves[item] = $SM.getProductionReserve(item); });
     var report = CampGuide.production(selected, $SM.get('stores') || {}, reserves);
+    report.reserves = reserves;
+    return report;
+  },
+  productionText: function() {
+    var report = CampGuide.productionSnapshot(), reserves = report.reserves;
     var text = [_('production snapshot: recipes below are for the entire assigned group, not one worker.')];
     var jobName = function(key) {return key === 'builder' ? _('Shinobu') : _(key);};
     var rateText = function(value) {return String(Math.round(value * 100) / 100);};
@@ -215,12 +220,110 @@ var CampGuide = {
   },
   showProduction: function() {
     if (Events.activeEvent()) return;
-    Events.startEvent({title:_('production overview'), scenes:{start:{text:CampGuide.productionText(),buttons:{
-      refresh:{text:_('refresh production snapshot'), nextScene:{1:'start'}},
+    Events.startEvent({title:_('production overview'), productionGuide:true, scenes:{start:{text:[],buttons:{
+      refresh:{text:_('refresh production snapshot'), onChoose:CampGuide.renderProduction},
       reserves:{text:_('production reserves'), onChoose:CampGuide.editReserves},
       close:{text:_('close'), nextScene:'end'}
-    }, onLoad:function() { Events.activeEvent().scenes.start.text = CampGuide.productionText(); }}}});
+    }}}}, {width:'580px'});
     Events.eventPanel().addClass('productionOverview');
+    CampGuide.renderProduction();
+  },
+  renderProduction: function() {
+    var event = Events.activeEvent();
+    if (!event || !event.productionGuide || event.ending) return false;
+    var panel = Events.eventPanel(), desc = panel.find('#description'), scroll = desc.scrollTop();
+    var folds = event.productionOpenDetails || {};
+    desc.find('details[data-production-fold]').each(function() {
+      folds[$(this).attr('data-production-fold')] = this.open;
+    });
+    event.productionOpenDetails = folds;
+    desc.empty();
+    var report = CampGuide.productionSnapshot();
+    var jobName = function(key) {return key === 'builder' ? _('Shinobu') : _(key);};
+    var rateText = function(value) {return String(Math.round(value * 100) / 100);};
+    var format = function(items) {return items.map(function(item) {return _(item.item) + ' ×' + item.amount;}).join(' / ') || _('none');};
+    var stopped = report.rows.filter(function(row) {return row.missing.length || row.reserved.length;});
+    $('<p>').addClass('productionIntro').text(_('production snapshot: recipes below are for the entire assigned group, not one worker.')).appendTo(desc);
+    var summary = $('<div>').addClass('productionSummary').appendTo(desc);
+    [['已分配',report.rows.length],['当前停工',stopped.length],['持续缺口',report.deficits.length]].forEach(function(stat) {
+      var box = $('<div>').appendTo(summary);
+      $('<strong>').text(stat[1]).appendTo(box);
+      $('<span>').text(stat[0]).appendTo(box);
+    });
+    var section = function(title, warning) {
+      var card = $('<section>').addClass('productionCard').toggleClass('productionWarning',!!warning).appendTo(desc);
+      $('<h3>').text(title).appendTo(card);
+      return card;
+    };
+    if (stopped.length) {
+      var blocked = section('先处理：当前停工的分工',true);
+      stopped.forEach(function(row) {
+        var item = $('<div>').addClass('productionBlockedRow').appendTo(blocked);
+        $('<strong>').text(jobName(row.key)).appendTo(item);
+        if (row.missing.length) {
+          $('<p>').addClass('productionReason').text(_('not enough for one group batch: {0}. reduce this assignment or supply its inputs.',row.missing.map(function(input) {
+            return _('{0}: {1}/{2}',_(input.item),input.have,input.amount);
+          }).join(' / '))).appendTo(item);
+        }
+        if (row.reserved.length) {
+          $('<p>').addClass('productionReason').text(_('production held for reserves: {0}. no inputs are consumed for this batch.',row.reserved.map(function(input) {
+            return _('{0}: stock {1}, reserved {2}, batch needs {3}',_(input.item),input.have,report.reserves[input.item],input.amount);
+          }).join(' / '))).appendTo(item);
+        }
+      });
+    } else if (report.rows.length) {
+      var healthy = section('本批原料检查：没有单组停工',false);
+      $('<p>').text('当前库存能满足每组各自的一批需求；共用原料仍可能相互竞争，持续供需请看下方。').appendTo(healthy);
+    }
+    if (report.deficits.length) {
+      var deficits = section('持续供需缺口 · 每分钟',true);
+      $('<p>').addClass('productionHelp').text(_('these assigned jobs consume materials faster than they produce them at full operation; current stock only buffers the gap.')).appendTo(deficits);
+      report.deficits.forEach(function(row) {
+        var item = $('<div>').addClass('productionDeficitRow').appendTo(deficits);
+        var heading = $('<div>').addClass('productionDeficitHeading').appendTo(item);
+        $('<strong>').text(_(row.item)).appendTo(heading);
+        $('<strong>').text('缺口 ' + rateText(row.demand-row.supply) + '/分钟').appendTo(heading);
+        $('<p>').text('供应 ' + rateText(row.supply) + '/分钟 · 消耗 ' + rateText(row.demand) + '/分钟').appendTo(item);
+        $('<p>').addClass('productionHelp').text('当前生产方：' + (row.producers.map(jobName).join(' / ') || _('none')) + '；消耗方：' + row.consumers.map(jobName).join(' / ')).appendTo(item);
+      });
+      $('<p>').addClass('productionHelp').text(_('increase available upstream jobs or reduce consumers. manual gathering and trading can also cover the gap; these figures are not a depletion countdown.')).appendTo(deficits);
+    }
+    var details = function(parent,key,title,open) {
+      var node = $('<details>').addClass('productionDetails').attr('data-production-fold',key)
+        .prop('open',Object.prototype.hasOwnProperty.call(folds,key) ? folds[key] : !!open).appendTo(parent);
+      $('<summary>').text(title).appendTo(node);
+      return node;
+    };
+    if (report.rows.length) {
+      var jobs = details(desc,'jobs','分工与整组配方（' + report.rows.length + ' 组）',false);
+      report.rows.forEach(function(row) {
+        var blocked = row.missing.length || row.reserved.length;
+        var job = details(jobs,'job:'+row.key,jobName(row.key) + ' · ' + (blocked ? '本批暂停' : '每 ' + row.delay + ' 秒产出 ' + format(row.outputs)),false);
+        $('<p>').text('整组每 ' + row.delay + ' 秒 · 消耗：' + format(row.inputs)).appendTo(job);
+        $('<p>').text('整组产出：' + format(row.outputs)).appendTo(job);
+        if (row.inputs.length) $('<p>').addClass('productionHelp').text('庄园现有：' + row.inputs.map(function(input) {return _(input.item) + ' ' + input.have + ' / 本批需 ' + input.amount;}).join(' · ')).appendTo(job);
+      });
+    } else $('<p>').addClass('productionEmpty').text(_('no active production yet. house survivors and assign available jobs first.')).appendTo(desc);
+    var rates = Object.keys(report.net).filter(function(item) {return Math.abs(report.net[item]) > 0.001;});
+    if (rates.length) {
+      var totals = details(desc,'net','查看计划净变化 · 每分钟',false);
+      var list = $('<div>').addClass('productionNetList').appendTo(totals);
+      rates.forEach(function(item) {
+        var value = Math.round(report.net[item] * 100) / 100, entry = $('<div>').appendTo(list);
+        $('<span>').text(_(item)).appendTo(entry);
+        $('<strong>').text((value > 0 ? '+' : '') + value).appendTo(entry);
+      });
+    }
+    var rules = details(desc,'rules','这些数字如何计算？',false);
+    $('<p>').text(_('planned rates assume full inputs and exclude manual gathering and random events. groups compete for materials; a short group batch produces nothing.')).appendTo(rules);
+    desc.scrollTop(scroll);
+    return true;
+  },
+  restoreProduction: function() {
+    var event = Events.activeEvent();
+    if (!event || !event.productionGuide || event.ending) return;
+    Events.loadScene('start');
+    CampGuide.renderProduction();
   },
   reserveItems: function() {
     var items = {}, stores = $SM.get('stores') || {}, saved = $SM.get('game.productionReserves') || {};
@@ -233,7 +336,13 @@ var CampGuide = {
     return Object.keys(items);
   },
   editReserves: function() {
-    var panel = Events.eventPanel(), desc = $('#description', panel).empty(), buttons = $('#buttons', panel).empty();
+    var event = Events.activeEvent();
+    if (!event || !event.productionGuide || event.ending) return;
+    var panel = Events.eventPanel(), desc = $('#description', panel), buttons = $('#buttons', panel).empty();
+    var folds = event.productionOpenDetails || {};
+    desc.find('details[data-production-fold]').each(function() {folds[$(this).attr('data-production-fold')] = this.open;});
+    event.productionOpenDetails = folds;
+    desc.empty().scrollTop(0);
     $('<p>').text(_('reserves only limit automatic worker production. zero disables protection. manual crafting, trade, departure and events can still use these materials.')).appendTo(desc);
     var inputs = {};
     CampGuide.reserveItems().forEach(function(item, index) {
@@ -244,6 +353,7 @@ var CampGuide = {
     if (!Object.keys(inputs).length) $('<p>').text(_('no known production inputs yet.')).appendTo(desc);
     var status = $('<p>').attr({role:'status','aria-live':'polite',id:'productionReserveStatus'}).appendTo(desc);
     $('<button>').attr({id:'saveProductionReserves',type:'button'}).text(_('save')).on('click',function() {
+      if (Events.activeEvent() !== event || event.ending) return;
       var next = Object.assign({}, $SM.get('game.productionReserves') || {}), valid = true;
       Object.keys(inputs).forEach(function(item) {
         var raw = inputs[item].val(), value = raw === '' ? 0 : Number(raw);
@@ -252,9 +362,12 @@ var CampGuide = {
       });
       if (!valid) {status.text(_('reserve quantities must be whole numbers from 0 to {0}. nothing was saved.', $SM.MAX_STORE));return;}
       $SM.set('game.productionReserves',next);
-      Events.loadScene('start');
+      CampGuide.restoreProduction();
     }).appendTo(buttons);
-    $('<button>').attr({id:'cancelProductionReserves',type:'button'}).text(_('cancel')).on('click',function() {Events.loadScene('start');}).appendTo(buttons);
+    $('<button>').attr({id:'cancelProductionReserves',type:'button'}).text(_('cancel')).on('click',function() {
+      if (Events.activeEvent() !== event || event.ending) return;
+      CampGuide.restoreProduction();
+    }).appendTo(buttons);
   },
   expedition: function(outfit, stores, equipped, weapons, capacity, weight, tester) {
     var errors = [], warnings = [], ready = [];

@@ -172,6 +172,69 @@ div.outfitRow .scrapBtn:hover {
 	color: #dc594c;
 	border-color: #dc594c;
 }
+div.outfitRow .scrapBtn:focus-visible {
+	outline: 2px solid #b28c32;
+	outline-offset: 2px;
+}
+#scrapQuantityOverlay {
+	position: fixed;
+	inset: 0;
+	background: rgba(0, 0, 0, 0.55);
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	z-index: 1100;
+}
+#scrapQuantityPanel {
+	width: 390px;
+	max-width: calc(100vw - 48px);
+	max-height: calc(100vh - 48px);
+	overflow-y: auto;
+	box-sizing: border-box;
+	padding: 20px;
+	background: #fff;
+	color: #222;
+	border: 1px solid currentColor;
+	box-shadow: 0 3px 14px rgba(0, 0, 0, 0.35);
+	font-size: 14px;
+	line-height: 1.6;
+}
+#scrapQuantityTitle { margin: 0 0 12px; font-size: 20px; }
+#scrapQuantityPanel p { margin: 10px 0; }
+.scrapQuantityStock, #scrapQuantityRefund {
+	padding: 8px 10px;
+	border: 1px solid #888;
+	margin: 10px 0;
+}
+.scrapQuantityStock > div, #scrapQuantityRefund > div {
+	display: flex;
+	justify-content: space-between;
+	gap: 16px;
+}
+#scrapQuantityPanel label { display: block; font-weight: bold; }
+#scrapQuantityInput {
+	box-sizing: border-box;
+	width: 100%;
+	padding: 7px 10px;
+	font: inherit;
+	color: inherit;
+	background: transparent;
+	border: 1px solid #888;
+}
+#scrapQuantityError { font-weight: bold; }
+#scrapQuantityError:empty, #scrapQuantityRefund:empty { display: none; }
+.scrapQuantityNote { opacity: 0.8; }
+.scrapQuantityActions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 16px; }
+.scrapQuantityActions button {
+	padding: 6px 12px;
+	font: inherit;
+	color: inherit;
+	background: transparent;
+	border: 1px solid #888;
+	cursor: pointer;
+}
+.scrapQuantityActions button:disabled { opacity: 0.45; cursor: default; }
+#scrapQuantityPanel :focus-visible { outline: 2px solid #b28c32; outline-offset: 2px; }
 .equipRow {
 	display: flex;
 	align-items: center;

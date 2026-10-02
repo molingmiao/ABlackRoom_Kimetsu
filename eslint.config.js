@@ -21,6 +21,7 @@ const gameGlobals = {
 	CastleReport: 'writable',
 	ExpeditionReport: 'writable',
 	FieldTreatment: 'writable',
+	UpdateNotes: 'writable',
 	Fabricator: 'writable',
 	Events: 'writable',
 	Notifications: 'writable',

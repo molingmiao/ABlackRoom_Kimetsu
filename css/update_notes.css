@@ -1,0 +1,35 @@
+.menu:focus-within { max-height: 600px; }
+.menu #updateNotesButton {
+  font: inherit;
+  color: inherit;
+  background: transparent;
+  border: 0;
+  padding: 0;
+  margin: 0 0 4px;
+  cursor: pointer;
+}
+
+.eventPanel.updateNotes:after { background: inherit; z-index: -1; }
+.updateNotes .eventTitle { position: static; margin-bottom: 12px; }
+.updateNotes .eventTitle:after { display: none; }
+.updateNotes #description { min-height: 0; font-size: 14px; line-height: 1.6; }
+.updateNotesIntro { margin: 0 0 12px; }
+.updateNotesTools { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
+.updateNotesTools select, .updateNotesTools button {
+  font: inherit;
+  color: inherit;
+  background: transparent;
+  border: 1px solid #999;
+  padding: 4px 10px;
+}
+.updateNotesTools select option { color: #222; background: #fff; }
+.updateNotesTools button, .updateNotesEntry summary { cursor: pointer; }
+#updateNotesBody { max-height: 48vh; overflow-y: auto; padding-right: 12px; }
+.updateNotesEntry { border-top: 1px solid #999; padding: 12px 0; }
+.updateNotesEntry summary { font-weight: bold; font-size: 15px; }
+.updateNotesEntry time { display: block; font-weight: normal; font-size: 12px; margin-left: 18px; }
+.updateNotesEntry ul { padding-left: 22px; margin: 10px 0 0; }
+.updateNotesEntry li + li { margin-top: 8px; }
+.updateNotesEntry strong { margin-right: 4px; }
+.updateNotes #buttons { margin-top: 14px; }
+.updateNotes :focus-visible, .menu #updateNotesButton:focus-visible { outline: 2px solid currentColor; outline-offset: 3px; }

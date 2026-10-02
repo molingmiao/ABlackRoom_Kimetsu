@@ -1,4 +1,29 @@
-.productionOverview #description { max-height: 55vh; overflow-y: auto; padding-right: 10px; }
+.eventPanel.productionOverview:after { background: inherit; z-index: -1; }
+.productionOverview .eventTitle { position: static; margin-bottom: 10px; }
+.productionOverview .eventTitle:after { display: none; }
+.productionOverview #description { max-height: 55vh; min-height: 0; overflow-y: auto; padding-right: 12px; line-height: 1.5; }
+.productionOverview #description > div { padding-bottom: 0; }
+.productionOverview #buttons { margin-top: 14px; }
+.productionOverview p { font-size: 13px; margin: 5px 0; }
+.productionIntro { font-size: 12px !important; margin-top: 0 !important; }
+.productionSummary { display: flex; gap: 10px; margin: 10px 0; }
+.productionSummary > div { flex: 1; border: 1px solid #888; padding: 5px 10px; }
+.productionSummary strong { display: block; font-size: 20px; }
+.productionSummary span { font-size: 12px; }
+.productionCard { border: 1px solid #888; margin-bottom: 10px; padding: 10px 12px; }
+.productionCard.productionWarning { border-left: 4px solid currentColor; padding-left: 9px; }
+.productionCard h3 { margin: 0 0 6px; font-size: 14px; }
+.productionBlockedRow + .productionBlockedRow, .productionDeficitRow + .productionDeficitRow { border-top: 1px dashed #888; margin-top: 8px; padding-top: 8px; }
+.productionReason { font-weight: bold; }
+.productionDeficitHeading { display: flex; justify-content: space-between; gap: 12px; }
+.productionOverview .productionHelp { font-size: 12px; }
+.productionDetails { margin: 8px 0; border: 1px solid #888; padding: 8px 10px; }
+.productionDetails summary { font-size: 13px; font-weight: bold; cursor: pointer; }
+.productionDetails summary:focus-visible { outline: 2px solid currentColor; outline-offset: 3px; }
+.productionDetails .productionDetails { margin-bottom: 0; }
+.productionNetList { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); column-gap: 18px; margin-top: 7px; }
+.productionNetList > div { display: flex; justify-content: space-between; gap: 10px; font-size: 12px; border-bottom: 1px dotted #888; padding: 3px 0; }
+.productionEmpty { padding: 10px 0; }
 #productionOverviewButton { width: 100px; }
 .weaponCompareHint { padding: 8px 10px; font-size: 12px; line-height: 1.5; border-bottom: 1px solid #999; }
 .weaponCompareDetails { white-space: pre-line; font-size: 12px; line-height: 1.5; margin-top: 5px; font-weight: normal; }
