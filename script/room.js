@@ -1409,6 +1409,41 @@ var Room = {
 		return false;
 	},
 
+	decorateWeaponButton: function(button, key) {
+		var weapon = World.Weapons[key];
+		if (!button || !weapon) return;
+		var tier = Path.getWeaponTier(key);
+		var grade = ['普通', '优秀', '精良', '史诗', '传说'][tier - 1];
+		var damage = weapon.damage === 'stun' ? '控制' : weapon.damage + ' 伤害';
+		var summary = damage + ' · ' + weapon.cooldown + '秒';
+		button.addClass('craftWeapon weapon-tier-' + tier);
+		if (!button.children('.craftWeaponName').length) {
+			button.contents().filter(function() { return this.nodeType === 3; }).remove();
+			$('<span>').addClass('craftWeaponName').text(_(key)).prependTo(button);
+			$('<span>').addClass('craftWeaponStats').insertBefore(button.children('.cooldown'));
+		}
+		button.children('.craftWeaponStats').text(summary);
+		button.attr('data-weapon', key);
+		var usage = Object.keys(weapon.cost || {}).map(function(item) { return _(item) + ' ×' + weapon.cost[item]; });
+		var details = '品级：' + grade + '（灰→绿→蓝→紫→金）\n' +
+			(weapon.damage === 'stun' ? '控制型，不造成直接伤害' : '基础伤害：' + weapon.damage) +
+			'；基础攻击间隔：' + weapon.cooldown + ' 秒\n' +
+			(usage.length ? '每次攻击消耗：' + usage.join('、') : '攻击无需弹药') +
+			'\n实际表现受天赋、流派、命中率及同类武器共享冷却影响。';
+		button.attr('aria-label', _(key) + '，' + details);
+		button.children('.tooltip').find('.craftWeaponDetails').remove();
+		$('<div>').addClass('craftWeaponDetails').text(details).appendTo(button.children('.tooltip'));
+	},
+	sortCraftWeaponButtons: function(section) {
+		var buttons = section.children('.craftWeapon').get();
+		buttons.sort(function(a,b) {
+			var first = World.Weapons[$(a).attr('data-weapon')].damage;
+			var second = World.Weapons[$(b).attr('data-weapon')].damage;
+			return (typeof second === 'number' ? second : -1) - (typeof first === 'number' ? first : -1);
+		});
+		buttons.forEach(function(button) { section.append(button); });
+	},
+
 	updateBuildButtons: function () {
 		var buildSection = $('#buildBtns');
 		var needsAppend = false;
@@ -1466,12 +1501,15 @@ var Room = {
 					Notifications.notify(Room, craftable.maxMsg);
 				}
 			}
+			if (craftable.type === 'weapon') Room.decorateWeaponButton(craftable.button, k);
 			if (max) {
 				Button.setDisabled(craftable.button, true);
 			} else {
 				Button.setDisabled(craftable.button, false);
 			}
 		}
+
+		Room.sortCraftWeaponButtons(craftSection);
 
 		for (var g in Room.TradeGoods) {
 			var good = Room.TradeGoods[g];

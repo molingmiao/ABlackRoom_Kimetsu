@@ -730,6 +730,8 @@
         $('.lightsOff').text(_('lights off.'));
         $SM.set('config.lightsOff', false, true);
       }
+      // Castle entry/return can leave an inline background; let the selected theme take over.
+      $('body').css('background-color', '');
     },
 
     confirmHyperMode: function(){

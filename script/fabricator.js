@@ -148,7 +148,12 @@ const Fabricator = {
     }
 
     for (const [ key, value ] of Object.entries(Fabricator.Craftables)) {
-      const max = $SM.num(key, value) + 1 > value.maximum;
+      const max = $SM.num(key, value) >= value.maximum;
+      if (value.type === 'upgrade' && max) {
+        if (value.button) value.button.remove();
+        value.button = null;
+        continue;
+      }
       if (!value.button) {
         if (Fabricator.canFabricate(key)) {
           const name = _(value.name) + ((value.quantity ?? 1) > 1 ? ` (x${value.quantity})` : '');
@@ -174,12 +179,15 @@ const Fabricator = {
           Notifications.notify(Fabricator, value.maxMsg);
         }
       }
+      if (value.type === 'weapon') Room.decorateWeaponButton(value.button, key);
       if (max) {
         Button.setDisabled(value.button, true);
       } else {
         Button.setDisabled(value.button, false);
       }
     }
+
+    Room.sortCraftWeaponButtons(section);
 
     if (needsAppend && section.children().length > 0) {
       section.appendTo(Fabricator.panel).animate({ opacity: 1 }, 300, 'linear');
@@ -219,11 +227,15 @@ const Fabricator = {
   fabricate: button => {
     const thing = $(button).attr('fabricateThing');
     const craftable = Fabricator.Craftables[thing];
-    const numThings = Math.min(0, $SM.get(`stores['${thing}']`, true));
+    const numThings = Math.max(0, $SM.get(`stores['${thing}']`, true));
 
     if (craftable.maximum <= numThings) {
       return;
     }
+
+    const quantity = typeof craftable.maximum === 'number'
+      ? Math.min(craftable.quantity ?? 1, craftable.maximum - numThings)
+      : craftable.quantity ?? 1;
 
     const storeMod = {};
     const cost = craftable.cost();
@@ -239,7 +251,7 @@ const Fabricator = {
     if (!Engine.options.testerMode) {
       $SM.setM('stores', storeMod);
     }
-    $SM.add(`stores['${thing}']`, craftable.quantity ?? 1);
+    $SM.add(`stores['${thing}']`, quantity);
 
     Notifications.notify(Fabricator, craftable.buildMsg);
     AudioEngine.playSound(AudioLibrary.CRAFT);

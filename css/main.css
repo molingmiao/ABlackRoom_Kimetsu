@@ -395,6 +395,19 @@ div.button div.cooldown {
 }
 .button.disabled .hotkeyBadge { opacity: 0.35; }
 
+/* Crafting uses the same five weapon tiers as equipment, with readable day/night shades. */
+.craftWeapon.weapon-tier-1 { --weapon-color: #626262; }
+.craftWeapon.weapon-tier-2 { --weapon-color: #287528; }
+.craftWeapon.weapon-tier-3 { --weapon-color: #246c91; }
+.craftWeapon.weapon-tier-4 { --weapon-color: #8540a9; }
+.craftWeapon.weapon-tier-5 { --weapon-color: #886300; }
+div.button.craftWeapon[class*="weapon-tier-"] { border-color: var(--weapon-color) !important; }
+div.button.craftWeapon.newly-unlocked { animation: none; box-shadow: none; }
+.craftWeaponName { display: block; color: var(--weapon-color); font-weight: bold; }
+.craftWeaponStats { display: block; font-size: 11px; line-height: 1.4; white-space: nowrap; }
+div.button.craftWeapon > .tooltip { width: 235px; text-align: left; font-size: 13px; }
+.craftWeaponDetails { clear: both; padding-top: 8px; margin-top: 6px; border-top: 1px solid #999; white-space: pre-line; line-height: 1.5; }
+
 /* Up/Down buttons. They're complicated! */
 
 .upBtn, .dnBtn, .upManyBtn, .dnManyBtn {

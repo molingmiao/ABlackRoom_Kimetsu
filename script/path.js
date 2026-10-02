@@ -165,15 +165,7 @@ var Path = {
 					var slot = $('<div>').addClass('equipSlot').attr('data-cat', cat).attr('data-slot', idx);
 					if (key) {
 						slot.addClass('filled').attr('title', _(key)).text(_(key));
-						var wDef = World.Weapons[key];
-						var dmg = wDef ? wDef.damage : 0;
-						var tier;
-						if (dmg === 'stun') tier = 5;
-						else if (dmg <= 2) tier = 1;
-						else if (dmg <= 5) tier = 2;
-						else if (dmg <= 8) tier = 3;
-						else if (dmg <= 12) tier = 4;
-						else tier = 5;
+						var tier = Path.getWeaponTier(key);
 						slot.addClass('weapon-tier-'+tier);
 					} else {
 						slot.addClass('empty').text('—');
@@ -214,14 +206,7 @@ var Path = {
 			});
 			var wDef = World.Weapons[k];
 			if (wDef) {
-				var dmg = wDef.damage;
-				var tier;
-				if (dmg === 'stun') tier = 5;
-				else if (dmg <= 2) tier = 1;
-				else if (dmg <= 5) tier = 2;
-				else if (dmg <= 8) tier = 3;
-				else if (dmg <= 12) tier = 4;
-				else tier = 5;
+				var tier = Path.getWeaponTier(k);
 				opt.addClass('weapon-tier-' + tier);
 			}
 			opt.appendTo(picker);
@@ -574,18 +559,17 @@ var Path = {
 
 	},
 	
+	getWeaponTier: function(key) {
+		var damage = World.Weapons[key] ? World.Weapons[key].damage : 0;
+		if (damage === 'stun') return 5;
+		return damage <= 2 ? 1 : damage <= 5 ? 2 : damage <= 8 ? 3 : damage <= 12 ? 4 : 5;
+	},
+
 	createOutfittingRow: function(key, num, store) {
 		if(!store.name) store.name = _(key);
 		var row = $('<div>').attr('id', 'outfit_row_' + key.replace(/ /g, '-')).addClass('outfitRow').attr('key',key);
 		if(store.type == 'weapon') {
-			var dmg = World.getDamage(key);
-			var tier;
-			if(dmg === 'stun') tier = 5;
-			else if(dmg <= 2) tier = 1;
-			else if(dmg <= 5) tier = 2;
-			else if(dmg <= 8) tier = 3;
-			else if(dmg <= 12) tier = 4;
-			else tier = 5;
+			var tier = Path.getWeaponTier(key);
 			row.addClass('weapon weapon-tier-' + tier);
 		}
 		$('<div>').addClass('row_key').text(store.name).appendTo(row);

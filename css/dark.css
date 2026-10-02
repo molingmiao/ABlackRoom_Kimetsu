@@ -90,6 +90,12 @@ div#notifications div.notification.notify-npc {
 	border-left-color: #78b0f0;
 }
 
+.craftWeapon.weapon-tier-1 { --weapon-color: #BBB; }
+.craftWeapon.weapon-tier-2 { --weapon-color: #7dcc7d; }
+.craftWeapon.weapon-tier-3 { --weapon-color: #7bc4e6; }
+.craftWeapon.weapon-tier-4 { --weapon-color: #cc9ae8; }
+.craftWeapon.weapon-tier-5 { --weapon-color: #efc65a; }
+
 /* 夜间模式下战斗按钮边框颜色保持不变（高亮足够），仅调法新解锁边框 */
 div.button.newly-unlocked {
 	border-color: #ffcf33 !important;
