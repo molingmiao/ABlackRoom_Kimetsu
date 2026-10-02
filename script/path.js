@@ -178,6 +178,50 @@ var Path = {
 				})(i);
 			}
 		});
+		Path.updateEquipmentReadiness();
+	},
+	equipmentReadiness: function() {
+		var bag = Path.outfit || {}, stores = $SM.get('stores') || {}, rows = [], ready = [];
+		var packed = function(key) { return Math.min(Path.loadoutCount(bag[key]), Path.loadoutCount(stores[key])); };
+		['primary','secondary','tool'].forEach(function(category) {
+			Path.getEquippedSlots(category).forEach(function(key,index) {
+				var weapon = World.Weapons[key];
+				if (!key || !weapon) return;
+				var missing = [], uses = null;
+				Object.keys(weapon.cost || {}).forEach(function(ammo) {
+					var required = weapon.cost[ammo], have = packed(ammo);
+					if (have < required) missing.push(_(ammo) + ' ×' + (required - have));
+					var count = Math.floor(have / required);
+					uses = uses === null ? count : Math.min(uses,count);
+				});
+				var usable = packed(key) > 0 && missing.length === 0;
+				if (usable && typeof weapon.damage === 'number' && weapon.damage > 0 && ready.indexOf(key) < 0) ready.push(key);
+				var message = !packed(key) ? '未装入背包' : missing.length ? '背包缺少 ' + missing.join('、') :
+					uses === null ? '已装包，可使用' : '背包弹药可用 ' + uses + ' 次';
+				rows.push({key:key,category:category,index:index,usable:usable,uses:uses,message:message});
+			});
+		});
+		return {rows:rows,ready:ready};
+	},
+	updateEquipmentReadiness: function() {
+		var doll = $('#equipDoll');
+		if (!doll.length) return;
+		var status = doll.children('.equipmentReadiness');
+		if (!status.length) status = $('<div>').addClass('equipmentReadiness').attr({role:'status','aria-live':'polite'}).appendTo(doll);
+		var info = Path.equipmentReadiness(), warnings = info.rows.filter(function(row) { return !row.usable; });
+		info.rows.forEach(function(row) {
+			var slot = doll.find('.equipSlot[data-cat="' + row.category + '"][data-slot="' + row.index + '"]');
+			slot.toggleClass('weaponNotReady',!row.usable).attr('title',_(row.key) + '：' + row.message);
+		});
+		var snapshot = JSON.stringify(info);
+		if (status.data('snapshot') === snapshot) return;
+		status.data('snapshot',snapshot);
+		status.empty().toggleClass('isWarning',!info.ready.length || warnings.length > 0);
+		$('<strong>').text(info.ready.length ? '可用伤害武器：' + info.ready.length + ' 把' : '当前没有可用的伤害武器').appendTo(status);
+		info.rows.forEach(function(row) {
+			if (!row.usable || row.uses !== null) $('<p>').text(_(row.key) + '：' + row.message).appendTo(status);
+		});
+		if (!info.ready.length) $('<p>').text('在装备栏选择伤害武器，再将武器和所需弹药装入背包。').appendTo(status);
 	},
 	showEquipPicker: function(slotEl, category, slotIndex) {
 		$('.equipPickerBackdrop, .equipPicker').remove();
@@ -491,6 +535,7 @@ var Path = {
 				} else {
 					$('div#' + row.attr('id') + ' > div.row_val > span', outfit).text(num);
 					$('div#' + row.attr('id') + ' .tooltip .numAvailable', outfit).text(have - num);
+					Path.updateScrapButton(row, k, Math.max(0, have - num));
 				}
 				if(num === 0) {
 					$('.dnBtn', row).addClass('disabled');
@@ -595,33 +640,51 @@ var Path = {
 		$('<div>').addClass('row_key').text(_('weight')).appendTo(tt);
 		$('<div>').addClass('row_val').text(Path.getWeight(key)).appendTo(tt);
 		$('<div>').addClass('row_key').text(_('available')).appendTo(tt);
-		$('<div>').addClass('row_val').addClass('numAvailable').text(numAvailable).appendTo(tt);
+		$('<div>').addClass('row_val').addClass('numAvailable').text(Math.max(0, numAvailable - num)).appendTo(tt);
 
-		// 回收按钮：武器/弹药/消耗品，只要能找到成本定义就可回收（30%）
-		// 但不能回收正在携带的部分：仅当「库存 − 携带 > 0」时才提供回收
+		Path.updateScrapButton(row, key, Math.max(0, numAvailable - num));
+		return row;
+	},
+
+	// 库存或装包状态更新时只刷新已有行，不重绘装备与其他备战控件。
+	updateScrapButtons: function() {
+		$('div#outfitting').children('.outfitRow').each(function() {
+			var row = $(this), key = row.attr('key');
+			if (!key) return;
+			var have = Path.loadoutCount($SM.get('stores["' + key + '"]', true));
+			var carried = Path.loadoutCount((Path.outfit || {})[key]);
+			var available = Math.max(0, have - carried);
+			$('.numAvailable', row).text(available);
+			Path.updateScrapButton(row, key, available);
+		});
+	},
+
+	// 行初建及数量变更时同步回收入口，仅允许回收未选入背包的库存。
+	updateScrapButton: function(row, key, available) {
+		var button = row.children('.scrapBtn');
 		var scrapCost = Path.getScrapCost(key);
-		if (scrapCost && (numAvailable - num) > 0) {
-			var parts = [];
+		var parts = [];
+		if (scrapCost && available > 0) {
 			for (var mat in scrapCost) {
 				var rv = Math.floor(scrapCost[mat] * 0.3);
 				if (rv > 0) parts.push(_(mat) + '+' + rv);
 			}
-			if (parts.length > 0) {
-				(function(wKey) {
-					$('<div>').addClass('scrapBtn').attr('title', parts.join(' ')).text(_('scrap'))
-						.on('click', function(e) {
-							e.stopPropagation();
-							if (e.shiftKey) {
-								Path._showScrapQuantityDialog(wKey);
-								return;
-							}
-							Path.scrapItem(wKey, 1);
-						}).appendTo(row);
-				})(key);
-			}
 		}
-
-		return row;
+		if (!parts.length) {
+			button.remove();
+			return;
+		}
+		if (!button.length) {
+			button = $('<div>').addClass('scrapBtn').text(_('scrap')).on('click', function(e) {
+				e.stopPropagation();
+				if (e.shiftKey) {
+					Path._showScrapQuantityDialog(key);
+					return;
+				}
+				Path.scrapItem(key, 1);
+			}).appendTo(row);
+		}
+		button.attr('title', parts.join(' '));
 	},
 
 	// 从 Room.Craftables / Room.TradeGoods / Fabricator.Craftables 中取 cost
@@ -1051,6 +1114,8 @@ var Path = {
 		} else if(Engine.activeModule == Path && (e.category == 'stores' || e.category == 'outfit' || e.category == 'character')) {
 			Path.updateLoadoutPanel();
 			Path.updateJourneyGuide();
+			Path.updateScrapButtons();
+			Path.updateEquipmentReadiness();
 		}
 	}
 };

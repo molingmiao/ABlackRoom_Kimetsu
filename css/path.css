@@ -205,6 +205,10 @@ div.outfitRow .scrapBtn:hover {
 	background: rgba(212, 160, 23, 0.05);
 	font-weight: 600;
 }
+.equipSlot.weaponNotReady { border-style: dashed; }
+.equipmentReadiness { border-top: 1px solid #999; margin-top: 10px; padding-top: 7px; font-size: 12px; line-height: 1.5; }
+.equipmentReadiness.isWarning { border-left: 3px solid #d4a017; padding-left: 7px; }
+.equipmentReadiness p { margin: 4px 0 0; overflow-wrap: anywhere; }
 .equipSlot.weapon-tier-1 { color: #999; font-weight: normal; }
 .equipSlot.weapon-tier-2 { color: #4ab24a; }
 .equipSlot.weapon-tier-3 { color: #5eaed2; }

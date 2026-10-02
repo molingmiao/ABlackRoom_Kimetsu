@@ -122,6 +122,7 @@ const Fabricator = {
 
   onArrival: transition_diff => {
     Fabricator.setTitle();
+    Fabricator.updateBuildButtons();
     Fabricator.updateBlueprints(true);
 
     if(!$SM.get('game.fabricator.seen')) {
@@ -167,24 +168,12 @@ const Fabricator = {
           }).css('opacity', 0).attr('fabricateThing', key).appendTo(section).animate({ opacity: 1 }, 300, 'linear');
         }
       } else {
-        // refresh the tooltip
-        const costTooltip = $('.tooltip', value.button);
-        costTooltip.empty();
-        const cost = value.cost();
-        for (const [ resource, num ] of Object.entries(cost)) {
-          $("<div>").addClass('row_key').text(_(resource)).appendTo(costTooltip);
-          $("<div>").addClass('row_val').text(num).appendTo(costTooltip);
-        }
         if (max && value.maxMsg && !value.button.hasClass('disabled')) {
           Notifications.notify(Fabricator, value.maxMsg);
         }
       }
       if (value.type === 'weapon') Room.decorateWeaponButton(value.button, key);
-      if (max) {
-        Button.setDisabled(value.button, true);
-      } else {
-        Button.setDisabled(value.button, false);
-      }
+      Room.updateCraftAvailability(value.button, value.cost(), max);
     }
 
     Room.sortCraftWeaponButtons(section);

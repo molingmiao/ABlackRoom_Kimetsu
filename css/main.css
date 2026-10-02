@@ -407,6 +407,14 @@ div.button.craftWeapon.newly-unlocked { animation: none; box-shadow: none; }
 .craftWeaponStats { display: block; font-size: 11px; line-height: 1.4; white-space: nowrap; }
 div.button.craftWeapon > .tooltip { width: 235px; text-align: left; font-size: 13px; }
 .craftWeaponDetails { clear: both; padding-top: 8px; margin-top: 6px; border-top: 1px solid #999; white-space: pre-line; line-height: 1.5; }
+.craftReadinessHint { display: block; margin-top: 3px; font-size: 11px; line-height: 1.4; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #52684b; }
+.craftMissing .craftReadinessHint { color: #9c4934; }
+div.button.craftReadiness > .tooltip { width: 235px; text-align: left; color: #222; }
+div.button.craftReadiness.disabled:hover > .tooltip { display: block; }
+.craftCostTitle { font-size: 11px; text-align: right; margin-bottom: 3px; }
+.craftCostRow { display: flex; justify-content: space-between; gap: 10px; line-height: 1.5; }
+.craftCostRow > span:last-child { white-space: nowrap; }
+.craftCostMissing { color: #9c4934; }
 
 /* Up/Down buttons. They're complicated! */
 

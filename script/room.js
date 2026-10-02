@@ -693,6 +693,7 @@ var Room = {
 			Room.changed = false;
 		}
 		Room.welcomeBuilder();
+		Room.updateBuildButtons();
 
 		Engine.moveStoresView(null, transition_diff);
 
@@ -1409,6 +1410,38 @@ var Room = {
 		return false;
 	},
 
+	updateCraftAvailability: function(button, cost, atMaximum) {
+		if (!button || !button.length) return;
+		var missing = [];
+		var tooltip = button.children('.tooltip');
+		if (!tooltip.length) tooltip = $('<div>').addClass('tooltip bottom right').appendTo(button);
+		// Replace only cost rows; weapon descriptions and the real button handler stay intact.
+		tooltip.children('.row_key, .row_val, .craftCostRows').remove();
+		var rows = $('<div>').addClass('craftCostRows').prependTo(tooltip);
+		$('<div>').addClass('craftCostTitle').text('现有 / 所需').appendTo(rows);
+		Object.keys(cost || {}).forEach(function(item) {
+			var have = $SM.get('stores["' + item + '"]', true) || 0;
+			var needed = cost[item];
+			var short = have < needed;
+			if (short) missing.push(_(item) + '×' + (needed - have));
+			var row = $('<div>').addClass('craftCostRow').toggleClass('craftCostMissing', short).appendTo(rows);
+			$('<span>').text(_(item)).appendTo(row);
+			$('<span>').text(have + ' / ' + needed).appendTo(row);
+		});
+		var hint = button.children('.craftReadinessHint');
+		if (!hint.length) hint = $('<span>').addClass('craftReadinessHint').insertBefore(button.children('.cooldown'));
+		var summary = missing.length === 1 ? '缺' + missing[0] : '缺 ' + missing.length + ' 种材料';
+		if (!missing.length) summary = '材料齐备';
+		if (missing.length && Engine.options.testerMode) summary = '测试：免材料';
+		if (atMaximum) summary = '已达上限';
+		var explanation = atMaximum ? summary : (missing.length ? '缺' + missing.join('、') : summary);
+		hint.text(summary).attr('title', explanation).toggle(missing.length > 0 && !atMaximum && !Engine.options.testerMode);
+		button.addClass('craftReadiness').toggleClass('craftMissing', missing.length > 0 && !atMaximum && !Engine.options.testerMode);
+		var disabled = atMaximum || (missing.length > 0 && !Engine.options.testerMode);
+		Button.setDisabled(button, disabled);
+		button.attr('aria-disabled', disabled ? 'true' : 'false').attr('aria-description', explanation);
+	},
+
 	decorateWeaponButton: function(button, key) {
 		var weapon = World.Weapons[key];
 		if (!button || !weapon) return;
@@ -1489,24 +1522,12 @@ var Room = {
 					Room._markNewlyUnlocked(craftable.button, k);
 				}
 			} else {
-				// refresh the tooltip
-				var costTooltip = $('.tooltip', craftable.button);
-				costTooltip.empty();
-				var cost = craftable.cost();
-				for (var c in cost) {
-					$("<div>").addClass('row_key').text(_(c)).appendTo(costTooltip);
-					$("<div>").addClass('row_val').text(cost[c]).appendTo(costTooltip);
-				}
 				if (max && !craftable.button.hasClass('disabled')) {
 					Notifications.notify(Room, craftable.maxMsg);
 				}
 			}
 			if (craftable.type === 'weapon') Room.decorateWeaponButton(craftable.button, k);
-			if (max) {
-				Button.setDisabled(craftable.button, true);
-			} else {
-				Button.setDisabled(craftable.button, false);
-			}
+			Room.updateCraftAvailability(craftable.button, craftable.cost(), max);
 		}
 
 		Room.sortCraftWeaponButtons(craftSection);
@@ -1571,7 +1592,8 @@ var Room = {
 		} else if (e.category == 'income') {
 			Room.updateStoresView();
 			Room.updateIncomeView();
-		} else if (e.stateName.indexOf('game.buildings') === 0) {
+			Room.updateBuildButtons();
+		} else if (e.stateName.indexOf('game.buildings') === 0 || e.stateName === 'config.testerMode') {
 			Room.updateBuildButtons();
 		}
 	},
