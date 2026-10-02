@@ -8,7 +8,7 @@ c.$=()=>({each(){}});
 c.$.Dispatch=()=>({publish(){}});
 c.window=c;
 vm.createContext(c);
-for (const file of ['state_manager.js','world.js','early_game.js','events/global.js']) {
+for (const file of ['state_manager.js','world.js','early_game.js','events/global.js','events/campaign.js']) {
   vm.runInContext(fs.readFileSync(path.join(__dirname,'../script',file),'utf8'),c);
 }
 c.$SM=c.StateManager;
@@ -64,9 +64,18 @@ const event=title=>c.Events.Global.find(item=>item.title===title);
 const district=event('The Pleasure District'), smiths=event('Smith Village Under Siege'), pillars=event('The Pillars Convene');
 assert.equal(!!district.isAvailable(),false,'clearing a city alone cannot skip the train chapter');
 sm.set('game.world.mugentrain',true);
-assert.equal(!!district.isAvailable(),true,'uses the actual game.cityCleared key');
+assert.equal(!!district.isAvailable(),true,'the train unlocks the district briefing');
 sm.set('game.cityCleared',false); sm.set('character.cityCleared',true);
 assert.equal(!!district.isAvailable(),true,'legacy character city flag remains supported');
+sm.set('character.cityCleared',false);
+assert.equal(!!district.isAvailable(),true,'unique O can be reached without clearing an unrelated Y city');
+assert.equal(district.scenes.start.buttons.ignore.nextScene,'end');
+assert.equal(district.scenes.start.buttons.ignore.onLoad,undefined,'declining never completes the chapter');
+assert.equal(district.scenes.start.buttons.help.cost,undefined,'briefing does not consume expedition supplies');
+district.scenes.briefing.onLoad();
+assert.equal(sm.get('game.yoshiwaraBriefed'),true);
+assert.equal(!!district.isAvailable(),false,'read briefings do not repeat');
+assert.equal(!!sm.get('game.yoshiwaraDone'),false,'a briefing is not a rescue victory');
 sm.set('game.buildings.workshop',1);
 assert.equal(!!smiths.isAvailable(),false);
 sm.set('game.yoshiwaraDone',true);
@@ -92,4 +101,4 @@ c.State={};
 assert.equal(c.EarlyGame.migrateCampaign(),true);
 sm.set('features.location.spaceShip',true);
 for(const id of ['district','smiths','pillars']) assert.equal(c.EarlyGame.storyPrerequisite(id),false,'newly discovering the castle does not impersonate a legacy save');
-console.log('PASS: twenty-stage chapter order, actual city flags, training fallback, lore continuity, safe old-map station migration and legacy castle access.');
+console.log('PASS: twenty-stage chapter order, map-based district briefing, training fallback, lore continuity, safe old-map station migration and legacy castle access.');

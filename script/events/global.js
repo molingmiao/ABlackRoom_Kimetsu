@@ -514,168 +514,34 @@ Events.Global = [
 		},
 		audio: AudioLibrary.EVENT_WANDERING_MASTER
 	},
-	{ /* 章 6：游郭篇 — 已探完 city 后触发。
-	     音柱·宇髓天元 + 三妻（须磨/雏鹤/卷绪）+ 上弦之陆 妓夫太郎/堕姬兄妹。 */
+	{ /* 游郭情报只引导到唯一的 O；实战及完成状态由远征章节负责。 */
 		title: _('The Pleasure District'),
 		isAvailable: function() {
 			return (Engine.activeModule == Room || Engine.activeModule == Outside)
-				&& ($SM.get('game.cityCleared') || $SM.get('character.cityCleared'))
 				&& (!window.EarlyGame || EarlyGame.storyPrerequisite('district'))
-				&& !$SM.get('game.yoshiwaraDone');
+				&& !$SM.get('game.yoshiwaraDone') && !$SM.get('game.yoshiwaraBriefed');
 		},
 		scenes: {
-			'start': {
+			start: {
 				text: [
-					_('a crow brings urgent word: the Sound Hashira, Uzui Tengen, is pinned in the pleasure quarter.'),
-					_('his three wives — disguised as courtesans — have located demons but not yet returned.'),
-					_('the upper moon presence is unmistakable. he asks for any able body who can wear a disguise.')
+					'鎹鸦送来音柱宇髓天元的情报：潜入游郭的三位妻子失去联络。花街越是热闹，失踪者留下的线索越容易被掩盖。',
+					'这次任务不再从庄园直接进入战斗。请整备远行物资，前往地图上唯一的 O，参与救援并安全返回；普通旧街 D 和市镇 R 不是游郭。'
 				],
-				notification: _('Uzui Tengen calls for aid from the pleasure quarter.'),
+				notification: '游郭任务已开放：寻找地图上的唯一地点 O。',
 				blink: true,
 				buttons: {
-					'help': {
-						text: _('travel to the quarter'),
-						cost: { 'cured meat': 30, 'torch': 3, 'wisteria charm': 1 },
-						nextScene: { 1: 'wives' }
-					},
-					'ignore': {
-						text: _('decline — the path is no place for a keeper'),
-						notification: _('the crow caws once and is gone.'),
-						onLoad: function() { $SM.set('game.yoshiwaraDone', true); },
-						nextScene: 'end'
-					}
+					help: {text: '查看救援任务', nextScene: 'briefing'},
+					ignore: {text: '暂不接下任务', nextScene: 'end'}
 				}
 			},
-			'wives': {
+			briefing: {
 				text: [
-					_('the pleasure quarter glitters with paper lanterns and distant screams.'),
-					_('Uzui presses a wisteria seal into your palm. "split up. each of my wives is in one of three houses."'),
-					_('"find one — any one. then we converge."')
+					'游郭通常距庄园 15 格，旧地图的原有位置会保留。宇髓安排你从后方协助三妻搜集情报、救出被血带困住的人，再为队士争取决胜机会。',
+					'备好武器、护甲、治疗物资与往返口粮。游郭内的连续战斗不能靠这张情报跳过；只有完成黎明结算并安全返回，主线才会确认完成。',
+					'宇髓提醒你：先保护活着的人。暂时推迟任务不会被算成胜利，也不会领取章节奖励。'
 				],
-				notification: _('choose which house to search.'),
-				buttons: {
-					'kyogoku': {
-						text: _('the highest-ranked house'),
-						nextScene: { 1: 'meet_makio' }
-					},
-					'ogimoto': {
-						text: _('a quieter, older quarter'),
-						nextScene: { 1: 'meet_suma' }
-					},
-					'tokitou': {
-						text: _('a backstreet teahouse'),
-						nextScene: { 1: 'meet_hinatsuru' }
-					}
-				}
-			},
-			'meet_makio': {
-				text: [
-					_('Makio — one of Uzui\'s wives — is bound but alive. she rips her gag off the moment you cut her free.'),
-					_('"the demoness wears the obi of a princess. she eats girls who cannot pay their debts."'),
-					_('"she is sister to the male one. they share a head."')
-				],
-				notification: _('Makio joins you. she knows the upper moon.'),
-				buttons: {
-					'fight': {
-						text: _('hunt the demoness'),
-						nextScene: { 1: 'combat' }
-					}
-				}
-			},
-			'meet_suma': {
-				text: [
-					_('Suma is in a closet, weeping, unhurt. she clings to your sleeve and refuses to let go.'),
-					_('"i found her. i found the demoness. she\'s so beautiful and so cruel."'),
-					_('"please — please let\'s go. Tengen will know what to do."')
-				],
-				notification: _('Suma joins you, terrified but unbroken.'),
-				buttons: {
-					'fight': {
-						text: _('hunt the demoness'),
-						nextScene: { 1: 'combat' }
-					}
-				}
-			},
-			'meet_hinatsuru': {
-				text: [
-					_('Hinatsuru is wounded but composed. she presses a folded paper into your hand.'),
-					_('"she has a brother. they share one heart between two bodies."'),
-					_('"to slay one is to slay neither. cut them both."')
-				],
-				notification: _('Hinatsuru joins you, with intelligence on the upper moon\'s nature.'),
-				buttons: {
-					'fight': {
-						text: _('hunt the demoness'),
-						nextScene: { 1: 'combat' }
-					}
-				}
-			},
-			'combat': {
-				combat: true,
-				enemy: 'upper six daki',
-				enemyName: _('upper moon six · sister'),
-				deathMessage: _('the obi-sash demoness scatters into red ribbons of mist.'),
-				chara: '陆',
-				damage: 10,
-				hit: 0.85,
-				attackDelay: 2,
-				health: 50,
-				ranged: false,
-				loot: {
-					'teeth': { min: 8, max: 15, chance: 1 },
-					'scales': { min: 5, max: 10, chance: 1 },
-					'wisteria charm': { min: 2, max: 3, chance: 0.8 }
-				},
-				notification: _('the obi-sash demoness — half of upper moon six — is unleashed.'),
-				buttons: {
-					'continue': {
-						text: _('she dissolves — but is the brother behind her?'),
-						nextScene: { 1: 'brother' }
-					}
-				}
-			},
-			'brother': {
-				combat: true,
-				enemy: 'upper six gyutaro',
-				enemyName: _('upper moon six · brother'),
-				deathMessage: _('the sickle-wielding demon collapses into ash beside his sister.'),
-				chara: '陆',
-				damage: 14,
-				hit: 0.9,
-				attackDelay: 2,
-				health: 70,
-				ranged: true,
-				loot: {
-					'demon stone': { min: 1, max: 2, chance: 1 },
-					'teeth': { min: 10, max: 20, chance: 1 },
-					'wisteria oil': { min: 1, max: 2, chance: 0.6 }
-				},
-				notification: _('he emerges from her shadow — the elder brother, sickles drawn. blood-mist art unfurls.'),
-				buttons: {
-					'finish': {
-						text: _('strike them both at once'),
-						nextScene: { 1: 'aftermath' }
-					}
-				}
-			},
-			'aftermath': {
-				text: [
-					_('Uzui crashes through a wall behind you, one hand missing, eyes wild and laughing.'),
-					_('"flashy! that\'s flashy as hell. you killed an upper moon."'),
-					_('he ruffles your hair with the hand he has left. it leaves blood.'),
-					_('"go home, keeper. there are pillars left to die for this. but stay for the breath i\'m about to teach you."')
-				],
-				notification: _('Uzui — Sound Hashira — survives. he teaches what he can before he retires.'),
-				onLoad: function() {
-					$SM.set('game.yoshiwaraDone', true);
-					if (!$SM.hasPerk('kehai dansha')) { $SM.addPerk('kehai dansha'); }
-				},
-				buttons: {
-					'leave': {
-						text: _('return to the wisteria'),
-						nextScene: 'end'
-					}
-				}
+				onLoad: function() {$SM.set('game.yoshiwaraBriefed',true);},
+				buttons: {leave: {text: '回庄园准备', nextScene: 'end'}}
 			}
 		},
 		audio: AudioLibrary.EVENT_WANDERING_MASTER

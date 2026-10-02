@@ -13,6 +13,8 @@ var World = {
     HOUSE: 'H',
     CAVE: 'V',
     TOWN: 'O',
+    ROAD_TOWN: 'D',
+    MARKET_TOWN: 'R',
     CITY: 'Y',
     OUTPOST: 'P',
     SHIP: 'W',
@@ -143,7 +145,9 @@ var World = {
     World.LANDMARKS[World.TILE.SULPHUR_MINE] = { num: 1, minRadius: 20, maxRadius: 20, scene: 'sulphurmine', label:  _('Sulphur&nbsp;Mine') };
     World.LANDMARKS[World.TILE.HOUSE] = { num: 10, minRadius: 0, maxRadius: World.RADIUS * 1.5, scene: 'house', label:  _('An&nbsp;Old&nbsp;House') };
     World.LANDMARKS[World.TILE.CAVE] = { num: 3, minRadius: 25, maxRadius: World.RADIUS * 1.5, scene: 'cave', label:  _('A&nbsp;Damp&nbsp;Cave') };
-    World.LANDMARKS[World.TILE.TOWN] = { num: 10, minRadius: 10, maxRadius: 20, scene: 'town', label:  _('An&nbsp;Abandoned&nbsp;Town') };
+    World.LANDMARKS[World.TILE.TOWN] = { num: 1, minRadius: 15, maxRadius: 15, scene: 'town', label: '游郭（唯一地点）' };
+    World.LANDMARKS[World.TILE.ROAD_TOWN] = { num: 5, minRadius: 10, maxRadius: 20, scene: 'roadTown', label: '宿场旧街' };
+    World.LANDMARKS[World.TILE.MARKET_TOWN] = { num: 4, minRadius: 10, maxRadius: 20, scene: 'marketTown', label: '废弃市镇' };
     World.LANDMARKS[World.TILE.CITY] = { num: 20, minRadius: 20, maxRadius: World.RADIUS * 1.5, scene: 'city', label:  _('A&nbsp;Ruined&nbsp;City') };
     World.LANDMARKS[World.TILE.SHIP] = { num: 1, minRadius: 28, maxRadius: 28, scene: 'ship', label:  _('A&nbsp;Crashed&nbsp;Starship')};
     World.LANDMARKS[World.TILE.BOREHOLE] = { num: 10, minRadius: 15, maxRadius: World.RADIUS * 1.5, scene: 'borehole', label:  _('A&nbsp;Borehole')};
@@ -178,6 +182,7 @@ var World = {
 
     // Patch older maps in place: never regenerate exploration or overwrite landmarks.
     World.ensureCampaignLandmarks();
+    World.ensureDistrictLandmarks();
 
     // Create the World panel
     this.panel = $('<div>').attr('id', "worldPanel").addClass('location').appendTo('#outerSlider');
@@ -614,30 +619,35 @@ var World = {
       const scene = World.state.executioner ? 'executioner-antechamber' : 'executioner-intro';
       const sceneData = Events.Executioner[scene];
       Events.startEvent(sceneData);
+      try { World.recordLandmarkVisit(curTile); } catch (e) { /* optional meta progress */ }
     } else if(typeof World.LANDMARKS[curTile] != 'undefined') {
       if(curTile != World.TILE.OUTPOST || !World.outpostUsed()) {
         Events.startEvent(Events.Setpieces[World.LANDMARKS[curTile].scene]);
-        // 元进程：记录已探索的地标类型，用于「无限城探索者赐福」（所有地标都探过 → 入城 +5% max HP）
-        try {
-          var visited = $SM.get('game.landmarksVisited') || {};
-          if (!visited[curTile]) {
-            visited[curTile] = true;
-            $SM.set('game.landmarksVisited', visited, true);
-            var need = Object.keys(World.LANDMARKS).filter(function(k) { return k != World.TILE.OUTPOST; });
-            var got = 0;
-            need.forEach(function(k) { if (visited[k]) got++; });
-            if (got >= need.length && !$SM.get('game.castleMeta.perfectExploration', true)) {
-              $SM.set('game.castleMeta.perfectExploration', true, true);
-              try { Notifications.notify(null, _('you have walked every corner of this world. the castle will remember.')); } catch (e) {}
-            }
-          }
-        } catch (e) { /* ignore */ }
+        try { World.recordLandmarkVisit(curTile); } catch (e) { /* optional meta progress */ }
       }
     } else {
       if(World.useSupplies()) {
         World.checkFight();
       }
     }
+  },
+
+  recordLandmarkVisit: function(tile) {
+    if (!World.LANDMARKS[tile]) return false;
+    var visited = $SM.get('game.landmarksVisited') || {};
+    if (!visited[tile]) {
+      visited = Object.assign({},visited);
+      visited[tile] = true;
+      $SM.set('game.landmarksVisited',visited,true);
+    }
+    // D/R are variants of the old ordinary towns, not extra requirements that
+    // may not exist on a cleared legacy map. Unique O and story T still count.
+    var optional = [World.TILE.OUTPOST,World.TILE.ROAD_TOWN,World.TILE.MARKET_TOWN];
+    var need = Object.keys(World.LANDMARKS).filter(function(key) {return optional.indexOf(key) < 0;});
+    if (!need.every(function(key) {return !!visited[key];}) || $SM.get('game.castleMeta.perfectExploration',true)) return false;
+    $SM.set('game.castleMeta.perfectExploration',true,true);
+    Notifications.notify(null,_('you have walked every corner of this world. the castle will remember.'));
+    return true;
   },
 
   getDistance: function(from, to) {
@@ -1080,6 +1090,7 @@ var World = {
     try { World._reportExpeditionSummary(false); } catch (e) { /* ignore */ }
     // Home safe! Commit the changes.
     $SM.setM('game.world', World.state);
+    if (window.Events && Events.Yoshiwara) Events.Yoshiwara.commit();
     World.testMap();
 
     if(World.state.sulphurmine && $SM.get('game.buildings["sulphur mine"]', true) === 0) {
@@ -1130,7 +1141,7 @@ var World = {
   finishExpeditionReport: function(outcome,reason) {
     if (!window.ExpeditionReport || !World.state) return null;
     var unlocks = [];
-    var flags = {ironmine:'铁矿供应',coalmine:'煤矿供应',sulphurmine:'硫磺矿供应',ship:'无限城入口',executioner:'制造器',mugentrain:'无限列车支援完成'};
+    var flags = {ironmine:'铁矿供应',coalmine:'煤矿供应',sulphurmine:'硫磺矿供应',ship:'无限城入口',executioner:'制造器',mugentrain:'无限列车支援完成',yoshiwara:'游郭救援完成'};
     Object.keys(flags).forEach(function(key) {
       if (outcome === 'return' && World.state[key] && !(World._expeditionFlags || {})[key]) unlocks.push(flags[key]);
     });
@@ -1304,7 +1315,7 @@ var World = {
     World.drawMap();
     World._expeditionFlags = {};
     World._expeditionBlueprints = $.extend({},$SM.get('character.blueprints') || {});
-    ['ironmine','coalmine','sulphurmine','ship','executioner','mugentrain'].forEach(function(key) {World._expeditionFlags[key] = !!World.state[key];});
+    ['ironmine','coalmine','sulphurmine','ship','executioner','mugentrain','yoshiwara'].forEach(function(key) {World._expeditionFlags[key] = !!World.state[key];});
     if (window.ExpeditionReport) ExpeditionReport.begin({outfit:Path.outfit || {},map:World.state.map,mask:World.state.mask,equipped:Path.getLoadoutEquipment()});
     World.setTitle();
     AudioEngine.playBackgroundMusic(AudioLibrary.MUSIC_WORLD);
@@ -1348,6 +1359,49 @@ var World = {
     map[position[0]][position[1]] = World.TILE.MUGEN_TRAIN;
     $SM.set('game.world.map',map,true);
     return true;
+  },
+
+  // Keep one real district in old saves. Rename duplicate towns in place,
+  // retaining discovery masks, cleared suffixes and every other landmark.
+  ensureDistrictLandmarks: function() {
+    var original = $SM.get('game.world.map');
+    if (!Array.isArray(original) || !original.length) return false;
+    var towns = [], terrain = [];
+    original.forEach(function(row,x) {
+      if (!Array.isArray(row)) return;
+      row.forEach(function(cell,y) {
+        if (typeof cell !== 'string') return;
+        var position = {x:x,y:y,offset:Math.abs(World.getDistance([x,y],World.VILLAGE_POS)-15)};
+        if (cell.charAt(0) === World.TILE.TOWN) towns.push(position);
+        else if (World.isTerrain(cell) && World.getDistance([x,y],World.VILLAGE_POS) >= 5) terrain.push(position);
+      });
+    });
+    var order = function(a,b) {return a.offset-b.offset || a.x-b.x || a.y-b.y;};
+    towns.sort(order);
+    terrain.sort(order);
+    var completed = !!($SM.get('game.yoshiwaraDone') || $SM.get('game.world.yoshiwara'));
+    // A previously cleared generic O! is not a completed new chapter. Prefer
+    // an uncleared old town, or add the unique entrance on unused terrain.
+    var canonical = completed ? (towns[0] || terrain[0]) :
+      (towns.find(function(position) {return original[position.x][position.y] === World.TILE.TOWN;}) || terrain[0]);
+    if (!canonical) return false;
+    var map = original.map(function(row) {return Array.isArray(row) ? row.slice() : row;});
+    var changed = false;
+    towns.filter(function(position) {return position !== canonical;}).forEach(function(position,index) {
+      var tile = index % 2 ? World.TILE.MARKET_TOWN : World.TILE.ROAD_TOWN;
+      map[position.x][position.y] = tile + original[position.x][position.y].slice(1);
+      changed = true;
+    });
+    if (original[canonical.x][canonical.y].charAt(0) !== World.TILE.TOWN) {
+      map[canonical.x][canonical.y] = World.TILE.TOWN;
+      changed = true;
+    }
+    if (completed && map[canonical.x][canonical.y] === World.TILE.TOWN) {
+      map[canonical.x][canonical.y] = World.TILE.TOWN + '!';
+      changed = true;
+    }
+    if (changed) $SM.set('game.world.map',map,true);
+    return changed;
   },
 
   handleStateUpdates: function(e){

@@ -222,7 +222,7 @@ var Space = {
 			var talBar = $('<div>').addClass('floorTalents').appendTo(hdr);
 			$('<span>').addClass('talentLabel').text(_('talents:') + ' ' + _('level limit Lv.{0}', Space.getTalentCap()) + ' ').appendTo(talBar);
 			_talents.forEach(function(t) {
-				$('<span>').addClass('talentChip').text(_(t.nameKey) + ' Lv.' + Space.getTalentLevel(t.id)).appendTo(talBar);
+				$('<span>').addClass('talentChip').text(Space.getTalentName(t.id) + ' Lv.' + Space.getTalentLevel(t.id)).appendTo(talBar);
 			});
 		}
 		// 元进程状态提示：治疗加成 + 探索者赐福 + 累计楼层永久 buff
@@ -685,6 +685,11 @@ var Space = {
 			damageAfter:id === 'steadyHand' ? Space.getSteadyHandDamageMult(next) : null,
 			inheritBefore:Space.getStartingTalentLevel(id,peak),inheritAfter:Space.getStartingTalentLevel(id,Math.max(peak,next))};
 	},
+	getTalentName: function(id) {
+		if (window.CombatStyles && CombatStyles.trainingName) return CombatStyles.trainingName(id);
+		var talent = Space.TALENTS.find(function(t) { return t.id === id; });
+		return talent ? _(talent.nameKey) : id;
+	},
 	talentPreviewText: function(id) {
 		var p = Space.talentPreview(id);
 		if (!p) return '';
@@ -700,6 +705,10 @@ var Space = {
 			text += '\n' + _('excess hit chance becomes weapon damage instead of being wasted.');
 		}
 		text += '\n' + _('next descent inheritance: Lv.{0} → Lv.{1}', p.inheritBefore, p.inheritAfter);
+		if (window.CombatStyles && CombatStyles.trainingPreview) {
+			var signature = CombatStyles.trainingPreview(id, p.level, p.next);
+			if (signature) text += '\n' + signature;
+		}
 		return text;
 	},
 
@@ -723,7 +732,7 @@ var Space = {
 		};
 		picks.forEach(function(t, i) {
 			var curLvl = Space.getTalentLevel(t.id);
-			var label = _(t.nameKey) + ' Lv.' + (curLvl + 1) + '/' + cap;
+			var label = Space.getTalentName(t.id) + ' Lv.' + (curLvl + 1) + '/' + cap;
 			buttons['talent_' + i] = {
 				text: label,
 				onChoose: (function(tid) { return function() { Space._takeTalent(tid, function() {}); }; })(t.id),
@@ -738,6 +747,7 @@ var Space = {
 		};
 
 		var text = [_('the demon fades. faint red motes drift toward you — pick one to absorb.')];
+		if (window.CombatStyles && CombatStyles.trainingName) text.push(_('six common cultivation levels are shared by all forms; your chosen form turns them into signature buffs. switching forms never resets cultivation.'));
 		text.push(_('talent limit: Lv.{0}; all six talents at the limit unlock +5 levels.', cap));
 		text.push(_('bounded bonuses keep growing with diminishing returns beyond their former safety limits.'));
 		text.push(_('previews show only the named bonuses, not final damage or hit chance. enemy defenses, other effects and rounding still apply.'));
@@ -747,7 +757,7 @@ var Space = {
 		picks.forEach(function(t) {
 			var curLvl = Space.getTalentLevel(t.id);
 			var val = (t.per < 1) ? Math.round(t.per * 1000) / 10 : t.per;
-			text.push('• ' + _(t.nameKey) + ' Lv.' + (curLvl + 1) + ': ' + _(t.descKey, val));
+			text.push('• ' + Space.getTalentName(t.id) + ' Lv.' + (curLvl + 1) + ': ' + _(t.descKey, val));
 			text.push(Space.talentPreviewText(t.id));
 		});
 		Events.startEvent({
@@ -767,7 +777,7 @@ var Space = {
 		if (!t) return false;
 		var curLvl = Space.getTalentLevel(id);
 		Space.setTalentLevel(id, curLvl + 1);
-		Notifications.notify(null, _('you take up {0} (now Lv.{1})', _(t.nameKey), curLvl + 1));
+		Notifications.notify(null, _('you take up {0} (now Lv.{1})', Space.getTalentName(t.id), curLvl + 1));
 		if (typeof onDone === 'function') {
 			onDone();
 		} else {
@@ -1506,7 +1516,7 @@ var Space = {
 									World.setHp(Math.max(1, World.health - costHp));
 									var pick = eligible[Math.floor(Math.random() * eligible.length)];
 									Space.setTalentLevel(pick.id, Space.getTalentLevel(pick.id) + 1);
-									Notifications.notify(null, _('the mark burns into your arm: {0} Lv.{1}', _(pick.nameKey), Space.getTalentLevel(pick.id)));
+									Notifications.notify(null, _('the mark burns into your arm: {0} Lv.{1}', Space.getTalentName(pick.id), Space.getTalentLevel(pick.id)));
 								}
 								Space.afterNode();
 							},
@@ -1544,7 +1554,7 @@ var Space = {
 				'start': {
 					text: [
 						_('a hashira sits at a crossroad here, teaching what they can spare.'),
-						_('{0} offers a lesson: {1}', _(p.nameKey), _(talent.nameKey))
+						_('{0} offers a lesson: {1}', _(p.nameKey), Space.getTalentName(talent.id))
 					],
 					buttons: {
 						'accept': {
@@ -1553,7 +1563,7 @@ var Space = {
 								var cur = Space.getTalentLevel(p.talent);
 								if (cur < Space.getTalentCap()) {
 									Space.setTalentLevel(p.talent, cur + 1);
-									Notifications.notify(null, _('{0} teaches you the way: {1} Lv.{2}', _(p.nameKey), _(talent.nameKey), cur + 1));
+									Notifications.notify(null, _('{0} teaches you the way: {1} Lv.{2}', _(p.nameKey), Space.getTalentName(talent.id), cur + 1));
 								} else {
 									Notifications.notify(null, _('you have already mastered this. they smile and give you a wisteria charm.'));
 									$SM.add('stores["wisteria charm"]', 1);

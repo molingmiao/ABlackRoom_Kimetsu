@@ -902,6 +902,49 @@ async function port() {
       return checks;
     })()`);
     console.log(chapterChecks.map(name=>'PASS: '+name).join('\n'));
+    const districtChecks=await evaluate(`(async function() {
+      const checks=[],check=(ok,label)=>{if(!ok) throw Error(label);checks.push(label);};
+      const until=async fn=>{for(let i=0;i<180&&!fn();i++) await new Promise(resolve=>setTimeout(resolve,30));if(!fn()) throw Error('district flow timeout: '+Events.activeScene);};
+      await new Promise(resolve=>$('#outerSlider').promise().done(resolve));
+      $SM.set('game.yoshiwaraDone',false);
+      $SM.setM('stores',{'nichirin katana':1,'cured meat':30,medicine:6});
+      Path.outfit={'nichirin katana':1,'cured meat':20,medicine:4};$SM.set('outfit',Path.outfit);
+      check(Path.embark(),'district rescue starts with a normal charged expedition');
+      const locations={};World.state.map.forEach((row,x)=>row.forEach((cell,y)=>{
+        if(['O','D','R'].includes(cell[0])) locations[cell[0]]=[x,y];
+      }));
+      check(World.state.map.flat().filter(cell=>cell[0]==='O').length===1,'real world has exactly one district, with independent D/R settlements');
+      World.state.mask=World.state.map.map(row=>row.map(()=>true));
+      World.curPos=locations.O;World.drawMap();
+      check(World.LANDMARKS.D.label==='宿场旧街' && World.LANDMARKS.R.label==='废弃市镇' &&
+        Events.Setpieces.roadTown.title.includes('宿场') && Events.Setpieces.marketTown.title.includes('市镇'), 'new settlement letters open distinct names instead of duplicate Yoshiwara');
+      World.doSpace();$('#enter').trigger('click');$('#search').trigger('click');
+      check($('#assemble').hasClass('disabled'),'real search cannot skip missing wife intelligence');
+      $('#makio').trigger('click');$('#back').trigger('click');
+      check($('#makio').hasClass('disabled') && $('#assemble').hasClass('disabled'),'found intelligence retires its action without opening the incomplete route');
+      $('#suma').trigger('click');$('#back').trigger('click');$('#hinatsuru').trigger('click');$('#back').trigger('click');
+      check(!$('#assemble').hasClass('disabled'),'all three actual search choices unlock the underground rescue');
+      $('#assemble').trigger('click');$('#guard').trigger('click');
+      const win=async(scene,next)=>{
+        check(Events.activeScene===scene && $('#enemy').length===1,'district '+scene+' enters real support combat');
+        Events.clearTimeouts();Events.dotDamage($('#enemy'),9999,'regression finishing strike');
+        await until(()=>Events.fought && $('#'+next).length);
+        check(!$SM.get('game.yoshiwaraDone'),'district '+scene+' victory alone cannot commit the chapter');
+        Button.clearCooldown($('#'+next));$('#'+next).trigger('click');
+      };
+      await win('obi','rescue');$('#routes').trigger('click');$('#alley').trigger('click');$('#hold').trigger('click');
+      await win('dakiObi','observe');$('#cover').trigger('click');
+      await win('bloodSickles','signal');$('#help').trigger('click');$('#listen').trigger('click');$('#dawn').trigger('click');
+      check(World.state.yoshiwara && !$SM.get('game.yoshiwaraDone') && World.state.map[locations.O[0]][locations.O[1]]==='O!',
+        'district ending marks only the temporary map and keeps permanent victory uncommitted');
+      check(Events.eventPanel().text().includes('安全返回庄园'),'district conclusion explicitly asks for a safe return');
+      $('#leave').trigger('click');await until(()=>!Events.activeEvent());
+      check(World.goHome() && $SM.get('game.yoshiwaraDone') && $SM.get('game.world.yoshiwara'),'actual safe return commits unique district victory');
+      check(CombatStyles.isUnlocked('sound') && $SM.hasPerk('kehai dansha'),'safe district rescue unlocks sound study and preserves its old training reward');
+      check(ExpeditionReport.latest().unlocks.includes('游郭救援完成'),'district completion appears in the real expedition report');
+      return checks;
+    })()`);
+    console.log(districtChecks.map(name=>'PASS: '+name).join('\n'));
     const noticeChecks = await evaluate(`(async function() {
       const checks = [];
       const check = (condition, name) => { if (!condition) throw Error(name); checks.push(name); };
@@ -1249,6 +1292,95 @@ async function port() {
     const shopShot=await page('Page.captureScreenshot',{format:'png'});
     fs.writeFileSync(path.join(profile,'guardian-shop.png'),Buffer.from(shopShot.data,'base64'));
     console.log('SCREENSHOT: '+path.join(profile,'guardian-shop.png'));
+    const breathingChecks = await evaluate(`(async function() {
+      const checks = [], check = (ok, label) => { if (!ok) throw Error(label); checks.push(label); };
+      await new Promise(resolve => Events.endEvent(resolve));
+      $SM.set('game.castleMeta.totalFloors',120); $SM.set('game.castleMeta.bossKilled',8);
+      $SM.set('game.pillarConvocationDone',true); $SM.set('game.swordsmithVillageDone',true);
+      $SM.set('game.yoshiwaraDone',true); Space.clearTalents();
+      const saved = { damage: Space.getDamageMult, dr: Space.getDamageReduction, permanentDR: Space.getPermanentDR, lifesteal: Space.getLifestealPct };
+      Space.getDamageMult = () => 1; Space.getDamageReduction = Space.getPermanentDR = Space.getLifestealPct = () => 0;
+      const until = async fn => { for (let i=0; i<120 && !fn(); i++) await new Promise(resolve=>setTimeout(resolve,25)); if (!fn()) throw Error('breathing UI timeout'); };
+      const begin = async id => {
+        if (Events.activeEvent()) await new Promise(resolve=>Events.endEvent(resolve));
+        Engine.activeModule = Ship; CombatStyles.renderPicker(Ship.panel);
+        const option = $('[data-style="'+id+'"]'); check(option.length === 1 && !option.prop('disabled'), id+' has an unlocked, usable picker card');
+        option.trigger('click'); check(CombatStyles.getSelected() === id, id+' selection is saved by the real picker');
+        Engine.activeModule = Space; Space.done = false; Space.currentFloor = 1;
+        World.setHp(World.getMaxHealth()-20);
+        Events.startEvent({title:'breathing regression',scenes:{start:{combat:true,enemy:'forest demon',health:10000,damage:0,attackDelay:100,hit:0,
+          buttons:{leave:{text:'leave',nextScene:'end'}}}}});
+        clearInterval(Events._enemyAttackTimer); (Events._specialTimers || []).forEach(clearInterval);
+        await until(()=>$('#wanderer').length && $('#enemy').length);
+        check($('.castleStyleStatusName').text() === CombatStyles.getName(id), id+' real combat displays its breathing name');
+      };
+      const hit = (name='nichirin katana',amount=100) => {
+        const before = $('#enemy').data('hp');
+        Events.damage($('#wanderer'),$('#enemy'),amount,'melee',null,{weaponName:name});
+        return before-$('#enemy').data('hp');
+      };
+      const incoming = (amount=10) => {
+        const before=World.health;
+        Events.damage($('#enemy'),$('#wanderer'),amount,'melee');
+        return before-World.health;
+      };
+      try {
+        await begin('wind'); for(let i=0;i<4;i++) hit();
+        check(hit()===132 && $('.castleStyleStatusText').text().includes('32%'), 'real wind attacks build four visible momentum stacks');
+        const momentum=CombatStyles._fight.combo; $('#enemy').data('status','shield'); hit();
+        check(CombatStyles._fight.combo===momentum, 'enemy shields cannot generate wind momentum');
+        await begin('stone'); for(let i=0;i<3;i++) incoming();
+        check(hit()===150 && CombatStyles._fight.counters===0, 'actual direct incoming damage arms and spends the stone counter');
+        await begin('mist'); check(incoming(100)===60, 'mist guard reduces the first real direct hit');
+        check(hit()===125 && hit()===100 && CombatStyles._fight.guardReadyAt>Date.now(), 'mist retaliation is exactly one attack with a visible recovery window');
+        await begin('insect'); for(let i=0;i<5;i++) hit();
+        check(CombatStyles._fight.poisonStacks===5 && CombatStyles._fight.wound.ticks===4, 'real insect strikes apply capped four-tick poison');
+        const poison=CombatStyles._fight.wound, poisonHp=$('#enemy').data('hp');
+        await until(()=>$('#enemy').data('hp')<poisonHp);
+        check(CombatStyles._fight.poisonStacks===5 && poison.damage===27, 'poison ticks do not recursively add doses');
+        await begin('sound'); hit('nichirin katana'); hit('wisteria gun');
+        check(hit('nichirin katana')===160 && CombatStyles._fight.combo===0, 'sound third alternating damage weapon hit completes a score');
+        await begin('beast'); hit('nichirin katana');
+        check(hit('nichirin spear')===135 && hit('nichirin spear')===100, 'beast rewards melee weapon changes rather than repeating a button');
+        await begin('flower'); for(let i=0;i<3;i++) hit();
+        check(hit()===160,'flower focus strengthens the fourth actual melee hit');
+        hit(); Events.dotDamage($('#wanderer'),1,'regression poison');
+        check(CombatStyles._fight.combo===0,'actual DOT damage also breaks flower focus');
+        await begin('love'); Events.restoreHealth(2,'lifesteal');
+        check(hit()===100,'automatic lifesteal cannot activate love surge');
+        Path.outfit.medicine=2; $SM.set('outfit',Path.outfit);
+        const meds=Path.outfit.medicine; Events.doHeal('medicine',World.medsHeal(),$('#meds'));
+        check(Path.outfit.medicine===meds-1 && hit()===125 && incoming(100)===85,'real consumed medicine heals and activates love attack and guard buffs');
+        await begin('serpent'); Events.damage($('#wanderer'),$('#enemy'),'stun','ranged',null,{weaponName:'bind kunai'});
+        $('#enemy').data('status','shield'); hit();
+        check(CombatStyles._fight.openingHits===2,'shielded serpent strikes keep both real damage opportunities');
+        check(hit()===140 && hit()===140 && hit()===100,'serpent control grants exactly two successful curved strikes');
+        await begin('sun'); for(let i=0;i<4;i++) hit();
+        check(hit()===130 && $('.castleStyleStatusText').text().includes('神乐循环'),'sun chain opens the real, timed dance window');
+        await begin('moon'); check(hit()===120 && CombatStyles._fight.wound.damage===14 && hit()===100,'moon sword imitation charges once and leaves a non-recursive sword trace');
+        await begin('wind'); Space.setTalentLevel('sharpEdge',30);
+        for(let i=0;i<4;i++) hit();
+        check(hit()===140 && Space.getTalentName('sharpEdge').includes('风之呼吸') && Space.talentPreviewText('sharpEdge').includes('流派核心增益'),
+          'saved cultivation actually strengthens signatures and has a before/after preview');
+        const persisted = JSON.stringify($SM.get('character.infinityTalents'));
+        Events.clearTimeouts(); await new Promise(resolve=>Events.endEvent(resolve));
+        check(CombatStyles._fight===null && CombatStyles._woundTimer===null && JSON.stringify($SM.get('character.infinityTalents'))===persisted,
+          'ending combat clears every temporary breathing buff without deleting shared cultivation');
+        Engine.activeModule=Path; $('#outerSlider').stop(true,true).css({top:'0px',left:'0px'}); Engine.travelTo(Ship);
+        await new Promise(resolve=>$('#locationSlider').promise().done(resolve)); window.scrollTo(0,0);
+        check($('.castleStyleOption').length===15 && $('.castleStylePicker').text().includes('不赋予鬼化'), 'entry preparation lists fourteen breathing forms plus technique and clearly labels moon imitation');
+        await until(()=>Number(getComputedStyle(Ship.panel[0]).opacity)>0.99);
+        check($('.castleStylePicker').is(':visible') && document.querySelector('.castleStyleHeading').getBoundingClientRect().top>=0,
+          'fourteen-form preparation is genuinely visible in the native entrance panel');
+        return checks;
+      } finally {
+        Space.getDamageMult=saved.damage; Space.getDamageReduction=saved.dr; Space.getPermanentDR=saved.permanentDR; Space.getLifestealPct=saved.lifesteal;
+      }
+    })()`);
+    console.log(breathingChecks.map(name=>'PASS: '+name).join('\n'));
+    const breathingShot=await page('Page.captureScreenshot',{format:'png'});
+    fs.writeFileSync(path.join(profile,'breathing-cultivation.png'),Buffer.from(breathingShot.data,'base64'));
+    console.log('SCREENSHOT: '+path.join(profile,'breathing-cultivation.png'));
     assert.deepEqual(errors, [], 'uncaught browser exceptions');
   } finally {
     if (call && socket?.readyState === WebSocket.OPEN) {

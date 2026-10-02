@@ -58,22 +58,28 @@ var CombatStyles = {
 		target.find('.castleStylePicker').remove();
 		var box = $('<div>').addClass('castleStylePicker').attr('role', 'group')
 			.attr('aria-label', _('castle battle form')).appendTo(target);
-		$('<div>').addClass('castleStyleHeading').text(_('castle battle form')).appendTo(box);
+		$('<div>').addClass('castleStyleHeading').text(_('castle battle form') + ' · ' + CombatStyles.getName()).appendTo(box);
 		$('<p>').addClass('castleStyleHint').text(_('choose before entering. the form stays fixed until you return and only affects castle battles.')).appendTo(box);
+		$('<p>').addClass('castleStyleHint').text(_('six common cultivation levels are shared by all forms; your chosen form turns them into signature buffs. switching forms never resets cultivation.')).appendTo(box);
 		var list = $('<div>').addClass('castleStyleOptions').appendTo(box);
+		var locked = $('<details>').addClass('castleStyleLocked').appendTo(box);
+		$('<summary>').text(_('future breathing forms and unlock progress')).appendTo(locked);
+		var lockedList = $('<div>').addClass('castleStyleOptions').appendTo(locked);
 		var selected = CombatStyles.getSelected();
-		CombatStyles.STYLES.forEach(function(style) {
+		CombatStyles.STYLES.forEach(function(style, index) {
 			var unlocked = CombatStyles.isUnlocked(style.id);
 			var chosen = style.id === selected;
 			var button = $('<button>').attr({ type: 'button', 'data-style': style.id, 'aria-pressed': chosen ? 'true' : 'false' })
 				.addClass('castleStyleOption style-' + style.id).toggleClass('selected', chosen)
-				.prop('disabled', !unlocked || CombatStyles._inCastle()).appendTo(list);
+				.prop('disabled', !unlocked || CombatStyles._inCastle()).appendTo(unlocked || index < 4 ? list : lockedList);
 			$('<span>').addClass('castleStyleName').text(CombatStyles.getName(style.id)).appendTo(button);
-			$('<span>').addClass('castleStyleDescription').text(_(style.description)).appendTo(button);
+			$('<span>').addClass('castleStyleDescription').text(CombatStyles.describe ? CombatStyles.describe(style.id) : _(style.description)).appendTo(button);
+			if (style.focus) $('<span>').addClass('castleStyleTraining').text(_('signature cultivation: {0} Lv.{1}',
+				_(BreathingCultivation.TRAINING[style.focus]), BreathingCultivation.trainingLevel(style.focus))).appendTo(button);
 			if (!unlocked) {
 				var uses = $SM.get('character.weaponHits["' + style.weapon + '"]', true) || 0;
 				$('<span>').addClass('castleStyleLock')
-					.text(_('unlock {0}: use {1} {2} times ({3}/{2}).', _(style.perk), _(style.weapon), style.uses, Math.min(style.uses, uses))).appendTo(button);
+					.text(CombatStyles.unlockText ? CombatStyles.unlockText(style) : _('unlock {0}: use {1} {2} times ({3}/{2}).', _(style.perk), _(style.weapon), style.uses, Math.min(style.uses, uses))).appendTo(button);
 			} else {
 				$('<span>').addClass('castleStyleChoice').text(chosen ? _('form selected') : _('select this form')).appendTo(button);
 			}
@@ -81,6 +87,7 @@ var CombatStyles = {
 				if (CombatStyles.setSelected(style.id)) CombatStyles.renderPicker(target);
 			});
 		});
+		if (!lockedList.find('.castleStyleOption').length) locked.remove();
 		return box;
 	},
 
@@ -118,19 +125,22 @@ var CombatStyles = {
 		var seconds = function(until) { return Math.max(0, Math.ceil((until - now) * CombatStyles._scale() / 1000)); };
 		if (fight.style === 'water') {
 			var combo = fight.lastWaterHit !== null && now - fight.lastWaterHit <= CombatStyles._duration(6000) ? fight.combo : 0;
-			return _('flow: {0}/3 melee hits', combo) + (fight.guardUntil > now ? ' · ' + _('flow guard: {0}s remaining', seconds(fight.guardUntil)) : '');
+			var guard = CombatStyles.parameters ? CombatStyles.parameters().waterGuard : 0.15;
+			return _('flow: {0}/3 melee hits', combo) + (fight.guardUntil > now ? ' · ' + _('cultivation guard: -{0}% damage, {1}s', Math.round(guard * 1000) / 10, seconds(fight.guardUntil)) : '');
 		}
 		if (fight.style === 'flame') return fight.wound ? _('deep cut: {0} damage, {1} ticks remaining', fight.wound.damage, fight.wound.ticks) : _('land a nichirin weapon hit to open a deep cut.');
-		if (fight.style === 'thunder') return fight.thunderReadyAt <= now ? _('charged: next melee hit +60%') : _('gathering breath: {0}s', seconds(fight.thunderReadyAt));
-		return fight.openingUntil > now ? _('opening: +35% damage for {0}s', seconds(fight.openingUntil)) : _('bind the enemy to create an opening.');
+		var p = CombatStyles.parameters ? CombatStyles.parameters() : { thunderBurst: 0.60, opening: 0.35 };
+		if (fight.style === 'thunder') return fight.thunderReadyAt <= now ? _('charged strike: +{0}%', Math.round(p.thunderBurst * 1000) / 10) : _('gathering breath: {0}s', seconds(fight.thunderReadyAt));
+		return fight.openingUntil > now ? _('timed damage buff: +{0}%, {1}s', Math.round(p.opening * 1000) / 10, seconds(fight.openingUntil)) : _('bind the enemy to create an opening.');
 	},
 	_updateStatus: function() { $('.castleStyleStatusText').text(CombatStyles._statusText()); },
 
 	modifyAttack: function(weaponName, damage) {
 		if (!CombatStyles._isActive() || typeof damage !== 'number' || damage <= 0) return damage;
 		var fight = CombatStyles._fight;
-		if (fight.style === 'thunder' && CombatStyles._isMelee(weaponName) && Date.now() >= fight.thunderReadyAt) return Math.max(1, Math.round(damage * 1.6));
-		if (fight.style === 'technique' && Date.now() < fight.openingUntil) return Math.max(1, Math.round(damage * 1.35));
+		var p = CombatStyles.parameters ? CombatStyles.parameters() : { thunderBurst: 0.60, opening: 0.35 };
+		if (fight.style === 'thunder' && CombatStyles._isMelee(weaponName) && Date.now() >= fight.thunderReadyAt) return Math.max(1, Math.round(damage * (1 + p.thunderBurst)));
+		if (fight.style === 'technique' && Date.now() < fight.openingUntil) return Math.max(1, Math.round(damage * (1 + p.opening)));
 		return damage;
 	},
 	afterHit: function(weaponName, actualDamage, enemy) {
@@ -138,6 +148,7 @@ var CombatStyles = {
 		if (!CombatStyles._isActive() || typeof actualDamage !== 'number' || actualDamage <= 0) return;
 		var fight = CombatStyles._fight;
 		var now = Date.now();
+		var p = CombatStyles.parameters ? CombatStyles.parameters() : { waterHeal: 0.04, cut: 0.18, thunderWait: 4 };
 		if (fight.style === 'water' && CombatStyles._isMelee(weaponName)) {
 			if (fight.lastWaterHit === null || now - fight.lastWaterHit > CombatStyles._duration(6000)) fight.combo = 0;
 			fight.lastWaterHit = now;
@@ -145,12 +156,12 @@ var CombatStyles = {
 			if (fight.combo >= 3) {
 				fight.combo = 0;
 				fight.guardUntil = now + CombatStyles._duration(4000);
-				CombatStyles._heal(Math.max(1, Math.ceil(World.getMaxHealth() * 0.04)));
+				CombatStyles._heal(Math.max(1, Math.ceil(World.getMaxHealth() * p.waterHeal)));
 			}
 		} else if (fight.style === 'flame' && ['nichirin katana', 'nichirin spear', 'flame blade'].indexOf(weaponName) >= 0) {
-			if (enemy && enemy.length && enemy.data('hp') > 0) CombatStyles._openWound(enemy, Math.max(1, Math.round(actualDamage * 0.18)));
+			if (enemy && enemy.length && enemy.data('hp') > 0) CombatStyles._openWound(enemy, Math.max(1, Math.round(actualDamage * p.cut)));
 		} else if (fight.style === 'thunder' && CombatStyles._isMelee(weaponName)) {
-			fight.thunderReadyAt = now + CombatStyles._duration(4000);
+			fight.thunderReadyAt = now + CombatStyles._duration(p.thunderWait * 1000);
 		}
 		CombatStyles._updateStatus();
 	},
@@ -164,12 +175,13 @@ var CombatStyles = {
 	modifyIncoming: function(damage) {
 		if (!CombatStyles._isActive() || typeof damage !== 'number' || damage <= 0) return damage;
 		var fight = CombatStyles._fight;
-		return fight.style === 'water' && Date.now() < fight.guardUntil ? Math.max(1, Math.round(damage * 0.85)) : damage;
+		var guard = CombatStyles.parameters ? CombatStyles.parameters().waterGuard : 0.15;
+		return fight.style === 'water' && Date.now() < fight.guardUntil ? Math.max(1, Math.round(damage * (1 - guard))) : damage;
 	},
 	cooldownMultiplier: function(weaponName) {
 		if (!CombatStyles._inCastle()) return 1;
 		var weapon = World.Weapons[weaponName];
-		return CombatStyles.getSelected() === 'technique' && weapon && weapon.damage === 'stun' ? 0.8 : 1;
+		return CombatStyles.getSelected() === 'technique' && weapon && weapon.damage === 'stun' ? (CombatStyles.parameters ? CombatStyles.parameters().controlCooldown : 0.8) : 1;
 	},
 	_heal: function(amount) {
 		var before = World.health;
@@ -186,9 +198,9 @@ var CombatStyles = {
 		if (Space.addMetaHealed) Space.addMetaHealed(hp - before);
 		if (typeof CastleReport !== 'undefined') CastleReport.recordHealing(hp - before, 'water style');
 	},
-	_openWound: function(enemy, damage) {
+	_openWound: function(enemy, damage, ticks, source) {
 		var fight = CombatStyles._fight;
-		fight.wound = { enemy: enemy, damage: damage, ticks: 3 };
+		fight.wound = { enemy: enemy, damage: damage, ticks: ticks || 3, source: source || 'deep cut' };
 		// Keep the ticking cadence when refreshing, so repeated slashes do not postpone every tick.
 		if (CombatStyles._woundTimer !== null) return;
 		CombatStyles._woundTimer = Engine.combatSetInterval(function() {
@@ -203,7 +215,7 @@ var CombatStyles = {
 			}
 			wound.ticks--;
 			// Existing DoT resolution also calls winFight when the target dies.
-			Events.dotDamage(wound.enemy, wound.damage);
+			Events.dotDamage(wound.enemy, wound.damage, wound.source);
 			if (wound.ticks <= 0 || Events.won || Events.fought) CombatStyles._clearWound();
 			CombatStyles._updateStatus();
 		}, 1000);

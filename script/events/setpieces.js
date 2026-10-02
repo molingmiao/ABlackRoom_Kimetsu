@@ -583,15 +583,15 @@ Events.Setpieces = {
 		},
 		audio: AudioLibrary.LANDMARK_CAVE
 	},
-	"town": { /* 游郭 - Entertainment District */
-		title: _('The Entertainment District'),
+	"town": { /* Generic town exploration, reused by D/R; campaign.js defines the unique O. */
+		title: '荒废的旧街',
 		scenes: {
 			'start': {
 				text: [
-					_('lanterns still flicker in the ruined entertainment district.'),
-					_('demons have made it their hunting ground, preying on those who wander in alone.')
+					'荒废的街道上还留着旧商铺与诊所，窗后的灯早已熄灭。',
+					'这里并不是游郭。鬼占据了废屋；仔细搜索，或许能带回有用的补给。'
 				],
-				notification: _("the entertainment district, where demons hunt in the dark"),
+				notification: '旧街静得异常，搜索时要提防埋伏。',
 				buttons: {
 					'enter': {
 						text: _('explore'),

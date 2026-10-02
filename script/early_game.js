@@ -18,7 +18,7 @@ var EarlyGame = {
       {id:'sulphur', title:'取得硫磺供应', goal:'清理硫磺矿并安全返回，解锁硫磺矿工', building:'sulphur mine', hint:'硫磺矿位于距庄园 20 格处；钢制护甲和治疗物资能帮助应对连续战斗。', reward:{sulphur:25,coal:50,steel:20}},
       {id:'armoury', title:'建立军械补给', goal:'建造军械库，形成持续的藤花弹供应', building:'armoury', hint:'安排军械工，以钢和硫磺制作弹药；别让炼钢原料断供。', reward:{'wisteria bullet':30,medicine:5,'cured meat':30}},
       {id:'wreck', title:'列车残骸与锻造线索', goal:'探明列车残骸、带回装置，开放日轮锻造', feature:'fabricator', hint:'残骸标记为 X，距庄园 28 格；与无限列车支援任务是两个不同地点。', reward:{'demon stone':2,'solar crystal':8,'cured meat':30}},
-      {id:'district', title:'游郭篇', goal:'完成音柱的游郭救援，解决上弦之陆的威胁', flag:'game.yoshiwaraDone', hint:'清理地图上的废墟城市 Y 后回庄园，等待鎹鸦带来宇髓的委托；备好口粮、火把和藤花符。', reward:{medicine:8,'wisteria charm':3,'cured meat':40}},
+      {id:'district', title:'游郭篇', goal:'在唯一的游郭完成三妻与居民救援，协助对抗上弦之陆并安全返回', flag:'game.yoshiwaraDone', hint:'游郭标记为 O（通常距庄园 15 格，旧地图可能略有偏移），只有一处；先完成无限列车。D/R 是普通旧街与市镇，不会触发游郭主线。备好武器、治疗和返程口粮。', reward:{medicine:8,'wisteria charm':3,'cured meat':40}},
       {id:'smiths', title:'刀匠村篇', goal:'支援刀匠村，完成霞柱与玄弥的战后剧情', flag:'game.swordsmithVillageDone', hint:'完成游郭后，刀匠村的委托会在庄园出现；可选择参战或保护后方伤员。', reward:{steel:40,leather:40,'cured meat':40}},
       {id:'pillars', title:'柱训练篇', goal:'参加柱合议，完成一位柱的训练', flag:'game.pillarConvocationDone', hint:'完成刀匠村并带回至少一张制造图纸后，回大厅迎接柱合议；训练需要口粮和火把。', reward:{medicine:10,'cured meat':60,fur:100}},
       {id:'castle', title:'通往决战之地', goal:'找到无限城入口并安全返回', feature:'spaceShip', reward:{'demon stone':2,medicine:5,'cured meat':15}}

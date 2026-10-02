@@ -17,6 +17,7 @@ const gameGlobals = {
 	Ship: 'writable',
 	Space: 'writable',
 	CombatStyles: 'writable',
+	BreathingCultivation: 'writable',
 	CombatTelegraphs: 'writable',
 	CastleReport: 'writable',
 	ExpeditionReport: 'writable',

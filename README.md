@@ -125,6 +125,8 @@ node tools/build-exe.cjs     # 基于 sea-config.json 生成 dist/wisteria-hall.
 
 ### Render 备用入口
 
+已上线：[紫藤庄园 · Render 入口](https://kimetsu-game.onrender.com)。保留原 GitHub Pages 入口；两个入口都随 `main` 提交自动更新。
+
 仓库提供 [render.yaml](./render.yaml)，用于 Render Static Site，与 GitHub Pages 同时保留。连接此仓库的 `main` 分支后，使用以下配置：
 
 - Build Command：`npm run build:web && npm run test:web`
@@ -137,6 +139,12 @@ node tools/build-exe.cjs     # 基于 sea-config.json 生成 dist/wisteria-hall.
 `build:web` 会清理并重建网页专用产物，剔除旧的安装包和开发测试界面；`node tools/sync-dist.cjs` 仍保留本地可执行打包的同步方式。jQuery 与游戏必需资源全部随站点加载，不需要连接 GitHub 或外部 CDN。
 
 **迁移存档**：存档保存在当前浏览器、当前网站地址中，不会在 GitHub Pages 和 Render 之间自动共享。在旧入口的菜单里选择“导出／导入”→“导出”，复制完整存档；到新入口的相同菜单选择“导入”并粘贴。导入会替换新入口已有的存档，请先备份。之后两个入口的进度各自保存，不会自动同步。
+
+### 呼吸流派与共通修炼
+
+无限城目前包含水、炎、雷、风、岩、霞、虫、音、兽、花、恋、蛇、日、月剑谱拟式，以及原有战斗技巧。剧情推进或累计无限城战斗经验逐步解锁；日与月拟式还要求柱训练及守关经验。流派在入城前选择，途中不能更换。
+
+六项修炼共用旧天赋等级，保留基础属性、共同突破和历史最高等级继承；流派将对应修炼转为专属战斗增益。详见 [流派规则与后续计划](doc/breathing-cultivation.md)。
 
 ## 本地化
 

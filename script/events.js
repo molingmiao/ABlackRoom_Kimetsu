@@ -572,6 +572,7 @@ var Events = {
 		if (window.Space && Engine.activeModule === Space) {
 			if (!options || options.legacy !== false) Space.addMetaHealed(Math.max(0, hp - oldHp));
 			if (window.CastleReport) CastleReport.recordHealing(hp - oldHp, item);
+			if (window.CombatStyles && CombatStyles.afterHeal) CombatStyles.afterHeal(hp - oldHp, item);
 		}
 		var w = $('#wanderer');
 		if (w.length) {
@@ -834,6 +835,7 @@ var Events = {
 		if(target.attr('id') == 'wanderer') {
 			if (window.CastleReport && window.Space && Engine.activeModule === Space) CastleReport.recordDamage(before - hp, source || 'bleeding');
 			World.setHp(hp);
+			if (window.CombatStyles && CombatStyles.afterIncoming && window.Space && Engine.activeModule === Space) CombatStyles.afterIncoming(before - hp, { dot: true });
 			Events.setHeal();
 			Events.checkPlayerDeath();
 		}
@@ -901,6 +903,7 @@ var Events = {
 					if(fighter.attr('id') == 'enemy') {
 						World.setHp(enemyHp);
 						if (inCastle && window.CastleReport && beforeHp > enemyHp) CastleReport.recordDamage(beforeHp - enemyHp, attackInfo.source || 'normal attack');
+						if (inCastle && window.CombatStyles && CombatStyles.afterIncoming && beforeHp > enemyHp) CombatStyles.afterIncoming(beforeHp - enemyHp, attackInfo);
 						Events.setHeal();
 					}
 					if (playerAttack && beforeHp > enemyHp && attackInfo.weaponName === 'nichirin katana' && Engine.NichirinColors) {
