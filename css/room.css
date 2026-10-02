@@ -101,3 +101,42 @@ div.storeRow.ammoRow > .row_val {
 	color: #888;
 	font-size: 0.9em;
 }
+
+/* Explicit batch purchase budget, including invalid quantities and live stock. */
+#buyQuantityPanel.buyQuantityPreview {
+	width: 480px;
+	max-width: calc(100vw - 32px);
+	max-height: calc(100vh - 48px);
+	box-sizing: border-box;
+	overflow-y: auto;
+	background: #fff;
+	color: #222;
+	border-color: currentColor;
+	line-height: 1.5;
+}
+#buyQuantityPanel.buyQuantityPreview .buyQuantityTitle { margin: 0 0 12px; }
+.buyQuantityStock { display: flex; gap: 12px; margin: 10px 0 14px; }
+.buyQuantityStock > div { flex: 1; border-bottom: 1px solid #888; padding-bottom: 5px; }
+.buyQuantityStock span, .buyQuantityStock strong { display: block; }
+.buyQuantityStock span { font-size: 12px; }
+.buyQuantityStock strong { font-size: 20px; }
+#buyQuantityPanel.buyQuantityPreview .buyQuantityInput {
+	margin-top: 5px;
+	color: inherit;
+	background: transparent;
+	border-color: currentColor;
+}
+.buyQuantityCostRow { display: grid; grid-template-columns: 1.3fr 1fr 1fr 1.4fr; gap: 8px; padding: 4px 0; }
+.buyQuantityCostRow > :not(:first-child) { text-align: right; }
+.buyQuantityCostHeading { border-bottom: 1px solid #888; font-size: 12px; }
+#buyQuantityError { min-height: 1.5em; color: #9c4934; font-weight: bold; }
+.buyQuantityNote { font-size: 12px; opacity: 0.8; margin-bottom: 14px; }
+#buyQuantityPanel.buyQuantityPreview .buyQuantityActions button {
+	background: transparent;
+	color: inherit;
+	border-color: currentColor;
+}
+#buyQuantityPanel.buyQuantityPreview .buyQuantityActions button:disabled { opacity: 0.45; cursor: default; }
+#buyQuantityPanel.buyQuantityPreview .buyQuantityActions button:hover:not(:disabled) { background: rgba(160, 160, 160, 0.15); }
+#buyQuantityPanel.buyQuantityPreview input:focus-visible,
+#buyQuantityPanel.buyQuantityPreview button:focus-visible { outline: 2px solid #b28c32; outline-offset: 2px; }

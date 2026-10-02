@@ -4,6 +4,7 @@ const path = require('node:path');
 const vm = require('node:vm');
 
 let modal = true;
+let overlay = null;
 const attack = { key: 'q', clicks: 0 };
 const heal = { key: '1', clicks: 0 };
 const background = { key: '1', clicks: 0 };
@@ -20,7 +21,7 @@ function selection(items) {
 }
 const context = {
   _: s => s,
-  window: {}, document: { activeElement: null, getElementById() { return null; } },
+  window: {}, document: { activeElement: null, getElementById(id) { return id === overlay ? {} : null; } },
   $: arg => {
     if (typeof arg === 'function') return; // Do not initialize the whole game.
     if (typeof arg !== 'string') return selection([arg]);
@@ -71,6 +72,12 @@ assert.equal(attack.clicks, 4, 'typing and browser shortcuts must not attack');
 modal = false;
 press('1');
 assert.equal(background.clicks, 1);
+for (const id of ['scrapQuantityOverlay', 'buyQuantityOverlay', 'loadoutEditorOverlay']) {
+  overlay = id;
+  press('1');
+  assert.equal(background.clicks, 1, 'planning dialogs must block background actions even with button focus');
+}
+overlay = null;
 assert.equal(press('w').stopped, undefined, 'unmatched W must remain available for movement');
 let moduleKeyUps = 0;
 Engine.activeModule = { keyUp() { moduleKeyUps++; } };

@@ -13,6 +13,7 @@ body.parent = root; root.nodes.push(body);
 let activeElement = body;
 const document = {
   documentElement: { contains: node => node === root || descendants(root).includes(node) },
+  getElementById: id => descendants(root).find(node => node.attrs.id === id) || null,
   get activeElement() { return activeElement; }
 };
 const matches = (node, selector) => selector[0] === '#' ? node.attrs.id === selector.slice(1)

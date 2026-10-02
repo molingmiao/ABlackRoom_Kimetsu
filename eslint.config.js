@@ -22,6 +22,7 @@ const gameGlobals = {
 	ExpeditionReport: 'writable',
 	FieldTreatment: 'writable',
 	UpdateNotes: 'writable',
+	LoadoutEditor: 'writable',
 	Fabricator: 'writable',
 	Events: 'writable',
 	Notifications: 'writable',

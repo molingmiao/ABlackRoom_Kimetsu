@@ -32,6 +32,12 @@ div#saveNotify {
 }
 .updateNotesTools select option { color: #EEE; background: #272823; }
 #scrapQuantityPanel { background-color: #272823; color: #EEE; }
+#loadoutEditorPanel { background-color: #272823; color: #EEE; }
+#buyQuantityOverlay #buyQuantityPanel { background-color: #272823; color: #EEE; border-color: #AAA; }
+#buyQuantityOverlay #buyQuantityPanel .buyQuantityInput { background: #1d1e19; color: #EEE; border-color: #888; }
+#buyQuantityOverlay #buyQuantityPanel .buyQuantityActions button { background: #272823; color: #EEE; border-color: #888; }
+#buyQuantityOverlay #buyQuantityPanel .buyQuantityActions button:hover { background: #3d3e34; }
+#buyQuantityError { color: #f0ae97; }
 
 .eventTitle:after {
 	background-color: #272823;

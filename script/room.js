@@ -1188,56 +1188,143 @@ var Room = {
 	},
 
 	_showBuyQuantityDialog: function (buyBtn, thing, good) {
-		var maxPossible = Room._getBuyMax(thing, good);
-		if (maxPossible <= 0) {
-			Notifications.notify(Room, _('not enough materials'));
-			return;
-		}
-
-		if ($('#buyQuantityOverlay').length) {
-			$('#buyQuantityOverlay').remove();
-		}
-
+		if (!Room.canBuyQuantityDialog() || !good || Room.TradeGoods[thing] !== good) return false;
+		Room.closeBuyQuantityDialog(false);
 		var overlay = $('<div>').attr('id', 'buyQuantityOverlay');
-		var panel = $('<div>').attr('id', 'buyQuantityPanel').appendTo(overlay);
-		$('<div>').addClass('buyQuantityTitle').text(_('buy {0}', _(thing))).appendTo(panel);
-		$('<div>').addClass('buyQuantityText').text(_('max buyable: {0}', maxPossible)).appendTo(panel);
+		var panel = $('<div>').attr({id:'buyQuantityPanel', role:'dialog', 'aria-modal':'true', 'aria-labelledby':'buyQuantityTitle'}).addClass('buyQuantityPreview').appendTo(overlay);
+		$('<h2>').attr('id','buyQuantityTitle').addClass('buyQuantityTitle').text(_('buy {0}', _(thing))).appendTo(panel);
+		var stock = $('<div>').addClass('buyQuantityStock').appendTo(panel);
+		$('<label>').attr('for','buyQuantityInput').text('本次购买数量').appendTo(panel);
 		var input = $('<input>').addClass('buyQuantityInput').attr({
-			type: 'number',
-			min: 1,
-			max: maxPossible,
-			value: maxPossible
+			id:'buyQuantityInput', type:'number', min:1, step:1, value:1,
+			'aria-describedby':'buyQuantityError buyQuantityCost'
 		}).appendTo(panel);
+		var preview = $('<div>').attr({id:'buyQuantityCost', 'aria-live':'polite'}).appendTo(panel);
+		var error = $('<p>').attr({id:'buyQuantityError', role:'status'}).appendTo(panel);
+		$('<p>').addClass('buyQuantityNote').text('只按确认的数量购买；不会自动买到最大数量。购买使用仓库材料，物品放入仓库。').appendTo(panel);
 		var actions = $('<div>').addClass('buyQuantityActions').appendTo(panel);
-		var commit = function () {
-			var entered = parseInt(input.val(), 10);
-			if (!isFinite(entered)) {
-				entered = maxPossible;
-			}
-			entered = Math.max(1, Math.min(maxPossible, entered));
-			overlay.remove();
-			Room.buy(buyBtn, { shiftKey: true, customQuantity: entered });
+		var trigger = $(buyBtn)[0] || document.activeElement;
+		// Trade buttons are divs; make the actual trigger programmatically focusable on close.
+		if (trigger && $(trigger).attr('tabindex') === undefined) $(trigger).attr('tabindex',-1);
+		var dialog = {overlay:overlay, trigger:trigger, closed:false};
+		Room._buyDialog = dialog;
+		var refresh = dialog.refresh = function() {
+			if (dialog.closed || Room._buyDialog !== dialog) return;
+			if (!Room.canBuyQuantityDialog()) { Room.closeBuyQuantityDialog(false); return; }
+			var info = Room.buyPreview(thing, input.val());
+			stock.empty();
+			[['仓库现有',info.have],['目前最多可买',info.maximum],['本次购买',info.amount]].forEach(function(row) {
+				var line = $('<div>').appendTo(stock);
+				$('<span>').text(row[0]).appendTo(line);
+				$('<strong>').text(row[1]).appendTo(line);
+			});
+			input.attr('max',info.maximum).attr('aria-invalid',!info.valid);
+			preview.empty();
+			var heading = $('<div>').addClass('buyQuantityCostRow buyQuantityCostHeading').appendTo(preview);
+			['材料','现有','总花费','购买后剩余'].forEach(function(label) { $('<strong>').text(label).appendTo(heading); });
+			info.materials.forEach(function(mat) {
+				var line = $('<div>').addClass('buyQuantityCostRow').appendTo(preview);
+				$('<span>').text(_(mat.key)).appendTo(line);
+				$('<span>').text(mat.have).appendTo(line);
+				$('<strong>').text(mat.cost === null ? '—' : mat.cost).appendTo(line);
+				$('<strong>').text(mat.remaining === null ? '—' : mat.remaining).appendTo(line);
+			});
+			error.text(info.error);
+			ok.prop('disabled',!info.valid);
 		};
-		$('<button>').addClass('buyQuantityOk').text(_('ok')).on('click', commit).appendTo(actions);
-		$('<button>').addClass('buyQuantityCancel').text(_('cancel')).on('click', function () { overlay.remove(); }).appendTo(actions);
-
-		overlay.on('click', function (e) {
-			if (e.target === overlay[0]) overlay.remove();
+		var commit = function() {
+			if (dialog.closed || Room._buyDialog !== dialog || !document.documentElement.contains(overlay[0])) return false;
+			refresh();
+			if (dialog.closed) return false;
+			var info = Room.buyPreview(thing, input.val());
+			if (!info.valid) return false;
+			Room.closeBuyQuantityDialog(false);
+			var success = Room.buy(buyBtn, {shiftKey:true, customQuantity:info.amount});
+			if (trigger && document.documentElement.contains(trigger)) trigger.focus();
+			return success;
+		};
+		var ok = $('<button>').attr('type','button').addClass('buyQuantityOk').text('确认购买').on('click',commit).appendTo(actions);
+		var cancelDialog = function() { if (Room._buyDialog === dialog) Room.closeBuyQuantityDialog(true); };
+		var cancel = $('<button>').attr('type','button').addClass('buyQuantityCancel').text(_('cancel')).on('click',cancelDialog).appendTo(actions);
+		overlay.on('click',function(e) {
+			e.stopPropagation();
+			if (e.target === overlay[0]) cancelDialog();
 		});
-		input.on('keydown', function (e) {
-			if (e.key === 'Enter') {
-				e.preventDefault();
-				commit();
+		overlay.on('keydown',function(e) {
+			e.stopPropagation();
+			if (e.key === 'Escape') { e.preventDefault(); cancelDialog(); }
+			else if (e.key === 'Enter' && e.target === input[0]) { e.preventDefault(); commit(); }
+			else if (e.key === 'Tab') {
+				var focusables = ok.prop('disabled') ? [input[0],cancel[0]] : [input[0],ok[0],cancel[0]];
+				var index = focusables.indexOf(document.activeElement);
+				if ((e.shiftKey && index <= 0) || (!e.shiftKey && index === focusables.length - 1)) {
+					e.preventDefault();
+					focusables[e.shiftKey ? focusables.length - 1 : 0].focus();
+				}
 			}
 		});
+		overlay.on('keyup',function(e) { e.stopPropagation(); });
+		input.on('input change',refresh);
+		$.Dispatch('stateUpdate').subscribe(refresh);
 		overlay.appendTo('body');
+		refresh();
 		input.focus().select();
+		return true;
+	},
+
+	buyQuantity: function(value) {
+		var amount = typeof value === 'string' && /^\d+$/.test(value.trim()) ? Number(value.trim()) : value;
+		return typeof amount === 'number' && Number.isSafeInteger(amount) && amount > 0 ? amount : 0;
+	},
+
+	buyPreview: function(thing, quantity) {
+		var good = Room.TradeGoods[thing];
+		var count = function(key) {
+			var value = $SM.get('stores["' + key + '"]',true);
+			return typeof value === 'number' && isFinite(value) && value > 0 ? value : 0;
+		};
+		var have = count(thing), amount = Room.buyQuantity(quantity), materials = [];
+		var tester = !!Engine.options.testerMode;
+		var storeLimit = typeof $SM.MAX_STORE === 'number' ? $SM.MAX_STORE : Number.MAX_SAFE_INTEGER;
+		var maximum = Math.max(0, Math.floor(storeLimit - have)), validCost = !!good;
+		if (good) {
+			if (typeof good.maximum === 'number') maximum = Math.min(maximum,Math.max(0,Math.floor(good.maximum - have)));
+			var cost = good.cost();
+			Object.keys(cost).forEach(function(key) {
+				var price = cost[key], current = count(key);
+				if (typeof price !== 'number' || !isFinite(price) || price < 0) validCost = false;
+				else {
+					if (price > 0 && !tester) maximum = Math.min(maximum,Math.floor(current / price));
+					var total = amount ? (tester ? 0 : price * amount) : null;
+					materials.push({key:key, have:current, cost:total, remaining:total === null ? null : current - total});
+				}
+			});
+		}
+		if (!validCost) maximum = 0;
+		var error = !validCost ? '该物品目前无法购买。' : !amount ? '请输入大于 0 的整数。'
+			: amount > maximum ? '数量超过目前最多可买数量，请重新输入。' : tester ? '测试模式：不消耗材料。' : '';
+		return {have:have, maximum:maximum, amount:amount, materials:materials, valid:validCost && amount > 0 && amount <= maximum, error:error};
+	},
+
+	canBuyQuantityDialog: function() {
+		return Engine.activeModule === Room && !(typeof Events !== 'undefined' && Events.activeEvent && Events.activeEvent())
+			&& !$('#scrapQuantityOverlay').length && !$('#loadoutEditorOverlay').length;
+	},
+
+	closeBuyQuantityDialog: function(restoreFocus) {
+		var dialog = Room._buyDialog;
+		if (!dialog) return;
+		Room._buyDialog = null;
+		dialog.closed = true;
+		$.Dispatch('stateUpdate').unsubscribe(dialog.refresh);
+		dialog.overlay.remove();
+		if (restoreFocus && dialog.trigger && document.documentElement.contains(dialog.trigger)) dialog.trigger.focus();
 	},
 
 	_getBuyCount: function (thing, good, event) {
 		if (!good || !good.cost) return 1;
 		if (!event || !event.shiftKey) return 1;
-		if (event.customQuantity) return event.customQuantity;
+		if (Object.prototype.hasOwnProperty.call(event,'customQuantity')) return Room.buyQuantity(event.customQuantity) || -1;
 		Room._showBuyQuantityDialog(event.buyBtn, thing, good);
 		return 0;
 	},
@@ -1247,10 +1334,11 @@ var Room = {
 		event.buyBtn = buyBtn;
 		var thing = $(buyBtn).attr('buildThing');
 		var good = Room.TradeGoods[thing];
+		if (!good) return false;
 		var numThings = $SM.get('stores["' + thing + '"]', true) || 0;
 		if (numThings < 0) numThings = 0;
 		if (good.maximum <= numThings) {
-			return;
+			return false;
 		}
 
 		var quantity = Room._getBuyCount(thing, good, event);
@@ -1264,12 +1352,13 @@ var Room = {
 			quantity = good.maximum - numThings;
 		}
 		if (quantity <= 0) {
-			return;
+			return false;
 		}
 
 		var storeMod = {};
 		var cost = good.cost();
 		for (var k in cost) {
+			if (typeof cost[k] !== 'number' || !isFinite(cost[k]) || cost[k] < 0 || !isFinite(cost[k] * quantity)) return false;
 			var have = $SM.get('stores["' + k + '"]', true) || 0;
 			if (have < cost[k] * quantity && !Engine.options.testerMode) {
 				Notifications.notify(Room, _("not enough " + k));
@@ -1278,19 +1367,19 @@ var Room = {
 				storeMod[k] = have - cost[k] * quantity;
 			}
 		}
-		if (!Engine.options.testerMode) {
-			$SM.setM('stores', storeMod);
-		}
+		if (numThings + quantity > (typeof $SM.MAX_STORE === 'number' ? $SM.MAX_STORE : Number.MAX_SAFE_INTEGER)) return false;
+		if (Engine.options.testerMode) storeMod = {};
+		storeMod[thing] = (storeMod[thing] === undefined ? numThings : storeMod[thing]) + quantity;
+		$SM.setM('stores',storeMod);
 
 		Notifications.notify(Room, good.buildMsg);
 		if (quantity > 1) {
 			Notifications.notify(Room, _('bought {0} {1}', quantity, _(thing)));
 		}
 
-		$SM.add('stores["' + thing + '"]', quantity);
-
 		// audio
 		AudioEngine.playSound(AudioLibrary.BUY);
+		return true;
 	},
 
 	build: function (buildBtn) {

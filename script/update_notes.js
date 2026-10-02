@@ -3,6 +3,15 @@ var UpdateNotes = window.UpdateNotes = {
   categories: ['全部', '玩法', '资源', '界面', '修复'],
   entries: [
     {
+      id: '2026-10-02-planning', date: '2026-10-02', title: '采购预算与配置目标编辑',
+      items: [
+        ['界面', '批量购买预算预览', '按住 Shift 购买，先查看当前库存、最多可买数量及每种材料的总花费和购买后剩余；默认选 1 件，修改数量实时更新。'],
+        ['修复', '采购确认不再猜数量', '空值、小数、负数及超过当前可买数量的输入不执行；库存变化后重新检查，取消或 Escape 不扣费，过期确认不会重复购买。'],
+        ['界面', '直接编辑配置目标', '远征和无限城配置可以直接修改目标数量，已发现但库存为 0 的物品也能规划；不必先装满背包再保存，0 表示不主动补齐。'],
+        ['界面', '规划与实际装包分开', '显示目标重量、当前预计可补齐量和库存／空间缺口；保存只更新目标，不购买、不装包、不换装备，超过容量的目标仍受实际补齐规则限制。']
+      ]
+    },
+    {
       id: '2026-10-02-notices', date: '2026-10-02', title: '更新公告、生产诊断与回收预览',
       items: [
         ['界面', '菜单更新公告', '新增游戏内公告入口，按开发批次整理近期更新；可按玩法、资源、界面、修复筛选，历史内容可展开或收起。'],
@@ -124,7 +133,7 @@ var UpdateNotes = window.UpdateNotes = {
     if (![window.Room, window.Outside, window.Path, window.Ship, window.Fabricator].some(function(module) {
       return module && Engine.activeModule === module;
     })) return false;
-    return !document.getElementById('scrapQuantityOverlay') && !document.getElementById('buyQuantityOverlay');
+    return !document.getElementById('scrapQuantityOverlay') && !document.getElementById('buyQuantityOverlay') && !document.getElementById('loadoutEditorOverlay');
   },
   show: function() {
     if (!UpdateNotes.canShow()) return false;

@@ -458,18 +458,7 @@ var Path = {
 		var space = Path.getFreeSpace();
 		var currentBagCapacity = 0;
 		// Add the non-craftables to the craftables
-		var carryable = $.extend({
-			'cured meat': { type: 'tool', desc: _('restores') + ' ' + World.MEAT_HEAL + ' ' + _('hp') },
-			'wisteria bullet': { type: 'tool', desc: _('use with rifle') },
-			'wisteria bomb': {type: 'weapon' },
-			'kusarigama': {type: 'weapon' },
-			'nichirin gun': {type: 'weapon' },
-			'solar crystal': {type: 'tool', desc: _('emits a soft red glow') },
-			'nichirin spear': {type: 'weapon' },
-			'wisteria charm': { type: 'tool', desc: _('reduces hostile encounter rate; each crumbles when one is averted') },
-			'demon stone': { type: 'tool' },
-			'medicine': {type: 'tool', desc: _('restores') + ' ' + World.MEDS_HEAL + ' ' + _('hp') }
-		}, Room.Craftables, Fabricator.Craftables);
+		var carryable = Path.carryables();
 
 		// 分类排序：武器按伤害降序 → 消耗品按名称升序
 		var weaponKeys = [], toolKeys = [];
@@ -718,7 +707,8 @@ var Path = {
 		return {have:have, carried:carried, available:available, amount:validAmount ? entered : 0, refund:refund, valid:!error, error:error};
 	},
 	canScrap: function() {
-		return Engine.activeModule === Path && !Events.activeEvent();
+		return Engine.activeModule === Path && !Events.activeEvent()
+			&& !$('#loadoutEditorOverlay').length && !$('#buyQuantityOverlay').length;
 	},
 	closeScrapQuantityDialog: function(restoreFocus) {
 		var dialog = Path._scrapDialog;
@@ -918,6 +908,21 @@ var Path = {
 		Path.updateJourneyGuide();
 		return true;
 	},
+	// Use the same item definitions for packing and editing future preparation targets.
+	carryables: function() {
+		return $.extend({
+			'cured meat': { type: 'tool', desc: _('restores') + ' ' + World.MEAT_HEAL + ' ' + _('hp') },
+			'wisteria bullet': { type: 'tool', desc: _('use with rifle') },
+			'wisteria bomb': {type: 'weapon' },
+			'kusarigama': {type: 'weapon' },
+			'nichirin gun': {type: 'weapon' },
+			'solar crystal': {type: 'tool', desc: _('emits a soft red glow') },
+			'nichirin spear': {type: 'weapon' },
+			'wisteria charm': { type: 'tool', desc: _('reduces hostile encounter rate; each crumbles when one is averted') },
+			'demon stone': { type: 'tool' },
+			'medicine': {type: 'tool', desc: _('restores') + ' ' + World.MEDS_HEAL + ' ' + _('hp') }
+		}, Room.Craftables, Fabricator.Craftables);
+	},
 	// Saved preparation targets are independent of the current expedition inventory.
 	LOADOUT_NAMES: { expedition: 'expedition loadout', castle: 'infinity castle loadout' },
 	loadoutCount: function(value) {
@@ -1090,6 +1095,7 @@ var Path = {
 			Path.showLoadoutResult('');
 		});
 		$('<button>').attr({ id: 'saveLoadoutBtn', type: 'button' }).text(_('save current loadout')).on('click', Path.saveLoadout).appendTo(row);
+		$('<button>').attr({ id: 'editLoadoutBtn', type: 'button' }).text('编辑配置目标').on('click', function() { LoadoutEditor.show(this); }).appendTo(row);
 		$('<button>').attr({ id: 'suggestLoadoutBtn', type: 'button' }).text(_('create suggested targets')).on('click', Path.createSuggestedLoadout).appendTo(row);
 		$('<button>').attr({ id: 'equipLoadoutBtn', type: 'button' }).text(_('apply saved equipment')).on('click', Path.applyLoadoutEquipment).appendTo(row);
 		$('<div>').attr('id', 'loadoutSummary').appendTo(panel);

@@ -833,6 +833,8 @@
       if(Engine.activeModule == module) {
         return;
       }
+      if (window.LoadoutEditor && module !== Path) LoadoutEditor.close(false);
+      if (window.Room && Room.closeBuyQuantityDialog && module !== Room) Room.closeBuyQuantityDialog(false);
 
       var currentIndex = Engine.activeModule ? $('.location').index(Engine.activeModule.panel) : 1;
       $('div.headerButton').removeClass('selected');
@@ -975,6 +977,7 @@
     _tryHotkey: function(e) {
       if (document.getElementById('castleReportOverlay')) return false;
       if (document.getElementById('scrapQuantityOverlay') || document.getElementById('buyQuantityOverlay')) return false;
+      if (document.getElementById('loadoutEditorOverlay')) return false;
       if (e.ctrlKey || e.altKey || e.metaKey || e.isComposing) return false;
       var key = Engine._resolveHotkey(e);
       if (!key) return false;

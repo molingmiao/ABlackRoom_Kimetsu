@@ -1743,6 +1743,8 @@ var Events = {
 		if(!event) {
 			return;
 		}
+		if (window.LoadoutEditor) LoadoutEditor.close(false);
+		if (window.Room && Room.closeBuyQuantityDialog) Room.closeBuyQuantityDialog(false);
 		event.audio && AudioEngine.playEventMusic(event.audio);
 		Engine.event('game event', 'event');
 		Engine.keyLock = true;

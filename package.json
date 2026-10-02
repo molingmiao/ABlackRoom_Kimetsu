@@ -22,7 +22,7 @@
     "test:camp": "node tools/test_camp_guide.cjs",
     "test:reserves": "node tools/test_production_reserves.cjs",
     "test:economy": "node tools/test_economy.cjs && node tools/test_cured_meat_recipe.cjs",
-    "test:ux": "node tools/test_update_notes.cjs && node tools/test_production_overview.cjs && node tools/test_scrap_preview.cjs",
+    "test:ux": "node tools/test_update_notes.cjs && node tools/test_production_overview.cjs && node tools/test_scrap_preview.cjs && node tools/test_buy_preview.cjs && node tools/test_loadout_editor.cjs",
     "update_pot": "pybabel extract -F lang/babel.cfg -c \"TRANSLATORS\" script -o lang/adarkroom.pot"
   },
   "dependencies": {
