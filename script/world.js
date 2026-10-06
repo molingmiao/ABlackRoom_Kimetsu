@@ -113,12 +113,6 @@ var World = {
       cooldown: 1,
       cost: { 'solar crystal': 1 }
     },
-    'flame blade': {
-      verb: _('slice'),
-      type: 'melee',
-      damage: 10,
-      cooldown: 2
-    },
     'bind kunai': {
       verb: _('stun'),
       type: 'ranged',

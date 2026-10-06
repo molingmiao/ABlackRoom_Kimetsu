@@ -5,7 +5,7 @@ var StoryCrafting = window.StoryCrafting = {
 	},
 	// Reuse the live recipes so story commissions cannot drift from ordinary crafting.
 	recipe: function(item) {
-		if (item === 'flame blade' || (window.NichirinForge && NichirinForge.items[item])) return null;
+		if (item === 'flame blade' || item === 'energy blade' || (window.NichirinForge && NichirinForge.items[item])) return null;
 		var recipe = Room.Craftables[item];
 		if (recipe && ['good', 'tool', 'weapon'].indexOf(recipe.type) >= 0) {
 			if ($SM.get('game.builder.level', true) < 4 ||

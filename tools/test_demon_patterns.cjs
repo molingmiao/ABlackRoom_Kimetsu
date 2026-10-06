@@ -51,14 +51,18 @@ function fixture(options = {}) {
   for (const file of ['events.js', 'combat_telegraphs.js', 'demon_patterns.js']) {
     vm.runInContext(fs.readFileSync(path.join(__dirname, '../script', file), 'utf8'), ctx);
   }
-  const scene = {combat: true, damage: 20, demonPatternIds: ctx.DemonPatterns.TYPES.map(type => type.id)};
+  const scene = {combat: true, damage: 20, health: 200, castleElite: !!options.elite, demonPatternIds: ctx.DemonPatterns.TYPES.map(type => type.id)};
   scene.telegraphAttacks = scene.demonPatternIds.map(key => Object.assign(ctx.DemonPatterns.makeArt(key, 20), {interval: 60, telegraphSec: 0.2}));
+  if (options.variant) {
+    ctx.DemonPatterns.configureScene(scene, options.floor || 21, options.elite ? 'elite' : 'normal', options.variant);
+    enemy.data('hp', scene.health).data('maxHp', scene.health);
+  }
   const event = {scenes: {start: scene}};
   let current = event;
   const Events = ctx.Events;
   Object.assign(Events, {
-    activeScene: 'start', activeEvent: () => current, eventPanel: () => panel,
-    updateFighterDiv() {}, drawFloatText() {}, setHeal() {}, setTakeAll() {}, canLeave() {},
+    activeScene: 'start', won: false, fought: false, activeEvent: () => current, eventPanel: () => panel,
+    updateFighterDiv() {}, drawFloatText() {}, setHeal() {}, setTakeAll() {}, canLeave() {}, winFight() { Events.won = true; },
     checkPlayerDeath() {
       if (ctx.World.health > 0) return false;
       if (options.revive && !Events._revived) {
@@ -132,7 +136,7 @@ function fixture(options = {}) {
   assert.equal(first.hp, 74); assert.equal(first.dmg, 5); assert.equal(first.patternId, null);
   for (const [floor, name] of [[11, 'combo'], [21, 'armour'], [31, 'siphon'], [41, 'bind'], [51, 'shadow']]) {
     let rolls = 0;
-    f.ctx.Math.random = () => rolls++ % 2 ? 0.999 : 0;
+    f.ctx.Math.random = () => rolls++ % 2 ? 0.999 : 0.3;
     const specialist = f.ctx.Space._pickEnemy(floor, true);
     assert.equal(specialist.patternId, name, 'real castle enemy generation chooses each progressive specialist');
     assert.equal(specialist.isElite, true);
@@ -140,6 +144,118 @@ function fixture(options = {}) {
   }
   f.ctx.Math.random = () => 0.999;
   assert.equal(f.ctx.Space._pickEnemy(51, false).patternId, null, 'familiar demons remain alongside specialist variants');
+}
+{
+  const f = fixture(); f.stop();
+  assert.equal(f.api.availableVariants(10).length, 0);
+  assert.equal(f.api.availableVariants(11).length, 1);
+  assert.equal(f.api.availableVariants(21).length, 2);
+  for (const [floor, normal, elite] of [[21, 4, 6], [31, 5, 7], [101, 12, 14], [10000, 12, 18]]) {
+    assert.equal(f.api.requiredHits(floor, false), normal);
+    assert.equal(f.api.requiredHits(floor, true), elite);
+  }
+  vm.runInContext(fs.readFileSync(path.join(__dirname, '../script/space.js'), 'utf8'), f.ctx);
+  for (const floor of [11, 20, 51, 10000]) for (const elite of [false, true]) {
+    f.ctx.Math.random = () => 0;
+    const e = f.ctx.Space._pickEnemy(floor, elite);
+    assert.equal(e.patternId, 'scurry');
+    assert.equal(e.dmg, elite ? 2 : 1, 'fast small demon never gains high late-floor damage');
+    assert.equal(e.delay, 0.4);
+    const scene = {damage: e.dmg * 1.6, health: e.hp, castleElite: elite, telegraphAttacks: [{dmg: 100}]};
+    f.api.configureScene(scene, floor, elite ? 'elite' : 'normal', e.patternId);
+    assert.equal(scene.damage, elite ? 2 : 1, 'even curse/elite setup cannot multiply the bounded fast strike');
+    assert.equal(scene.attackDelay, 0.4);
+    assert.equal(scene.telegraphAttacks.length, 0, 'fast demons do not inherit damaging blood arts');
+    assert.equal(scene.castleVariantId, 'scurry');
+  }
+  for (const elite of [false, true]) {
+    let rolls = 0;
+    f.ctx.Math.random = () => rolls++ % 2 ? 0.999 : 0;
+    const e = f.ctx.Space._pickEnemy(31, elite);
+    assert.equal(e.patternId, 'bloodless');
+    assert.equal(e.hp, elite ? 7 : 5);
+    const scene = {health: 1, damage: e.dmg, castleElite: elite, telegraphAttacks: [{patternType: 'siphon'}]};
+    f.api.configureScene(scene, 31, elite ? 'elite' : 'normal', e.patternId);
+    assert.equal(scene.health, elite ? 7 : 5, 'damage potions cannot bypass required hit count');
+    assert.equal(scene.castleHitCount, scene.health);
+    assert.equal(scene.telegraphAttacks.length, 0, 'a bloodless body cannot heal its hit counter through siphon');
+  }
+  const boss = {castleBoss: true, damage: 30, health: 1000};
+  f.api.configureScene(boss, 51, 'boss', 'bloodless');
+  assert.equal(boss.castleVariantId, undefined, 'named guardians keep their story identity and health');
+  assert.equal(boss.health, 1000);
+}
+for (const variant of ['scurry', 'bloodless']) {
+  const f = fixture({variant});
+  assert.ok(f.api._fight, 'intrinsic demon guide starts without a blood-art timer');
+  assert.equal(f.ctx.CombatTelegraphs._fight.arts.length, 0);
+  assert.ok(f.api._fight.box.children[0].content.includes(variant === 'bloodless' ? '空壳鬼' : '疾爪小鬼'));
+  assert.ok(f.api._fight.live.content.includes(variant === 'bloodless' ? '4 / 4' : '0.4 秒'));
+  const callbacks = [...f.timers.values()].map(timer => timer.callback);
+  f.changeScene(); f.tick(100);
+  assert.equal(f.api._fight, null); assert.equal(f.timers.size, 0);
+  callbacks.forEach(fn => fn());
+  assert.equal(f.strikes(), 0, 'a stale intrinsic guide never creates attacks or progress in a later battle');
+}
+for (const elite of [false, true]) {
+  const f = fixture({variant: 'scurry', elite, floor: 51});
+  f.scene.hit = 1;
+  f.ctx.Events.startEnemyAttacks();
+  f.tick(1600);
+  assert.equal(f.strikes(), 4, 'the real normal-attack scheduler delivers a strike every 0.4 seconds');
+  assert.equal(f.ctx.World.health, 160 - 4 * (elite ? 2 : 1), 'the real damage path keeps repeated fast strikes individually low');
+  f.control();
+  const strikes = f.strikes(); f.tick(2800);
+  assert.equal(f.strikes(), strikes, 'control creates a meaningful opening against fast small demons');
+  f.ctx.Events.clearTimeouts(); f.tick(f.ctx.Events.STUN_DURATION);
+  assert.equal(f.api._fight, null); assert.equal(f.timers.size, 0, 'battle cleanup owns both fast normals and intrinsic guide');
+}
+{
+  const f = fixture({variant: 'bloodless'});
+  const total = f.scene.castleHitCount;
+  f.ctx.Space.getLifestealPct = () => 1;
+  f.ctx.World.health = 60; f.player.data('hp', 60);
+  let colorHeals = 0;
+  f.ctx.Engine.NichirinColors = {red: {healOnHit: 10}};
+  f.ctx.Engine.getNichirinColor = () => 'red';
+  f.ctx.Events.restoreHealth = () => { colorHeals++; };
+  f.hit('nichirin katana', 1000000);
+  assert.equal(f.enemy.data('hp'), total - 1, 'even huge direct damage removes only one required hit');
+  assert.equal(f.ctx.World.health, 60); assert.equal(colorHeals, 0, 'bloodless attacks provide neither talent nor blade-color healing');
+  f.hit('sword', -1);
+  assert.equal(f.enemy.data('hp'), total - 1, 'miss does not progress required hits');
+  f.enemy.data('status', 'shield'); f.hit('sword', 1000000);
+  assert.equal(f.enemy.data('hp'), total - 1, 'shield absorption neither progresses nor restores a hit count');
+  assert.equal(f.enemy.data('status'), 'none');
+  f.control(); assert.equal(f.enemy.data('hp'), total - 1, 'control alone does not progress required hits');
+  f.ctx.Events.dotDamage(f.enemy, 1000000, 'poison');
+  assert.equal(f.enemy.data('hp'), total - 1, 'damage-over-time cannot bypass count or kill a bloodless body');
+  assert.equal(f.ctx.Events.won, false);
+  for (let i = 0; i < total - 2; i++) f.hit('gun', 1000000);
+  assert.equal(f.enemy.data('hp'), 1, 'every melee or ranged direct attack counts exactly once');
+  f.api.update(); assert.ok(f.api._fight.live.content.includes('1 / 4'));
+  f.hit('sword', 1); assert.equal(f.enemy.data('hp'), 0, 'the exact final required direct hit defeats the body');
+  f.stop(); f.tick(f.ctx.Events.STUN_DURATION); assert.equal(f.timers.size, 0);
+}
+for (const variant of ['scurry', 'bloodless']) for (const elite of [false, true]) for (const pathName of ['normal', 'ambush']) {
+  const f = fixture(); f.stop();
+  vm.runInContext(fs.readFileSync(path.join(__dirname, '../script/space.js'), 'utf8'), f.ctx);
+  const space = f.ctx.Space;
+  space.currentFloor = 31;
+  const stats = {enemy: variant, hp: 140, dmg: 10, hit: 0.9, delay: 1.2, isElite: elite, patternId: variant};
+  space._pickEnemy = () => Object.assign({}, stats);
+  space._configureBattleLoot = () => {};
+  let event;
+  f.ctx.Events.startEvent = value => {event = value;};
+  if (pathName === 'normal') space.triggerBattle(elite);
+  else { space._ambushRemaining = 3; space._ambushNext(); }
+  const scene = event.scenes.start;
+  assert.equal(scene.castlePatternId, variant, pathName + ' carries the selected intrinsic body into the actual fight scene');
+  assert.equal(scene.castleElite, elite);
+  f.api.configureScene(scene, 31, elite ? 'elite' : 'normal', scene.castlePatternId);
+  assert.equal(scene.castleVariantId, variant);
+  if (variant === 'bloodless') assert.equal(scene.health, elite ? 7 : 5);
+  else { assert.equal(scene.damage, elite ? 2 : 1); assert.equal(scene.attackDelay, 0.4); }
 }
 {
   const f = fixture(); f.cast('combo');
@@ -257,4 +373,4 @@ for (const revive of [false, true]) {
   f.ctx.Engine.activeModule = {}; f.hit('forged', 12); assert.equal(f.enemy.data('hp'), 173, 'outside the castle no matching-style multiplier is applied');
   f.ctx.Engine.activeModule = f.ctx.Space; f.stop();
 }
-console.log('PASS: five progressive demon tactics, real-hit counters, armour, siphon, binding/cleansing, shadows, three-part combos, bounded strength, adaptation, death/revive, stale-timer cleanup and forged blade actual damage.');
+console.log('PASS: five progressive demon tactics, fast low-damage bodies, bounded bloodless hit counts, no lifesteal/color healing/DOT bypass, real-hit counters, adaptation, death/revive and stale-timer cleanup.');

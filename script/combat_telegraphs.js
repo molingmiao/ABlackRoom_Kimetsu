@@ -18,7 +18,8 @@ var CombatTelegraphs = {
   },
   start: function(scene, parent) {
     CombatTelegraphs.stop();
-    if (!scene.telegraphAttacks || !scene.telegraphAttacks.length) return;
+    var attacks = scene.telegraphAttacks || [];
+    if (!attacks.length && !scene.castleVariantId) return;
     var panel = Events.eventPanel();
     var box = $('<div>').addClass('combatTelegraphs').attr('aria-label', _('blood art warnings')).appendTo(parent);
     var fight = CombatTelegraphs._fight = {
@@ -30,9 +31,9 @@ var CombatTelegraphs = {
     // the rhythm guide, so a boss's three techniques cannot hide a new cast.
     fight.chargeBox = $('<div>').addClass('combatTelegraphCharges').appendTo(box);
     if (typeof DemonPatterns !== 'undefined') DemonPatterns.start(scene, box, fight);
-    $('<div>').addClass('combatTelegraphHint').text(_('watch for blood arts here. a successful control hit during a warning interrupts the cast.')).appendTo(box);
-    if (fight.adaptive) $('<div>').addClass('combatTelegraphAdaptation').text(_('castle demons retry faster after an interruption. warning time stays unchanged; a completed cast resets the interval.')).appendTo(box);
-    scene.telegraphAttacks.forEach(function(attack, index) {
+    if (attacks.length) $('<div>').addClass('combatTelegraphHint').text(_('watch for blood arts here. a successful control hit during a warning interrupts the cast.')).appendTo(box);
+    if (attacks.length && fight.adaptive) $('<div>').addClass('combatTelegraphAdaptation').text(_('castle demons retry faster after an interruption. warning time stays unchanged; a completed cast resets the interval.')).appendTo(box);
+    attacks.forEach(function(attack, index) {
       if (fight.adaptive) {
         var baseInterval = Math.max(0.1, attack.interval || 12);
         var art = {

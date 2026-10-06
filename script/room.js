@@ -14,28 +14,28 @@ var Room = {
 	StoreDescriptions: {
 		// 基础资源
 		'wood': _('烧火、建造与合成的基础原料'),
-		'fur': _('兽皮——可用于交易、鞄皮成牋革'),
-		'meat': _('生肉，可腐坏；不能直接骨出征心充体力'),
+		'fur': _('毛皮——用于交易，也可由制革工鞣制成皮革'),
+		'meat': _('生肉——用于制作熏肉，不能直接作为远征口粮或恢复生命'),
 		'cured meat': _('熏肉，远征口粮。食用可恢复生命'),
-		'bait': _('授诱猟物，配合陷阱使用'),
+		'bait': _('诱饵——配合陷阱使用，提高捕获效率'),
 		'scales': _('鬼鳞——探索鬼族与无限城战斗可得，用于交易和补给'),
-		'teeth': _('兽齿——可与商人交换炼炭'),
-		'cloth': _('布料，用于缝装与制作某些装备'),
-		'leather': _('鞄皮后的兽革，用于护具、背包、装备组件'),
-		'iron': _('铁错——锻造较高阶装备的原料'),
-		'coal': _('炭火，炼钢场燃料'),
-		'steel': _('钢错——高级锻造与重型装备原料'),
-		'sulphur': _('硝碎，炼制酱粉与炸裂物的原料'),
-		'compass': _('指南针——解锁世界探索与面包'),
+		'teeth': _('牙齿——用于交易、制作武器与购买药剂'),
+		'cloth': _('布料——用于制作火把、背包与部分装备'),
+		'leather': _('皮革——由毛皮鞣制而成，用于护甲、背包与装备'),
+		'iron': _('铁——锻造装备与炼制钢材的原料'),
+		'coal': _('煤——炼钢场的燃料'),
+		'steel': _('钢——高级锻造与重型装备的原料'),
+		'sulphur': _('硫磺——用于制作紫藤弹与爆炸物'),
+		'compass': _('罗盘——解锁世界探索与背包整备'),
 
 		// 远征消耗品
 		'medicine': _('药品，使用后大幅恢复生命'),
 		'wisteria oil': _('紫藤油，使用与药品同类，远征中助息'),
-		'concentration pill': _('丸药，恢复气力与状态'),
-		'torch': _('火把，黑暗场景必备；能被萤火珠替代'),
-		'firefly orb': _('萤火珠——走远征时永久照明，代替火把'),
+		'concentration pill': _('全集中丸：战斗中消耗10生命，使攻击间隔减半，持续15秒；重复服用刷新时长，不叠加。'),
+		'torch': _('火把——黑暗场景的照明工具；携带萤之珠可替代火把'),
+		'firefly orb': _('萤之珠——远征时永久照明，代替火把，不因照明而消耗'),
 		'wisteria charm': _('紫藤护身符——身携可驱鬼'),
-		'solar crystal': _('日轮结晶——散发柔和红光，是高阶武器的能源'),
+		'solar crystal': _('太阳结晶——高阶远程武器使用的能源'),
 		'demon stone': _('鬼石——锻造高阶战争器械的稀有原料'),
 
 		// 弹药 / 投掷
@@ -44,10 +44,10 @@ var Room = {
 
 		// 近身武器
 		'bone yari': _('骨枪——初期粗陋但实用的近战兵器'),
-		'kou katana': _('铁口刯——中期主力近战'),
+		'kou katana': _('钢之刀——中期主力近战武器'),
 		'nichirin katana': _('日轮刀——鬼杀队魂之武器，与使用者呼吸共鸣'),
 		'nichirin spear': _('日轮枪——长柄、高伤害，适合面对强鬼'),
-		'flame blade': _('焰刃刀——炼狱杯醁郎所持之刀'),
+		'flame blade': _('日轮刀【炎】——适配炎之呼吸的锻造日轮刀'),
 
 		// 远程 / 特殊武器
 		'wisteria gun': _('紫藤之枪——响着烈响射出紫藤弹的枪型武器'),
@@ -940,6 +940,17 @@ var Room = {
 			}).addClass('storeGroup').css('opacity', 0);
 			wNeedsAppend = true;
 		}
+		// Deleted inventory keys also occur during save migrations; remove stale
+		// item rows without changing discovery history or preparation targets.
+		weapons.children('.storeRow').each(function() {
+			var row = $(this);
+			if (row.hasClass('ammoRow')) return;
+			var key = row.attr('data-store-key');
+			if (key && !($SM.get('stores[' + JSON.stringify(key) + ']',true) >= 1)) {
+				row.remove();
+				Room._removeWeaponAmmoRows(key,weapons);
+			}
+		});
 		for (var k in $SM.get('stores')) {
 
 			if (k.indexOf('blueprint') > 0) {
@@ -985,6 +996,13 @@ var Room = {
 			}
 
 			var lk = _(k);
+			// Hiding an empty item is a presentation-only change: leave its state
+			// key intact so crafting/shop discovery and saved preparation targets survive.
+			if (location === weapons && num < 1) {
+				row.remove();
+				Room._removeWeaponAmmoRows(k,weapons);
+				continue;
+			}
 
 			// thieves?
 			if (typeof $SM.get('game.thieves') == 'undefined' && num > 5000 && $SM.get('features.location.world')) {
@@ -992,7 +1010,7 @@ var Room = {
 			}
 
 			if (row.length === 0) {
-				row = $('<div>').attr('id', id).addClass('storeRow');
+				row = $('<div>').attr({'id': id, 'data-store-key': k}).addClass('storeRow');
 				$('<div>').addClass('row_key').text(lk).appendTo(row);
 				$('<div>').addClass('row_val').text(Math.floor(num)).appendTo(row);
 				$('<div>').addClass('clear').appendTo(row);
@@ -1051,6 +1069,7 @@ var Room = {
 			weapons.animate({ opacity: 1 }, 300, 'linear');
 			Room._wireStoreGroupToggle(weapons);
 		}
+		weapons.toggle(weapons.children('.storeRow').length > 0);
 
 		if (newRow) {
 			Room.updateIncomeView();
@@ -1102,6 +1121,12 @@ var Room = {
 		});
 	},
 
+	_removeWeaponAmmoRows: function(weaponKey, container) {
+		var prefix = 'ammorow_'+weaponKey.replace(/ /g,'-')+'_';
+		container.children('.ammoRow').each(function() {
+			if (($(this).attr('id') || '').indexOf(prefix) === 0) $(this).remove();
+		});
+	},
 	_updateWeaponAmmoRow: function(weaponKey, container) {
 		if (typeof World === 'undefined' || !World.Weapons) return;
 		var wDef = World.Weapons[weaponKey];
@@ -1114,6 +1139,10 @@ var Room = {
 			var ammoId = 'ammorow_' + weaponKey.replace(/ /g, '-') + '_' + ammoKey.replace(/ /g, '-');
 			var ammoRow = $('#' + ammoId, container);
 			var ammoNum = $SM.get('stores["' + ammoKey + '"]', true) || 0;
+			if (ammoNum < 1 || !($SM.get('stores["'+weaponKey+'"]',true) > 0)) {
+				ammoRow.remove();
+				continue;
+			}
 			if (ammoRow.length === 0) {
 				ammoRow = $('<div>').attr('id', ammoId).addClass('storeRow ammoRow');
 				$('<div>').addClass('row_key').text('— ' + _(ammoKey)).appendTo(ammoRow);

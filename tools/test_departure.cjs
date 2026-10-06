@@ -69,8 +69,8 @@ const copy = value => JSON.parse(JSON.stringify(value));
     c.State.character.castleStyle = style;
     assert.match(c.Ship.getDepartureInfo().warnings.join(' '), /fists and ranged attacks do not activate/);
   }
-  c.State.character.equipped.primary = ['flame blade'];
-  assert.match(c.Ship.getDepartureInfo().warnings.join(' '), /equipped but not packed: flame blade/);
+  c.State.character.equipped.primary = ['kou katana'];
+  assert.match(c.Ship.getDepartureInfo().warnings.join(' '), /equipped but not packed: kou katana/);
 }
 
 {

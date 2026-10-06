@@ -487,7 +487,7 @@ var Space = {
 		{ id: 'hardBody',   nameKey: 'hardened body',   maxLevel: 20, per: 5,    descKey: '+{0} max hp per level' },
 		{ id: 'sharpEdge',  nameKey: 'sharpened edge',  maxLevel: 20, per: 0.04, descKey: '+{0}% weapon damage per level' },
 		{ id: 'ironWall',   nameKey: 'iron wall',       maxLevel: 20, per: 0.015, descKey: '+{0}% damage reduction per level; diminishing gains after Lv.20' },
-		{ id: 'bloodDrink', nameKey: 'blood drinker',   maxLevel: 20, per: 0.01, descKey: '+{0}% lifesteal per level' },
+		{ id: 'bloodDrink', nameKey: 'blood drinker',   maxLevel: 20, per: 0.005, descKey: '+{0}% lifesteal per level' },
 		{ id: 'steadyHand', nameKey: 'steady hand',     maxLevel: 20, per: 0.01, descKey: '+{0}% hit chance per level' },
 		{ id: 'swiftBlade', nameKey: 'swift blade',     maxLevel: 20, per: 0.015, descKey: '-{0}% weapon cooldown per level; diminishing gains after Lv.20' }
 	],
@@ -650,7 +650,8 @@ var Space = {
 		} catch (e) { /* ignore */ }
 		var total = base + perkBonus, overflow = Math.max(0, total - 0.25);
 		// Formerly capped at 25% even before Lv.20 with breath perks. Keep every upgrade useful.
-		return Math.min(0.25, total) + 0.15 * overflow / (overflow + 0.15);
+		// Halve the whole result, including breath bonuses and breakthrough scaling.
+		return (Math.min(0.25, total) + 0.15 * overflow / (overflow + 0.15)) * 0.5;
 	},
 	getAccuracyBonus: function() { return Space.getTalentLevel('steadyHand') * 0.01; },
 	getTalentHitChance: function(level) {
@@ -840,7 +841,7 @@ var Space = {
 	// ---- 节点：战斗 ----
 
 	_pickEnemy: function(floor, isElite) {
-		// 分段生命成长；伤害缓慢增加，普攻间隔不低于一秒。
+		// 分段生命成长；普通鬼普攻不低于一秒，疾爪小鬼例外但伤害固定极低。
 		var hp, dmg;
 		if (floor <= 10) {
 			hp  = Math.floor(24 + floor * 5);
@@ -863,16 +864,30 @@ var Space = {
 		];
 		var enemy = enemyNames[Math.min(enemyNames.length - 1, Math.floor(floor / 4))];
 		// Keep familiar demons in the encounter pool alongside the new specialists.
-		var archetype = window.DemonPatterns && Math.random() < 0.7 ? DemonPatterns.pickArchetype(floor) : null;
-		if (archetype) enemy = archetype.name;
+		var archetype = null, variant = null;
+		if (window.DemonPatterns) {
+			var roll = Math.random();
+			if (roll < 0.22 && DemonPatterns.availableVariants(floor).length) variant = DemonPatterns.pickVariant(floor);
+			else if (roll < 0.7) archetype = DemonPatterns.pickArchetype(floor);
+		}
+		var body = variant || archetype;
+		if (body) enemy = body.name;
 
 		if (isElite) {
 			hp = Math.floor(hp * 1.3);
 			dmg = Math.floor(dmg * 1.15);
-			enemy = archetype ? _('elite demon') + ' · ' + enemy : 'elite ' + enemy;
+			enemy = body ? _('elite demon') + ' · ' + enemy : 'elite ' + enemy;
 		}
-		var stats = { enemy: enemy, hp: hp, dmg: dmg, hit: hit, delay: delay, isElite: !!isElite, patternId: archetype ? archetype.id : null };
-		return window.DemonPatterns ? DemonPatterns.strengthen(stats, floor) : stats;
+		var stats = { enemy: enemy, hp: hp, dmg: dmg, hit: hit, delay: delay, isElite: !!isElite, patternId: body ? body.id : null };
+		if (window.DemonPatterns) DemonPatterns.strengthen(stats, floor);
+		if (variant && variant.id === 'scurry') {
+			stats.hp = Math.max(1, Math.floor(stats.hp * 0.65));
+			stats.dmg = isElite ? 2 : 1;
+			stats.delay = 0.4;
+		} else if (variant && variant.id === 'bloodless') {
+			stats.hp = DemonPatterns.requiredHits(floor, !!isElite);
+		}
+		return stats;
 	},
 
 	// ---- 药水系统：购买/开箱时立即饮下，只影响下一场战斗 ----

@@ -1582,6 +1582,7 @@ async function port() {
         Engine.activeModule=Space;Space.done=false;Space.currentFloor=100;
         World.setHp(World.getMaxHealth());
         const art=DemonPatterns.makeArt(id,20);
+        art.hit=1; // This regression checks resolution, not the independent miss roll.
         Events.startEvent({title:'鬼术实战回归',scenes:{start:{combat:true,enemy:'forest demon',health:1000,damage:0,attackDelay:100,hit:0,
           _demonPatternsConfigured:true,demonPatternIds:[id],telegraphAttacks:[art],buttons:{leave:{text:'leave',nextScene:'end'}}}}});
         clearInterval(Events._enemyAttackTimer);(Events._specialTimers||[]).forEach(clearInterval);
@@ -1620,6 +1621,56 @@ async function port() {
       }
     })()`);
     console.log(demonChecks.map(name=>'PASS: '+name).join('\n'));
+    const finalCombatChecks=await evaluate(`(async function() {
+      const checks=[],check=(ok,label)=>{if(!ok)throw Error(label);checks.push(label);};
+      const wait=ms=>new Promise(resolve=>setTimeout(resolve,ms));
+      const saved={damage:Space.getDamageMult,lifesteal:Space.getLifestealPct,tester:Engine.options.testerMode};
+      Space.getDamageMult=()=>1;Space.getLifestealPct=()=>.5;Engine.options.testerMode=false;
+      const begin=async variant=>{
+        if(Events.activeEvent())await new Promise(resolve=>Events.endEvent(resolve));
+        Engine.activeModule=Ship;CombatStyles.setSelected('technique');Engine.activeModule=Space;
+        Space.done=false;Space.currentFloor=21;
+        Path.outfit={'bone yari':1,'concentration pill':2};$SM.set('outfit',Path.outfit,true);
+        $SM.set('character.equipped',{primary:['bone yari',null],secondary:[null,null],tool:[null,null]},true);
+        World.setHp(World.getMaxHealth()-30);
+        const scene={combat:true,enemy:variant==='bloodless'?'空壳鬼':'计时回归',health:100,damage:0,attackDelay:100,hit:0,
+          _demonPatternsConfigured:true,buttons:{leave:{text:'leave',nextScene:'end'}}};
+        if(variant)DemonPatterns.configureScene(scene,21,'normal',variant);
+        Events.startEvent({title:'补给与特殊鬼回归',scenes:{start:scene}});
+        clearInterval(Events._enemyAttackTimer);return scene;
+      };
+      try {
+        await begin('bloodless');const hp=World.health;
+        check($('#enemy').data('hp')===4&&$('.demonPatternLive').text().includes('4 / 4'),'bloodless encounter displays four remaining effective hits');
+        Events.dotDamage($('#enemy'),9999,'poison');
+        check($('#enemy').data('hp')===4,'actual bloodless panel resists lethal DOT');
+        for(let i=0;i<3;i++)Events.damage($('#wanderer'),$('#enemy'),999999,'melee',null,{weaponName:'bone yari'});
+        check($('#enemy').data('hp')===1&&$('.demonPatternLive').text().includes('1 / 4'),'three huge direct hits leave exactly one required hit');
+        check(World.health===hp,'bloodless hits cannot heal with a positive lifesteal buff');
+        await begin();const before=World.health;
+        $('#use-stim').trigger('click');
+        check(Path.outfit['concentration pill']===1&&World.health===before-10,'real pill button consumes one pill and ten HP');
+        check(Events.BOOST_DURATION===15000&&Events.boostRemaining()>0&&$('#wanderer .hp').text().includes('全集中'),'pill starts a visible fifteen-second combat buff');
+        await wait(5000);for(let i=0;i<20;i++)Events.updateFighterDiv($('#wanderer'));
+        check(Events.boostRemaining()<=10&&Events.boostRemaining()>0,'refreshing the fighter does not restart the timer');
+        await wait(10100);
+        check(Events.boostRemaining()===0&&!$('#wanderer').hasClass('boost')&&!$('#wanderer .hp').text().includes('全集中'),'real wall-clock expiry removes both acceleration and its displayed buff');
+        await new Promise(resolve=>Events.endEvent(resolve));
+        check(!Events._boost&&!DemonPatterns._fight,'ending the battle clears transient pill and body state');
+      } finally {
+        Space.getDamageMult=saved.damage;Space.getLifestealPct=saved.lifesteal;Engine.options.testerMode=saved.tester;
+      }
+      Engine.activeModule=Room;
+      $SM.set('stores["nichirin blade flame"]',1,true);$SM.set('stores["concentration pill"]',1,true);Room.updateStoresView();
+      check($('#weapons [data-store-key="nichirin blade flame"] > .row_key').text()==='日轮刀【炎】','actual warehouse renders the one-character flame blade name');
+      $SM.set('stores["concentration pill"]',0,true);Room.updateStoresView();
+      check(!$('#weapons [data-store-key="concentration pill"]').length,'zero pill inventory disappears from the actual item list');
+      $SM.set('stores["concentration pill"]',1,true);Room.updateStoresView();
+      check($('#weapons [data-store-key="concentration pill"]').length===1,'replenishing an item restores exactly one row');
+      check(_('buy {0}',_('medicine'))==='购买药剂'&&_('Floor {0} / {1}',3,100)==='楼层：3 / 100','runtime parameterized templates use the loaded Chinese translations');
+      return checks;
+    })()`);
+    console.log(finalCombatChecks.map(name=>'PASS: '+name).join('\n'));
     assert.deepEqual(errors, [], 'uncaught browser exceptions');
   } finally {
     if (call && socket?.readyState === WebSocket.OPEN) {

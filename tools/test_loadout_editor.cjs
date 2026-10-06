@@ -88,7 +88,7 @@ function reset(saved = true) {
   L.close(false);
   context.State = {stores:{'cured meat':3,medicine:0,'bone yari':1,torch:2,wood:100}, outfit:{'cured meat':1,torch:2}, character:{selectedLoadout:'expedition',
     equipped:{primary:['bone yari',null],secondary:['wisteria gun',null],tool:[]},
-    loadouts:{castle:{version:1,targets:{medicine:9},equipped:{primary:['flame blade']}}}}};
+    loadouts:{castle:{version:1,targets:{medicine:9},equipped:{primary:['nichirin spear']}}}}};
   if (saved) context.State.character.loadouts.expedition = {
     version:1,targets:{'cured meat':5,medicine:2,'legacy relic':7},equipped:{primary:['nichirin katana',null]},meta:{old:true}
   };
@@ -106,7 +106,7 @@ reset();
 const before = snapshot(), bag = P.outfit, equipped = context.State.character.equipped, other = plain(context.State.character.loadouts.castle);
 const keys = Array.from(L.editableKeys(P.getLoadout('expedition')));
 for (const key of ['medicine','torch','bone yari','wisteria gun','wisteria bullet','nichirin katana']) assert.ok(keys.includes(key));
-for (const key of ['wood','flame blade','solar crystal','legacy relic']) assert.ok(!keys.includes(key),`unseen or non-carryable item hidden: ${key}`);
+for (const key of ['wood','nichirin spear','solar crystal','legacy relic']) assert.ok(!keys.includes(key),`unseen or non-carryable item hidden: ${key}`);
 open();
 assert.equal($('#loadoutEditorPanel').attr('role'),'dialog');
 assert.equal(input('medicine').val(),2);

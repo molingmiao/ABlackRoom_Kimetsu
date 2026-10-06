@@ -7,14 +7,6 @@ const Fabricator = {
   _STORES_OFFSET: 0,
   name: _('Forge'),
   Craftables: {
-    'flame blade': {
-      name: _('flame blade'),
-      type: 'weapon',
-      buildMsg: _("the blade hums — flame breathing kindles the edge."),
-      cost: () => ({
-        'demon stone': 1
-      })
-    },
     'water cycle': {
       name: _('water cycle'),
       type: 'upgrade',
@@ -153,8 +145,6 @@ const Fabricator = {
     }
 
     for (const [ key, value ] of Object.entries(Fabricator.Craftables)) {
-      // Legacy blades remain usable/recyclable, but no longer have a guaranteed exchange.
-      if (key === 'flame blade') {if (value.button) value.button.remove();value.button=null;continue;}
       const max = $SM.num(key, value) >= value.maximum;
       if (value.type === 'upgrade' && max) {
         if (value.button) value.button.remove();
@@ -204,7 +194,7 @@ const Fabricator = {
 
     for (const k in $SM.get('character.blueprints')) {
       const id = 'blueprint_' + k.replace(/ /g, '-');
-      if (k === 'flame blade') {$('#' + id).remove();continue;}
+      if (k === 'flame blade' || k === 'nichirin blade flame') {$('#' + id).remove();continue;}
       let r = $('#' + id);
       if($SM.get(`character.blueprints["${k}"]`) && r.length === 0) {
         r = $('<div>').attr('id', id).addClass('blueprintRow').appendTo(blueprints);
@@ -224,7 +214,7 @@ const Fabricator = {
   fabricate: button => {
     const thing = $(button).attr('fabricateThing');
     const craftable = Fabricator.Craftables[thing];
-    if (thing === 'flame blade' || !craftable) return false;
+    if (!craftable) return false;
     const numThings = Math.max(0, $SM.get(`stores['${thing}']`, true));
 
     if (craftable.maximum <= numThings) {

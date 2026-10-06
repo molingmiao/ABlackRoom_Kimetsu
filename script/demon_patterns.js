@@ -8,6 +8,12 @@ var DemonPatterns = {
     { id: 'bind', floor: 41, name: '缚丝鬼', title: '血鬼术 · 缠身血丝', hint: '命中后降低命中率 15 个百分点，最多 6 秒；三次实际命中、控制或服药/精油可解除。' },
     { id: 'shadow', floor: 51, name: '影分身鬼', title: '血鬼术 · 血影分身', hint: '分身存在最多 10 秒，每 2.5 秒追加一次低伤攻击；远程命中一次、近战命中三次或控制可驱散。' }
   ],
+  // Bodies and techniques are separate pools: an unusual body must not also
+  // inherit high-damage blood arts, or regenerate its required hit counter.
+  VARIANTS: [
+    { id: 'scurry', floor: 11, name: '疾爪小鬼', hint: '每 0.4 秒迅速扑击，单次基础伤害仅 1（精英 2）。用控制打断攻势，留意连续失血并及时治疗；不使用额外血鬼术。' },
+    { id: 'bloodless', floor: 21, name: '空壳鬼', hint: '没有可吸取的血肉。必须累计足够次数的有效直接命中；伤害再高，每次也只计一次。未命中、护盾吸收、控制和持续伤害都不计数，攻击它无法吸血或触发刀色回血。' }
+  ],
   _scale: function() {
     return Engine.options.testerMode ? Math.max(1, Engine.options.combatTimeScale || 1) : 1;
   },
@@ -17,6 +23,25 @@ var DemonPatterns = {
   pickArchetype: function(floor) {
     var pool = DemonPatterns.available(floor);
     return pool.length ? pool[Math.floor(Math.random() * pool.length)] : null;
+  },
+  availableVariants: function(floor) {
+    return DemonPatterns.VARIANTS.filter(function(type) { return floor >= type.floor; });
+  },
+  pickVariant: function(floor) {
+    var pool = DemonPatterns.availableVariants(floor);
+    return pool.length ? pool[Math.floor(Math.random() * pool.length)] : null;
+  },
+  requiredHits: function(floor, isElite) {
+    floor = Number(floor) || 21;
+    return Math.min(isElite ? 18 : 12, (isElite ? 6 : 4) + Math.floor(Math.max(0, floor - 21) / 10));
+  },
+  isBloodless: function(scene) {
+    return !!scene && scene.castleVariantId === 'bloodless';
+  },
+  resolveDirectDamage: function(scene, damage) {
+    // The caller applies this only after a real unshielded direct hit. HP for
+    // this body represents remaining hits, never a pool that damage can skip.
+    return DemonPatterns.isBloodless(scene) && damage > 0 ? 1 : damage;
   },
   strengthen: function(stats, floor) {
     // Preserve the first twenty floors; strength comes mainly from tactics,
@@ -43,6 +68,23 @@ var DemonPatterns = {
     return art;
   },
   configureScene: function(scene, floor, kind, preferredId) {
+    var variant = DemonPatterns.availableVariants(floor).filter(function(type) { return type.id === preferredId; })[0];
+    if (variant && !scene.castleBoss) {
+      scene.castleVariantId = variant.id;
+      scene.demonPatternIds = [];
+      scene.telegraphAttacks = [];
+      var isElite = !!scene.castleElite || kind === 'elite';
+      if (variant.id === 'bloodless') {
+        scene.castleHitCount = DemonPatterns.requiredHits(floor, isElite);
+        // Rebase after pre-fight potions as well: a damage potion cannot turn
+        // a required-hit body into a one-hit kill, nor a curse into 20+ hits.
+        scene.health = scene.castleHitCount;
+      } else {
+        scene.damage = isElite ? 2 : 1;
+        scene.attackDelay = 0.4;
+      }
+      return scene;
+    }
     var pool = DemonPatterns.available(floor).slice();
     if (!pool.length) return scene;
     var count = (kind === 'boss' && floor >= 50) || (kind === 'elite' && floor >= 31) ? 2 : 1;
@@ -74,13 +116,15 @@ var DemonPatterns = {
   },
   start: function(scene, parent, telegraphs) {
     DemonPatterns.stop();
-    if (Engine.activeModule !== Space || !(scene.demonPatternIds || []).length) return;
+    if (Engine.activeModule !== Space || (!(scene.demonPatternIds || []).length && !scene.castleVariantId)) return;
     var fight = DemonPatterns._fight = {
       scene: scene, telegraphs: telegraphs, enemy: telegraphs.enemy, player: telegraphs.player,
       timers: [], armour: null, bind: null, shadow: null, combo: null,
       box: $('<div>').addClass('demonPatternStatus').attr('aria-live', 'polite').appendTo(parent)
     };
-    $('<div>').addClass('demonPatternGuide').text('本场鬼术：' + scene.demonPatternIds.map(function(id) {
+    var variant = DemonPatterns.VARIANTS.filter(function(type) { return type.id === scene.castleVariantId; })[0];
+    if (variant) $('<div>').addClass('demonPatternGuide demonVariantGuide').text('鬼的特性 · ' + variant.name + '：' + variant.hint).appendTo(fight.box);
+    if ((scene.demonPatternIds || []).length) $('<div>').addClass('demonPatternGuide').text('本场鬼术：' + scene.demonPatternIds.map(function(id) {
       return DemonPatterns.TYPES.filter(function(type) { return type.id === id; })[0].hint;
     }).join(' ')).appendTo(fight.box);
     fight.live = $('<div>').addClass('demonPatternLive').appendTo(fight.box);
@@ -93,6 +137,8 @@ var DemonPatterns = {
     if (!DemonPatterns._isCurrent(fight)) { DemonPatterns.stop(); return; }
     var wasBound = !!fight.bind;
     var labels = [];
+    if (DemonPatterns.isBloodless(fight.scene)) labels.push('还需有效命中 ' + Math.max(0, fight.enemy.data('hp')) + ' / ' + fight.scene.castleHitCount + ' 次 · 无法吸血');
+    if (fight.scene.castleVariantId === 'scurry') labels.push('疾速扑击 · 间隔 0.4 秒 · 单次基础伤害 ' + fight.scene.damage);
     ['armour', 'bind', 'shadow'].forEach(function(id) {
       var effect = fight[id];
       if (effect && (id === 'shadow' ? Date.now() > effect.until : Date.now() >= effect.until)) {

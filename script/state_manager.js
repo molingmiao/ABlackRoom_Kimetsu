@@ -329,12 +329,14 @@ var StateManager = {
 	// 幂等地把任何残留旧 key（含 ' blueprint' 后缀变体）合并到新 key 上。
 	// 无残留时整体是 no-op，调用多次安全。
 	cleanupRenamedKeys: function() {
+		$SM.mergeNichirinAliases();
 		var STORE_RENAME = $SM._RENAME_STORES;
 		var PERK_RENAME = $SM._RENAME_PERKS;
 		var dirty = false;
 
 		var stores = $SM.get('stores') || {};
 		for (var sK in STORE_RENAME) {
+			if (Object.prototype.hasOwnProperty.call($SM._NICHIRIN_ALIASES,sK)) continue;
 			if (Object.prototype.hasOwnProperty.call(stores, sK)) {
 				var sN = STORE_RENAME[sK];
 				stores[sN] = (stores[sN] || 0) + (stores[sK] || 0);
@@ -354,6 +356,7 @@ var StateManager = {
 		dirty = false;
 		var outfit = $SM.get('outfit') || {};
 		for (var oK in STORE_RENAME) {
+			if (Object.prototype.hasOwnProperty.call($SM._NICHIRIN_ALIASES,oK)) continue;
 			if (Object.prototype.hasOwnProperty.call(outfit, oK)) {
 				var oN = STORE_RENAME[oK];
 				outfit[oN] = (outfit[oN] || 0) + (outfit[oK] || 0);
@@ -384,6 +387,7 @@ var StateManager = {
 		dirty = false;
 		var blueprints = $SM.get('character.blueprints') || {};
 		for (var bK in STORE_RENAME) {
+			if (Object.prototype.hasOwnProperty.call($SM._NICHIRIN_ALIASES,bK)) continue;
 			if (blueprints[bK]) {
 				blueprints[STORE_RENAME[bK]] = blueprints[bK];
 				delete blueprints[bK];
@@ -408,7 +412,8 @@ var StateManager = {
 		'bone spear':      'bone yari',
 		'iron sword':      'kou katana',
 		'steel sword':     'nichirin katana',
-		'energy blade':    'flame blade',
+		'energy blade':    'nichirin blade flame',
+		'flame blade':     'nichirin blade flame',
 		'disruptor':       'bind kunai',
 		'hypo':            'wisteria oil',
 		'stim':            'concentration pill',
@@ -429,6 +434,59 @@ var StateManager = {
 		'scout':           'crow scout',
 		'stealthy':        'kehai dansha',
 		'gastronome':      'breath nourish'
+	},
+	// One real purple flame weapon. Also normalize loadouts and old report/snapshot IDs.
+	// These are in-place, no-reward migrations: repeat calls never re-add an item.
+	_NICHIRIN_ALIASES: {'energy blade':'nichirin blade flame','flame blade':'nichirin blade flame'},
+	mergeNichirinAliases: function() {
+		var aliases = $SM._NICHIRIN_ALIASES;
+		var canonical = function(key) {
+			if (typeof key !== 'string') return key;
+			if (Object.prototype.hasOwnProperty.call(aliases,key)) return aliases[key];
+			if (key.slice(-10) === ' blueprint') {
+				var base = key.slice(0,-10);
+				if (Object.prototype.hasOwnProperty.call(aliases,base)) return aliases[base]+' blueprint';
+			}
+			return key;
+		};
+		var mergeValue = function(current, old) {
+			if (current === undefined) return {ok:true,value:old};
+			if (typeof current === 'boolean' && typeof old === 'boolean') return {ok:true,value:current || old};
+			if (Number.isSafeInteger(current) && current >= 0 && Number.isSafeInteger(old) && old >= 0
+				&& current + old <= $SM.MAX_STORE) return {ok:true,value:current+old};
+			return {ok:false};
+		};
+		var walk = function(value, mode) {
+			if (!value || typeof value !== 'object') return mode === 'reference' ? canonical(value) : value;
+			if (Array.isArray(value)) {
+				var usedFlame = false;
+				value.forEach(function(child,index) {
+					var next = walk(child,mode === 'slots' || mode === 'equipment' ? 'reference' : null);
+					if (mode === 'slots' && next === 'nichirin blade flame') {
+						if (usedFlame) next = null;
+						else usedFlame = true;
+					}
+					value[index] = next;
+				});
+				return value;
+			}
+			Object.keys(value).forEach(function(key) {
+				var nextMode = key === 'equipped' ? 'equipment' : mode === 'equipment' && Array.isArray(value[key]) ? 'slots'
+					: ['key','item','weapon','weaponName','weaponKey'].indexOf(key) >= 0 ? 'reference' : null;
+				value[key] = walk(value[key],nextMode);
+				var renamed = canonical(key);
+				if (renamed === key) return;
+				var merged = mergeValue(value[renamed],value[key]);
+				if (!merged.ok) {
+					Engine.log('Kept legacy Nichirin data without truncation: '+key);
+					return;
+				}
+				value[renamed] = merged.value;
+				delete value[key];
+			});
+			return value;
+		};
+		walk(State,null);
 	},
 
 	/******************************************************************

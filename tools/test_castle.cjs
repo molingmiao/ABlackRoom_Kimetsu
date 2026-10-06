@@ -226,7 +226,7 @@ for (const count of [3, 4, 5]) {
   sm.set('character.infinityTalents.bloodDrink',10);
   for(const perk of ['water breath I','flame breath I','thunder breath I']) sm.set('character.perks["'+perk+'"]',true);
   let p=c.Space.talentPreview('bloodDrink');
-  assert.equal(p.before,0.25);assert.ok(p.after>p.before);assert.equal(p.capped,false);
+  assert.equal(p.before,0.125);assert.ok(p.after>p.before);assert.equal(p.capped,false);
   sm.set('character.infinityTalents.hardBody',2);
   sm.set('game.castleMeta.peakTalent.hardBody',2);
   sm.set('game.castleMeta.perfectExploration',true);

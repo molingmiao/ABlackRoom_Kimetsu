@@ -94,7 +94,7 @@ const World = {
   Weapons: {
     'nichirin katana': { type: 'melee', damage: 6 },
     'nichirin spear': { type: 'melee', damage: 8 },
-    'flame blade': { type: 'melee', damage: 10 },
+    'nichirin blade flame': { type: 'melee', damage: 12, nichirinForged: true, breathingStyle: 'flame', tier: 4 },
     'bone yari': { type: 'melee', damage: 2 },
     'wisteria gun': { type: 'ranged', damage: 5 },
     'bind kunai': { type: 'ranged', damage: 'stun' }
@@ -225,7 +225,7 @@ assert.equal(timers.size, 0, 'invalid, blocked and non-nichirin hits cannot leav
 styles.afterHit('nichirin katana', 100, enemy);
 advance(1000);
 assert.equal(enemy.data('hp'), 182);
-styles.afterHit('flame blade', 50, enemy);
+styles.afterHit('nichirin blade flame', 50, enemy);
 assert.equal(timers.size, 1, 'cuts refresh instead of stacking timers');
 advance(3000);
 assert.equal(enemy.data('hp'), 155, 'refreshed cut deals three ticks of the latest hit');

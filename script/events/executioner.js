@@ -1078,7 +1078,7 @@ Events.Executioner = {
           _('through the bulkhead is a large room, walls lined with weapon racks. fighting seems to have passed it by.')
         ],
         loot: {
-          'flame blade': {
+          'nichirin blade flame': {
             min: 2,
             max: 5,
             chance: 1
@@ -1203,7 +1203,7 @@ Events.Executioner = {
             max: 5,
             chance: 1
           },
-          'flame blade': {
+          'nichirin blade flame': {
             min: 1,
             max: 1,
             chance: 0.2

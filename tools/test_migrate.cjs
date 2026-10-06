@@ -78,7 +78,8 @@ assert(State.stores['alien alloy'] === undefined, 'old alien alloy still present
 assert(State.stores['wisteria bullet'] === 200, 'wisteria bullet not 200');
 assert(State.stores['bone yari'] === 1, 'bone yari not 1');
 assert(State.stores['nichirin katana'] === 1, 'nichirin katana not 1');
-assert(State.stores['flame blade'] === 1, 'flame blade not 1');
+assert(State.stores['nichirin blade flame'] === 1, 'purple flame blade not migrated');
+assert(State.stores['flame blade'] === undefined, 'duplicate legacy flame blade still present');
 assert(State.stores['wisteria oil blueprint'] === 1, 'wisteria oil blueprint not migrated');
 assert(State.outfit['wisteria bullet'] === 50, 'outfit wisteria bullet not 50');
 assert(State.outfit['wisteria oil'] === 3, 'outfit wisteria oil not 3');

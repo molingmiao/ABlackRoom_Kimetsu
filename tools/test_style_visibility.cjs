@@ -267,7 +267,7 @@ const pause = ms => new Promise(resolve => setTimeout(resolve, ms));
       const permanent=['waterskin','cask','water tank','water cycle','rucksack','wagon','convoy','cargo crow',
         'l armour','i armour','s armour','wind armour','compass'];
       const weapons=Object.keys(World.Weapons).filter(key=>key!=='fists');
-      check(weapons.length===39,'the complete live weapon registry contains eleven legacy weapons and twenty-eight forged blades');
+      check(weapons.length===38,'the complete live weapon registry contains ten legacy weapons and twenty-eight forged blades');
       $SM.set('character.equippedInit',true,true);
       $SM.set('character.equipped',{primary:[null,null],secondary:[null,null],tool:[null,null]},true);
       $SM.set('outfit',{},true);Path.outfit=$SM.get('outfit');
@@ -319,14 +319,14 @@ const pause = ms => new Promise(resolve => setTimeout(resolve, ms));
       Path.closeScrapQuantityDialog(false);
       $SM.set('character.equipped',{primary:[null,null],secondary:[null,null],tool:[null,null]},true);
       $SM.set('outfit',{},true);Path.outfit=$SM.get('outfit');
-      $SM.setM('stores',{'flame blade':5,'demon stone':10},true);$SM.set('game.scrapRemainders',{},true);
+      $SM.setM('stores',{'thunder gun':5,'demon stone':10},true);$SM.set('game.scrapRemainders',{},true);
       $SM.fireUpdate('stores');Path.updateOutfitting();
       for(let i=1;i<=4;i++) {
-        const button=document.querySelector('#outfit_row_flame-blade .scrapBtn');
+        const button=document.querySelector('#outfit_row_thunder-gun .scrapBtn');
         if(!button)throw Error('low-cost single-item recycling entry disappeared');
         button.click();
         const balance=$SM.get('game.scrapRemainders["demon stone"]');
-        if($SM.get('stores["flame blade"]')!==5-i||balance!==[30,60,90,20][i-1]||
+        if($SM.get('stores["thunder gun"]')!==5-i||balance!==[30,60,90,20][i-1]||
           $SM.get('stores["demon stone"]')!==10+(i===4?1:0))
           throw Error('low-cost single recycling lost fractional credit at attempt '+i);
       }
@@ -370,10 +370,10 @@ const pause = ms => new Promise(resolve => setTimeout(resolve, ms));
     const protectionChecks=await evaluate(`(function() {
       const checks=[],check=(ok,label)=>{if(!ok)throw Error(label);checks.push(label);};
       const before=JSON.stringify([$SM.get('stores'),$SM.get('game.scrapRemainders')]);
-      Path.setEquipSlot('primary',0,'flame blade');
-      check(!(Path.outfit['flame blade']>0)&&!Path.scrapPreview('flame blade',1).valid,
+      Path.setEquipSlot('secondary',0,'thunder gun');
+      check(!(Path.outfit['thunder gun']>0)&&!Path.scrapPreview('thunder gun',1).valid,
         'an equipped but unpacked final weapon is protected from recycling');
-      check(!document.querySelector('#outfit_row_flame-blade .scrapBtn')&&Path.scrapItem('flame blade',1)===false,
+      check(!document.querySelector('#outfit_row_thunder-gun .scrapBtn')&&Path.scrapItem('thunder gun',1)===false,
         'equipped final-weapon protection covers both the actual entry and direct execution');
       check(JSON.stringify([$SM.get('stores'),$SM.get('game.scrapRemainders')])===before,
         'blocked equipped-weapon recycling cannot change inventory or fractional credit');
@@ -401,7 +401,7 @@ const pause = ms => new Promise(resolve => setTimeout(resolve, ms));
       clearTimeout(Engine._incomeTimeout);AudioEngine.playSound=AudioEngine.playBackgroundMusic=AudioEngine.playEventMusic=function(){};
       Engine.travelTo(Path);await new Promise(resolve=>$('#locationSlider').promise().done(resolve));
       if($SM.get('game.scrapRemainders["demon stone"]')!==20||$SM.get('stores["demon stone"]')!==11||
-        $SM.get('stores["flame blade"]')!==1||!Path.isEquipped('flame blade'))
+        $SM.get('stores["thunder gun"]')!==1||!Path.isEquipped('thunder gun'))
         throw Error('refresh lost material remainder, refund or protected equipped weapon');
       const permanent=['waterskin','cask','water tank','water cycle','rucksack','wagon','convoy','cargo crow',
         'l armour','i armour','s armour','wind armour','compass'];

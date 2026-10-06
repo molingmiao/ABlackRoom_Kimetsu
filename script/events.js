@@ -18,7 +18,7 @@ var Events = {
 	EXPLOSION_DURATION: 3000,
 	ENRAGE_DURATION: 4000,
 	MEDITATE_DURATION: 5000,
-	BOOST_DURATION: 3000,
+	BOOST_DURATION: 15000,
 	BOOST_DAMAGE: 10,
 	DOT_TICK: 1000,
 	BLINK_INTERVAL: false,
@@ -116,6 +116,8 @@ var Events = {
 		Events.won = false;
 		Events._deathRecoveryUsed = false;
 		Events._castleDamageCarry = {};
+		Events._lifestealCarry = 0;
+		Events.clearBoost();
 		if (window.Space && Engine.activeModule === Space) {
 			Space._sharpenedBattle = !!Space._sharpenedNext;
 			Space._sharpenedNext = false;
@@ -242,6 +244,7 @@ var Events = {
 	},
 
 	setStatus: (fighter, status) => {
+		if (status === 'boost') return Events.startBoost(fighter);
 		fighter.data('status', status);
 		if (status === 'enraged' && fighter.attr('id') === 'enemy') {
 			Events.startEnemyAttacks(0.5);
@@ -256,11 +259,41 @@ var Events = {
 				fighter.data('status', 'none');
 			}, Events.MEDITATE_DURATION);
 		}
-		if (status === 'boost') {
-			setTimeout(() => {
-				fighter.data('status', 'none');
-			}, Events.BOOST_DURATION);
+	},
+	clearBoost: function() {
+		clearTimeout(Events._boostTimeout);
+		clearInterval(Events._boostTicker);
+		var boost = Events._boost;
+		Events._boost = null;
+		if (boost && boost.player.data('status') === 'boost') {
+			boost.player.data('status','none');
+			Events.updateFighterDiv(boost.player);
 		}
+	},
+	boostRemaining: function() {
+		var boost = Events._boost;
+		if (!boost || !Events._ownsCombat(boost.event,boost.scene) || boost.player.data('status') !== 'boost') return 0;
+		return Math.max(0,Math.ceil((boost.until - Date.now()) * boost.scale / 1000));
+	},
+	startBoost: function(player) {
+		var event = Events.activeEvent(), scene = Events.activeScene;
+		if (!player.length || player.attr('id') !== 'wanderer' || !Events._ownsCombat(event,scene)
+			|| !event.scenes[scene] || !event.scenes[scene].combat) return false;
+		Events.clearBoost();
+		var scale = Engine.options && Engine.options.testerMode ? Math.max(1,Number(Engine.options.combatTimeScale) || 1) : 1;
+		var boost = {event:event,scene:scene,player:player,scale:scale,until:Date.now() + Events.BOOST_DURATION / scale};
+		Events._boost = boost;
+		player.data('status','boost');
+		Events._boostTimeout = Engine.combatSetTimeout(function() {
+			if (Events._boost === boost) Events.clearBoost();
+		},Events.BOOST_DURATION);
+		Events._boostTicker = Engine.combatSetInterval(function() {
+			if (Events._boost !== boost) return;
+			if (!Events._ownsCombat(event,scene)) { Events.clearBoost(); return; }
+			Events.updateFighterDiv(player);
+		},500);
+		Events.updateFighterDiv(player);
+		return true;
 	},
 
 	setPause: function(btn, state){
@@ -506,7 +539,7 @@ var Events = {
 			text: weapon.verb,
 			cooldown: cd,
 			click: Events.useWeapon,
-			boosted: () => $('#wanderer').data('status') === 'boost',
+			boosted: () => Events.boostRemaining() > 0,
 			cost: weapon.cost
 		});
 		if(typeof weapon.damage == 'number' && weapon.damage > 0) {
@@ -632,13 +665,15 @@ var Events = {
 	},
 
 	useStim: btn => {
-		if ((Path.outfit['concentration pill'] || 0) <= 0 || World.health <= Events.BOOST_DAMAGE) return;
+		const player = $('#wanderer'), event = Events.activeEvent();
+		if (!Events._ownsCombat(Events.activeEvent(),Events.activeScene)
+			|| !event.scenes[Events.activeScene].combat || !player.length
+			|| (Path.outfit['concentration pill'] || 0) <= 0 || World.health <= Events.BOOST_DAMAGE) return;
 		Path.outfit['concentration pill']--;
 		$SM.set('outfit["concentration pill"]', Path.outfit['concentration pill']);
 		World.updateSupplies();
 		if (window.CastleReport && window.Space && Engine.activeModule === Space) CastleReport.recordConsumption('concentration pill', 1);
-		const player = $('#wanderer');
-		player.data('status', 'boost');
+		Events.startBoost(player);
 		Events.dotDamage(player, Events.BOOST_DAMAGE, 'boost cost');
 		Events.updateFighterDiv(player);
 	},
@@ -837,6 +872,12 @@ var Events = {
 	},
 
 	dotDamage: (target, dmg, source) => {
+		var event = Events.activeEvent(), scene = event && event.scenes[Events.activeScene];
+		if (target.attr('id') === 'enemy' && window.Space && Engine.activeModule === Space
+			&& window.DemonPatterns && DemonPatterns.isBloodless(scene)) {
+			Events.drawFloatText('抵抗持续伤害', $('.hp',target));
+			return 0;
+		}
 		const before = target.data('hp');
 		const hp = Math.max(0, before - dmg);
 		target.data('hp', hp);
@@ -862,6 +903,8 @@ var Events = {
 		var beforeHp = enemyHp;
 		var inCastle = window.Space && Engine.activeModule === Space;
 		var playerAttack = fighter.attr('id') === 'wanderer' && enemy.attr('id') === 'enemy';
+		var event = Events.activeEvent(), scene = event && event.scenes[Events.activeScene];
+		var bloodless = inCastle && playerAttack && window.DemonPatterns && DemonPatterns.isBloodless(scene);
 		const maxHp = enemy.data('maxHp');
 		var msg = "";
 		const shielded = enemy.data('status') === 'shield';
@@ -903,10 +946,12 @@ var Events = {
 				}
 
 				if (meditating) {
-					Events._meditateDmg = (Events._meditateDmg ?? 0) + dmg;
+					if (!bloodless) Events._meditateDmg = (Events._meditateDmg ?? 0) + dmg;
 					msg = dmg;
 				}
 				else {
+					if (bloodless && shielded) dmg = 0; // A shield must not restore hit-count progress.
+					if (inCastle && playerAttack && !shielded && window.DemonPatterns) dmg = DemonPatterns.resolveDirectDamage(scene,dmg);
 					msg = (shielded ? '+' : '-') + dmg;
 					enemyHp = Math.min(maxHp, Math.max(0, enemyHp + (shielded ? dmg : -dmg)));
 					enemy.data('hp', enemyHp);
@@ -916,7 +961,7 @@ var Events = {
 						if (inCastle && window.CombatStyles && CombatStyles.afterIncoming && beforeHp > enemyHp) CombatStyles.afterIncoming(beforeHp - enemyHp, attackInfo);
 						Events.setHeal();
 					}
-					if (playerAttack && beforeHp > enemyHp && attackInfo.weaponName === 'nichirin katana' && Engine.NichirinColors) {
+					if (playerAttack && !bloodless && beforeHp > enemyHp && attackInfo.weaponName === 'nichirin katana' && Engine.NichirinColors) {
 						var colorSpec = Engine.NichirinColors[Engine.getNichirinColor()];
 						if (colorSpec && colorSpec.healOnHit > 0) Events.restoreHealth(colorSpec.healOnHit, 'nichirin color', { legacy: false });
 					}
@@ -924,7 +969,12 @@ var Events = {
 						var actualDamage = beforeHp - enemyHp;
 						if (window.DemonPatterns) DemonPatterns.afterHit(attackInfo.weaponName || 'fists', actualDamage);
 						var lifesteal = Space.getLifestealPct();
-						if (lifesteal > 0) Events.restoreHealth(Math.max(1, Math.floor(actualDamage * lifesteal)), 'lifesteal');
+						if (lifesteal > 0 && !bloodless) {
+							var siphon = actualDamage * lifesteal + (Events._lifestealCarry || 0);
+							var heal = Math.floor(siphon + 1e-9);
+							Events._lifestealCarry = Math.max(0,siphon - heal);
+							if (heal > 0) Events.restoreHealth(heal, 'lifesteal');
+						}
 						if (window.CombatStyles) CombatStyles.afterHit(attackInfo.weaponName || 'fists', actualDamage, enemy);
 					}
 				}
@@ -1077,6 +1127,8 @@ var Events = {
 	},
 
 	clearTimeouts: () => {
+		Events.clearBoost();
+		Events._lifestealCarry = 0;
 		if (window.CombatStyles) CombatStyles.endFight();
 		if (window.CombatTelegraphs) CombatTelegraphs.stop();
 		clearInterval(Events._enemyAttackTimer);
@@ -1460,9 +1512,10 @@ var Events = {
 	},
 
 	updateFighterDiv: function(fighter) {
-		$('.hp', fighter).text(fighter.data('hp') + '/' + fighter.data('maxHp'));
+		var remaining = fighter.attr('id') === 'wanderer' ? Events.boostRemaining() : 0;
+		$('.hp', fighter).text(fighter.data('hp') + '/' + fighter.data('maxHp') + (remaining ? ' · 全集中 ' + remaining + '秒' : ''));
 		const status = fighter.data('status');
-		const hasStatus = status && status !== 'none';
+		const hasStatus = status && status !== 'none' && (status !== 'boost' || remaining > 0);
 		fighter.attr('class', `fighter${hasStatus ? ` ${status}` : ''}`);
 	},
 

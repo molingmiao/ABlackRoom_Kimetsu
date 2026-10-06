@@ -146,7 +146,7 @@ for (const entry of ['triggerShrine', 'triggerHashiraEncounter']) {
   assert.ok(c.Space.getLifestealPct(21) > c.Space.getLifestealPct(20));
   assert.ok(c.Space.getDamageReduction(1000) < 0.4);
   assert.ok(c.Space.getCooldownMult(1000) > 0.4);
-  assert.ok(c.Space.getLifestealPct(1000) < 0.4);
+  assert.ok(c.Space.getLifestealPct(1000) < 0.2);
   assert.equal(c.Space.getDamageReduction(10), 0.15);
   assert.equal(c.Space.getCooldownMult(10), 0.85);
   const mult = c.Space.getDamageMult();
@@ -156,7 +156,7 @@ for (const entry of ['triggerShrine', 'triggerHashiraEncounter']) {
   assert.ok(steady.damageAfter > steady.damageBefore);
   assert.match(c.Space.talentPreviewText('steadyHand'), /excess accuracy weapon damage multiplier/);
   const blood = c.Space.getLifestealPct(10);
-  assert.equal(blood, 0.25);
+  assert.equal(blood, 0.125);
   assert.ok(c.Space.getLifestealPct(11) > blood, 'breath perks no longer make a blood upgrade worthless');
   delete c.World.BASE_HIT_CHANCE;
   assert.ok(c.Space.getSteadyHandDamageMult(21) > 1, 'older fixtures use the actual 0.8 hit chance default');

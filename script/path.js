@@ -19,7 +19,7 @@ var Path = {
 	PERMANENT_EQUIPMENT: ['waterskin','cask','water tank','water cycle','rucksack','wagon','convoy','cargo crow','l armour','i armour','s armour','wind armour','compass'],
 	_scrapping: false,
 	WeaponCategory: {
-		primary:   ['bone yari','kou katana','nichirin katana','nichirin spear','flame blade'],
+		primary:   ['bone yari','kou katana','nichirin katana','nichirin spear'],
 		secondary: ['wisteria gun','nichirin gun','thunder gun','wisteria bomb'],
 		tool:      ['kusarigama','bind kunai']
 	},

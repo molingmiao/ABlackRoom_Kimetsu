@@ -28,7 +28,7 @@ let rolls=[], randomCalls=0;
 vm.runInContext('Math.random=()=>window.nextRandom();',c);
 c.nextRandom=()=>{randomCalls++;assert.ok(rolls.length,'unexpected random draw');return rolls.shift();};
 function reset(attempts=0,resources={'demon stone':100,steel:2000,wood:10000}) {
-  c.State={stores:{...resources},features:{location:{fabricator:true}},game:{nichirinForge:{attempts}},character:{equipped:{primary:['flame blade',null]}}};
+  c.State={stores:{...resources},features:{location:{fabricator:true}},game:{nichirinForge:{attempts}},character:{equipped:{primary:['nichirin blade flame',null]}}};
   c.Path.outfit={torch:2}; c.Engine.activeModule=c.Fabricator; c.Engine.keyLock=false;
   c.Events.eventStack=[]; checked=mounted=true; modal=false; forge._busy=false;
   forge._context={node:{},overlay:{remove(){}},accepted:{prop(){return checked;}},closed:false};
@@ -47,7 +47,7 @@ for(const style of Object.keys(forge.FORMS)) for(const tier of [4,5]) {
   assert.equal(c.Path.getWeaponTier(item),tier); assert.equal(c.Path.getWeaponCategory(item),'primary');
   assert.equal(c.Path.getWeight(item),5); assert.ok(c.Path.carryables()[item]);
   assert.equal(c.Room.MiscItems[item].type,'weapon'); assert.match(c.Room.StoreDescriptions[item],/不解锁/);
-  assert.match(c.labels[item],tier===5?/^极日轮刀·/:/^日轮刀·/);
+  assert.equal(c.labels[item],(tier===5?'极日轮刀':'日轮刀')+'【'+forge.FORMS[style]+'】');
   assert.deepEqual(plain(c.Path.getScrapCost(item)),plain(forge.COST));
 }
 const primarySize=c.Path.WeaponCategory.primary.length;
@@ -70,7 +70,7 @@ assert.deepEqual(plain(c.State.stores),{'demon stone':99,steel:1980,wood:9900});
 assert.equal(forge.attempts(),1); assert.equal(saves,1); assert.deepEqual(publishes,['stores']);
 assert.equal(c.State.game.nichirinForge.lastResults[0].tier,0,'failure produces nothing and has no refund');
 assert.deepEqual(plain(c.Path.outfit),{torch:2});
-assert.deepEqual(plain(c.State.character.equipped.primary),['flame blade',null],'forging never auto-equips');
+assert.deepEqual(plain(c.State.character.equipped.primary),['nichirin blade flame',null],'forging never auto-equips');
 
 reset(); rolls=[.95,0]; assert.equal(perform(1),true); assert.equal(c.State.stores[gold],1);
 assert.equal(forge.attempts(),1,'natural gold never resets the fixed-ten counter');
@@ -129,12 +129,16 @@ assert.equal(forge._busy,false);onPublish=null;
 reset();c.Engine.options.testerMode=true;rolls=[.01];perform(1);
 assert.equal(c.State.stores.steel,1980,'tester mode does not bypass forge costs');c.Engine.options.testerMode=false;
 
-reset();c.State.stores['flame blade']=2;before=snapshot();
+reset();c.State.stores['flame blade']=2;c.State.stores['nichirin blade flame']=3;
+c.StateManager.cleanupRenamedKeys();before=snapshot();
+assert.equal(c.State.stores['nichirin blade flame'],5);
+assert.equal(c.State.stores['flame blade'],undefined);
 assert.equal(c.Fabricator.fabricate({attr(){return 'flame blade';}}),false);
 assert.equal(snapshot(),before,'legacy guaranteed exchange is inaccessible while old blades remain intact');
 assert.equal(c.StoryCrafting.recipe('flame blade'),null);
 assert.equal(c.StoryCrafting.recipe(key),null,'story commission cannot bypass a random forge');
-assert.ok(c.Path.carryables()['flame blade']);assert.ok(c.Path.getScrapCost('flame blade'));
+assert.equal(c.Path.carryables()['flame blade'],undefined);assert.equal(c.Path.getScrapCost('flame blade'),null);
+assert.ok(c.Path.carryables()['nichirin blade flame']);assert.ok(c.Path.getScrapCost('nichirin blade flame'));
 reset();c.Engine.activeModule=c.Space;assert.equal(forge.getDamageMultiplier(key),1.15);assert.equal(forge.getDamageMultiplier(gold),1.25);
 assert.equal(forge.getDamageMultiplier(forge.key('flame',5)),1);assert.equal(forge.getDamageMultiplier('nichirin katana'),1);
 c.Engine.activeModule=c.World;assert.equal(forge.getDamageMultiplier(gold),1,'matching bonus is castle-only');

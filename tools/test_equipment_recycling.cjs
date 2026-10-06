@@ -48,7 +48,7 @@ function rejected(key, amount) {
 
 // Discover every weapon, including all dynamically registered purple/gold blades.
 const weapons = Object.keys(context.World.Weapons).filter(key => key !== 'fists');
-assert.ok(weapons.length >= 39, 'all legacy weapons and 28 breathing-specific blades are registered');
+assert.equal(weapons.length, 38, 'the legacy flame alias is merged into the 28 breathing-specific blades');
 assert.equal(Object.keys(context.NichirinForge.items).length, 28);
 for (const key of weapons) {
   assert.ok(P.getWeaponCategory(key), `equipment category covers ${key}`);
@@ -143,7 +143,7 @@ for (const key of ['trap', 'hut', 'cart', 'workshop', 'iron', 'steel', 'scales',
 }
 
 // Cheap forged gear must not vanish from the recycling UI or lose fractional value.
-for (const key of ['flame blade', 'bind kunai', 'thunder gun']) {
+for (const key of ['bind kunai', 'thunder gun']) {
   reset({ [key]: 4 });
   for (let index = 1; index <= 4; index++) {
     const info = P.scrapPreview(key, 1);
@@ -157,8 +157,8 @@ for (const key of ['flame blade', 'bind kunai', 'thunder gun']) {
   assert.equal(savedRemainders()['demon stone'], 20);
 }
 
-reset({ 'flame blade': 1, 'bind kunai': 1, 'thunder gun': 2 });
-for (const key of ['flame blade', 'bind kunai', 'thunder gun', 'thunder gun']) assert.equal(P.scrapItem(key, 1), true);
+reset({ 'bind kunai': 1, 'thunder gun': 3 });
+for (const key of ['bind kunai', 'thunder gun', 'thunder gun', 'thunder gun']) assert.equal(P.scrapItem(key, 1), true);
 assert.equal(context.State.stores['demon stone'], 1, 'credit is shared by material, not stranded on an item or rarity');
 assert.equal(savedRemainders()['demon stone'], 20);
 

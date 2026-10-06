@@ -8,6 +8,16 @@ var NichirinForge = window.NichirinForge = {
   key: function(style,tier) {return (tier === 5 ? 'supreme nichirin blade ' : 'nichirin blade ') + style;},
   formName: function(style) {return style === 'moon' ? '月之呼吸剑谱·拟式' : NichirinForge.FORMS[style] + '之呼吸';},
   register: function() {
+    // Old flame/energy blades are save aliases, not a second live weapon or recipe.
+    ['flame blade','energy blade'].forEach(function(alias) {
+      delete World.Weapons[alias];
+      delete NichirinForge.items[alias];
+      delete Room.MiscItems[alias];
+      delete Fabricator.Craftables[alias];
+      Object.keys(Path.WeaponCategory).forEach(function(category) {
+        Path.WeaponCategory[category] = Path.WeaponCategory[category].filter(function(key) {return key !== alias;});
+      });
+    });
     Object.keys(NichirinForge.FORMS).forEach(function(style) {
       [4,5].forEach(function(tier) {
         var key = NichirinForge.key(style,tier);

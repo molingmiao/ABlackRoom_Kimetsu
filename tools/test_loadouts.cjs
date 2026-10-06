@@ -75,18 +75,18 @@ result = plan({ medicine: Infinity, torch: -2 }, {}, { medicine: 10, torch: 5 },
 assert.deepEqual(result.outfit, {}, 'malformed saved targets are ignored');
 
 reset();
-SM.set('stores', { 'bone yari': 1, 'flame blade': 1, 'cured meat': 30, medicine: 10, wagon: 1 }, true);
+SM.set('stores', { 'bone yari': 1, 'kou katana': 1, 'cured meat': 30, medicine: 10, wagon: 1 }, true);
 SM.set('character.equipped', { primary: ['bone yari', null], secondary: [], tool: [] }, true);
 P.outfit = { 'cured meat': 6, medicine: 2 };
 P.saveLoadout();
 assert.equal(P.getLoadout('expedition').targets['bone yari'], 1, 'saving includes equipped-but-not-yet-packed weapons');
 assert.equal(P.getLoadout('expedition').targets['cured meat'], 6);
 P.outfit['cured meat'] = 1;
-SM.set('character.equipped.primary', ['flame blade', null], true);
+SM.set('character.equipped.primary', ['kou katana', null], true);
 const beforeStores = plain(context.State.stores);
 P.autoFillSupplies();
 assert.deepEqual(plain(context.State.stores), beforeStores, 'refill selects but does not withdraw home inventory');
-assert.equal(SM.get('character.equipped.primary')[0], 'flame blade', 'refill never reselects strongest weapons');
+assert.equal(SM.get('character.equipped.primary')[0], 'kou katana', 'refill never reselects strongest weapons');
 assert.equal(P.outfit['cured meat'], 6);
 const firstFill = plain(P.outfit);
 P.autoFillSupplies();
@@ -116,7 +116,7 @@ assert.ok(suggested.targets.medicine > 0);
 assert.equal(suggested.targets['wisteria bullet'], 10, 'suggested ammunition matches selected weapon');
 assert.equal(suggested.targets['solar crystal'], undefined, 'unmatched ammunition is not packed');
 assert.ok(weight(suggested.targets) <= P.getCapacity() + 0.000001);
-assert.equal(suggested.targets['flame blade'], undefined, 'suggestions do not replace selected weapons');
+assert.equal(suggested.targets['kou katana'], undefined, 'suggestions do not replace selected weapons');
 
 // Deterministic boundary coverage across inventories, target amounts and small bags.
 const keys = ['cured meat', 'medicine', 'wisteria bullet', 'solar crystal', 'bone yari'];
