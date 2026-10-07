@@ -49,7 +49,7 @@ assert.equal(writes, 0, 'moves are memory only');
 const end = {
   outfit: {'cured meat': 4, 'bone yari': 1, fur: 5},
   map: [['A', 'H!'], ['O!', ';']], mask: [[true, true], [true, true]],
-  unlocks: ['iron mine', 'iron mine']
+  unlocks: ['iron mine', 'iron mine'],roadNotes:['补好的绳结','补好的绳结','名单的空白处']
 };
 let completed = report.finish('return', end);
 assert.equal(writes, 1);
@@ -63,6 +63,7 @@ assert.equal(completed.gained.fur, 5);
 assert.equal(completed.reduced['cured meat'], 4);
 assert.equal(completed.returned['bone yari'], 1);
 assert.equal(completed.unlocks.length, 1);
+assert.equal(completed.roadNotes.length,2,'read-only notes are bounded and deduplicated');
 end.outfit.fur = 999; end.unlocks.push('coal mine'); completed.returned.fur = 123;
 assert.equal(report.latest().returned.fur, 5, 'input and result dictionaries cannot mutate saved report');
 assert.equal(report.latest().unlocks.length, 1);
@@ -77,6 +78,7 @@ assert.equal(shown.event.scenes.start.buttons.closeExpeditionReport.nextScene, '
 assert.equal(shown.event.scenes.start.text.length, 0, 'structured sections replace flat paragraphs');
 assert.match(renderedText.join(' '), /净增加.*净减少.*不含庄园生产/);
 assert.match(renderedText.join(' '), /已返回庄园.*地图进展已保存.*探索进展.*3 步.*本次解锁.*iron mine.*下次准备/);
+assert.match(renderedText.join(' '),/沿途见闻.*已收录.*补好的绳结/);
 assert.equal(JSON.stringify(state), snapshot, 'review is read-only');
 activeEvent = {};
 assert.equal(report.show(), false, 'cannot interrupt another event');

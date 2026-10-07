@@ -18,6 +18,7 @@ const gameGlobals = {
 	Path: 'writable',
 	World: 'writable',
 	WorldStoryGuide: 'writable',
+	WorldRoadStories: 'writable',
 	Ship: 'writable',
 	Space: 'writable',
 	CombatStyles: 'writable',

@@ -10,10 +10,12 @@ Events.StoryChapters = {
   reset: function(id) {
     if (!Events.StoryChapters._progress) Events.StoryChapters._progress = {};
     Events.StoryChapters._progress[id] = {state:World.state,choices:{}};
+    if (window.WorldStoryGuide) WorldStoryGuide.update();
   },
   mark: function(id,key) {
     var progress = (Events.StoryChapters._progress || {})[id];
     if (progress && progress.state === World.state) progress.choices[key] = true;
+    if (window.WorldStoryGuide) WorldStoryGuide.update();
   },
   has: function(id,key) {
     var progress = (Events.StoryChapters._progress || {})[id];

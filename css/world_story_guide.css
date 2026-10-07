@@ -14,3 +14,8 @@ div#outerSlider > div#worldPanel {
 .worldStoryCard[data-status="pending"] { border-left: 4px solid #b28c32; }
 .worldStoryCard[data-status="done"] { border-left: 4px solid #738567; }
 .worldStoryRoute, .worldStoryNote { font-weight: bold; }
+.worldStoryAccess { font-weight: bold; border-left: 3px solid #b28c32; padding-left: 5px; }
+.worldStoryObjectives { border-top: 1px dashed #91958b; padding-top: 4px; }
+.worldRoadJournal { margin-top: 8px; }
+.worldRoadNotes { max-height: 170px; overflow-y: auto; margin-top: 6px; }
+.worldRoadNotes .worldStoryCard { margin-bottom: 6px; }

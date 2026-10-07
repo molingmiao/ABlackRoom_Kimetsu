@@ -100,6 +100,7 @@ var ExpeditionReport = {
       newTiles: ExpeditionReport._countNew(run.mask, ExpeditionReport._grid(options.mask), function(cell) { return cell === true; }),
       newLocations: ExpeditionReport._countNew(run.map, ExpeditionReport._grid(options.map), function(cell) { return typeof cell === 'string' && cell.indexOf('!') >= 0; }),
       mapSaved: outcome === 'return', unlocks: ExpeditionReport._names(options.unlocks),
+      roadNotes: ExpeditionReport._names(options.roadNotes).slice(0,3),
       gained: gained, reduced: reduced, returned: remaining,
       reason: ['food', 'water', 'combat'].indexOf(options.reason) >= 0 ? options.reason : null,
       diagnostics: ExpeditionReport._diagnostics(run, remaining)
@@ -142,6 +143,7 @@ var ExpeditionReport = {
       '结算时归还仓库：' + ExpeditionReport._format(report.returned),
       '以上仅对比出发与结算背包，不含庄园生产。净减少可能包含使用、丢弃等；净增加不是全部拾取量，不能当作总消耗或总掉落。'
     ];
+    if (report.roadNotes && report.roadNotes.length) lines.push('沿途见闻' + (report.mapSaved ? '（已收录）' : '（本次未收录）') + '：' + ExpeditionReport._names(report.roadNotes).join('、'));
     return lines.concat(ExpeditionReport.suggestions(report));
   },
   show: function() {
@@ -183,6 +185,10 @@ var ExpeditionReport = {
     });
     var unlocks = section('本次解锁', 'expeditionUnlocks');
     $('<strong>').text(report.unlocks.length ? report.unlocks.map(function(item) { return _(item); }).join('、') : '无新解锁').appendTo(unlocks);
+    if (report.roadNotes && report.roadNotes.length) {
+      var notes = section('沿途见闻' + (report.mapSaved ? ' · 已收录' : ' · 本次未收录'), 'expeditionRoadNotes');
+      ExpeditionReport._names(report.roadNotes).forEach(function(title){$('<p>').text(title).appendTo(notes);});
+    }
     var resources = section('物资变化', 'expeditionResources');
     [['背包净增加', report.gained], ['背包净减少', report.reduced], ['归还仓库', report.returned]].forEach(function(resource) {
       var row = $('<div>').addClass('expeditionResourceRow').appendTo(resources);

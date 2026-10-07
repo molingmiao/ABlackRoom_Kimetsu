@@ -409,6 +409,7 @@ var World = {
     if (curDist > oldMax) $SM.set('game.maxDistance', curDist, true);
     if (window.ExpeditionReport) ExpeditionReport.recordMove(curDist);
     World.doSpace();
+    if (window.WorldRoadStories) WorldRoadStories.onMove();
     World.updateTravelGuide();
     if (window.FieldTreatment) FieldTreatment.update();
     if (World.dead || Engine.activeModule !== World) return true;
@@ -1062,6 +1063,7 @@ var World = {
       // Dead! Discard any world changes and go home
       Notifications.notify(World, _('the world fades'));
       World.state = null;
+      if (window.WorldRoadStories) WorldRoadStories.reset();
       World.updateTravelGuide();
       if (window.FieldTreatment) FieldTreatment.reset();
       // 无限城中获得的所有掉落都返回家中，不再因为死亡而消失。
@@ -1109,6 +1111,7 @@ var World = {
     $SM.setM('game.world', World.state);
     if (window.Events && Events.Yoshiwara) Events.Yoshiwara.commit();
     if (window.Events && Events.StoryChapters) Events.StoryChapters.commit();
+    if (window.WorldRoadStories) WorldRoadStories.commit();
     World.testMap();
 
     if(World.state.sulphurmine && $SM.get('game.buildings["sulphur mine"]', true) === 0) {
@@ -1134,6 +1137,7 @@ var World = {
     }
     World.redeemBlueprints();
     World.finishExpeditionReport('return');
+    if (window.WorldRoadStories) WorldRoadStories.reset();
     World.state = null;
     if (window.FieldTreatment) FieldTreatment.reset();
 
@@ -1166,7 +1170,11 @@ var World = {
     if (outcome === 'return') Object.keys($SM.get('character.blueprints') || {}).forEach(function(key) {
       if ($SM.get('character.blueprints[' + JSON.stringify(key) + ']') && !(World._expeditionBlueprints || {})[key]) unlocks.push('制造图纸：' + _(key));
     });
-    var report = ExpeditionReport.finish(outcome,{outfit:Path.outfit || {},map:World.state.map,mask:World.state.mask,unlocks:unlocks,reason:reason});
+    var roadNotes = window.WorldRoadStories ? WorldRoadStories.notes().map(function(id) {
+      var entry = WorldRoadStories.entries.find(function(item){return item.id === id;});
+      return entry.title;
+    }) : [];
+    var report = ExpeditionReport.finish(outcome,{outfit:Path.outfit || {},map:World.state.map,mask:World.state.mask,unlocks:unlocks,reason:reason,roadNotes:roadNotes});
     if (report) Notifications.notify(null,outcome === 'return' ? '远征已结算：地图进展和剩余物资已带回，可在备战页查看远征报告。' : '远征失败：本次地图进展未保存，剩余背包已归还；可在备战页查看原因与建议。');
     return report;
   },
@@ -1321,6 +1329,7 @@ var World = {
     Engine.keyLock = false;
     // Explore in a temporary world-state. We'll commit the changes if you return home safe.
     World.state = $.extend(true, {}, $SM.get('game.world'));
+    if (window.WorldRoadStories) WorldRoadStories.begin();
     if (window.FieldTreatment) FieldTreatment.reset();
     World.setWater(World.getMaxWater());
     World.setHp(World.getMaxHealth());

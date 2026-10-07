@@ -1061,7 +1061,7 @@ async function port() {
         if(item.tile==='Q') {
           check($('#worldStoryGuide').length===1&&!$('#worldStoryGuide').prop('open'),'field notes are collapsed by default');
           $('#worldStoryGuide').prop('open',true);WorldStoryGuide.update();
-          check($('.worldStoryCard').length===7&&$('#worldStoryGuide [data-tile="Q"]').text().includes('你就在这里'),'seven separately framed landmarks show the discovered local destination');
+          check($('.worldStoryList > .worldStoryCard').length===7&&$('#worldStoryGuide [data-tile="Q"]').text().includes('你就在这里'),'seven separately framed landmarks show the discovered local destination');
           const list=$('.worldStoryList')[0];list.scrollTop=60;WorldStoryGuide.update();
           check($('#worldStoryGuide').prop('open')&&list.scrollTop===60,'map redraw retains field notes open state and scroll');
         }
@@ -1077,6 +1077,7 @@ async function port() {
             const button=$('#'+step);
             check(button.length===1&&!button.hasClass('disabled'),item.tile+' free story choice '+step+' is available');
             button.trigger('click');
+            if(item.tile==='Q'&&step==='stream') check($('#worldStoryGuide [data-tile="Q"] .worldStoryObjectives').text().includes('✓ 确认山道'),'actual branch choice updates the transient objective checklist');
           }
         }
         check(World.state[item.id]&&!$SM.get(definition.flag),item.tile+' completed story is temporary until safe return');
@@ -1124,6 +1125,34 @@ async function port() {
     await evaluate(`(async function(){World.goHome();await new Promise(resolve=>$('#outerSlider').promise().done(resolve));Engine.travelTo(Room);await new Promise(resolve=>$('#locationSlider').promise().done(resolve));})()`);
     await page('Emulation.setDeviceMetricsOverride',{width:1280,height:1000,deviceScaleFactor:1,mobile:false});
     console.log('PASS: scrollable full map with expanded story notes at 1200x745 and readable light/dark themes');
+    const journalChecks=await evaluate(`(async function(){
+      const checks=[],check=(ok,label)=>{if(!ok)throw Error(label);checks.push(label);};
+      Engine.travelTo(Path);await new Promise(resolve=>$('#locationSlider').promise().done(resolve));
+      $SM.set('game.roadsideSeen',[]);Path.outfit={'nichirin katana':1,'cured meat':10};$SM.set('outfit',Path.outfit);
+      check(Path.embark(),'roadside notes use normal departure');
+      await new Promise(resolve=>$('#outerSlider').promise().done(resolve));
+      let origin=null;
+      for(let x=1;x<54&&!origin;x++)for(let y=1;y<60&&!origin;y++)if(Array.from({length:7},(_,i)=>World.state.map[x+i][y]).every(tile=>World.isTerrain(tile)))origin=[x,y];
+      check(!!origin,'fixture has seven ordinary adjacent terrain cells');World.curPos=origin;
+      World.setWater(100);World.setHp(World.getMaxHealth());
+      const stock=JSON.stringify(State.stores),fight=World.checkFight;
+      try{World.checkFight=function(){};for(let i=0;i<6;i++)check(World.move(World.EAST),'actual ordinary movement '+i);}finally{World.checkFight=fight;}
+      const ids=WorldRoadStories.notes();check(ids.length===1&&!Events.activeEvent(),'six distinct steps add one note without opening an event');
+      check(JSON.stringify(State.stores)===stock&&!$SM.get('game.roadsideSeen').length,'hearing a vignette grants no estate resources or permanent collection');
+      $('#worldStoryGuide').prop('open',true);$('.worldRoadJournal').prop('open',true);WorldStoryGuide.update();
+      check($('.worldRoadNotes').text().includes('待安全返程'),'actual notebook distinguishes unsubmitted entries');
+      check(World.goHome(),'ordinary return submits roadside journal');
+      check($SM.get('game.roadsideSeen').includes(ids[0])&&WorldRoadStories._run===null,'safe return records seen ids and clears all active note state');
+      check(ExpeditionReport.latest().roadNotes.length===1,'real expedition report includes the roadside title');
+      await new Promise(resolve=>$('#outerSlider').promise().done(resolve));
+      check(ExpeditionReport.show(),'roadside report opens only back at camp');
+      check($('.expeditionRoadNotes').text().includes('已收录'),'real recap distinguishes collected roadside notes');
+      $('#closeExpeditionReport').trigger('click');
+      for(let i=0;i<100&&Events.activeEvent();i++)await new Promise(resolve=>setTimeout(resolve,30));
+      Engine.travelTo(Room);await new Promise(resolve=>$('#locationSlider').promise().done(resolve));
+      return checks;
+    })()`);
+    console.log(journalChecks.map(name=>'PASS: '+name).join('\n'));
     const blueprintStateBackup = await evaluate('JSON.stringify(State)');
     const blueprintChecks = await evaluate(`(async function() {
       const checks=[],check=(ok,label)=>{if(!ok) throw Error(label);checks.push(label);};
