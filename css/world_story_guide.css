@@ -19,3 +19,8 @@ div#outerSlider > div#worldPanel {
 .worldRoadJournal { margin-top: 8px; }
 .worldRoadNotes { max-height: 170px; overflow-y: auto; margin-top: 6px; }
 .worldRoadNotes .worldStoryCard { margin-bottom: 6px; }
+.longQuestJournal { margin-top: 8px; max-height: 260px; overflow-y: auto; }
+.longQuestJournal > p { border-left: 2px solid #91958b; padding: 5px 7px; }
+.longQuestNpc, .longQuestCorners { font-weight: bold; }
+.longQuestJournal button { color: inherit; background: transparent; border: 1px solid currentColor; padding: 5px 9px; cursor: pointer; }
+.longQuestJournal button:disabled { opacity: .5; cursor: default; }

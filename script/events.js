@@ -1878,6 +1878,7 @@ var Events = {
 			$('body').focus();
 			if (typeof onEnd === 'function') onEnd();
 			if (window.FieldTreatment) FieldTreatment.update();
+			if (window.WorldStoryGuide) WorldStoryGuide.update();
 		});
 	},
 

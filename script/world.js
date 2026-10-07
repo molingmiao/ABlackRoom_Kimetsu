@@ -159,6 +159,7 @@ var World = {
     World.LANDMARKS[World.TILE.SAGIRI_ROAD] = { num: 1, minRadius: 7, maxRadius: 7, scene: 'sagiriRoad', label: '狭雾山旧道 · 送行见闻' };
     World.LANDMARKS[World.TILE.DRUM_ROAD] = { num: 1, minRadius: 11, maxRadius: 11, scene: 'drumRoad', label: '鼓屋外围 · 撤离支援' };
     World.LANDMARKS[World.TILE.WISTERIA_HOUSE] = { num: 1, minRadius: 16, maxRadius: 16, scene: 'wisteriaHouse', label: '藤之家 · 夜路护送' };
+    if (window.LongQuests) LongQuests.configure();
 
     // Only add the cache if there is prestige data
     if($SM.get('previous.stores')) {
@@ -188,6 +189,7 @@ var World = {
     World.ensureCampaignLandmarks();
     World.ensureDistrictLandmarks();
     World.ensureStoryLandmarks();
+    if (window.LongQuests) LongQuests.ensureMap();
 
     // Create the World panel
     this.panel = $('<div>').attr('id', "worldPanel").addClass('location').appendTo('#outerSlider');
@@ -618,6 +620,10 @@ var World = {
 
   doSpace: function() {
     var curTile = World.state.map[World.curPos[0]][World.curPos[1]];
+    if (window.LongQuests) {
+      LongQuests.visit(curTile);
+      if (LongQuests.openSite(curTile)) return;
+    }
     // Only these optional sites have a read-only revisit scene after completion.
     if (World.isRoadStoryTile(curTile)) curTile = curTile.charAt(0);
 
@@ -653,6 +659,7 @@ var World = {
     var optional = [World.TILE.OUTPOST,World.TILE.ROAD_TOWN,World.TILE.MARKET_TOWN,
       World.TILE.SWORDSMITH_VILLAGE,World.TILE.BUTTERFLY_ESTATE,
       World.TILE.SAGIRI_ROAD,World.TILE.DRUM_ROAD,World.TILE.WISTERIA_HOUSE];
+    optional = optional.concat(['N','1','2','3','4']);
     var need = Object.keys(World.LANDMARKS).filter(function(key) {return optional.indexOf(key) < 0;});
     if (!need.every(function(key) {return !!visited[key];}) || $SM.get('game.castleMeta.perfectExploration',true)) return false;
     $SM.set('game.castleMeta.perfectExploration',true,true);
@@ -1064,6 +1071,7 @@ var World = {
       Notifications.notify(World, _('the world fades'));
       World.state = null;
       if (window.WorldRoadStories) WorldRoadStories.reset();
+      if (window.LongQuests) LongQuests.reset();
       World.updateTravelGuide();
       if (window.FieldTreatment) FieldTreatment.reset();
       // 无限城中获得的所有掉落都返回家中，不再因为死亡而消失。
@@ -1112,6 +1120,7 @@ var World = {
     if (window.Events && Events.Yoshiwara) Events.Yoshiwara.commit();
     if (window.Events && Events.StoryChapters) Events.StoryChapters.commit();
     if (window.WorldRoadStories) WorldRoadStories.commit();
+    if (window.LongQuests) LongQuests.commit();
     World.testMap();
 
     if(World.state.sulphurmine && $SM.get('game.buildings["sulphur mine"]', true) === 0) {
@@ -1138,6 +1147,7 @@ var World = {
     World.redeemBlueprints();
     World.finishExpeditionReport('return');
     if (window.WorldRoadStories) WorldRoadStories.reset();
+    if (window.LongQuests) LongQuests.reset();
     World.state = null;
     if (window.FieldTreatment) FieldTreatment.reset();
 
@@ -1167,6 +1177,7 @@ var World = {
     Object.keys(flags).forEach(function(key) {
       if (outcome === 'return' && World.state[key] && !(World._expeditionFlags || {})[key]) unlocks.push(flags[key]);
     });
+    if (outcome === 'return' && window.LongQuests) unlocks = unlocks.concat(LongQuests.report());
     if (outcome === 'return') Object.keys($SM.get('character.blueprints') || {}).forEach(function(key) {
       if ($SM.get('character.blueprints[' + JSON.stringify(key) + ']') && !(World._expeditionBlueprints || {})[key]) unlocks.push('制造图纸：' + _(key));
     });
@@ -1330,6 +1341,7 @@ var World = {
     // Explore in a temporary world-state. We'll commit the changes if you return home safe.
     World.state = $.extend(true, {}, $SM.get('game.world'));
     if (window.WorldRoadStories) WorldRoadStories.begin();
+    if (window.LongQuests) LongQuests.begin();
     if (window.FieldTreatment) FieldTreatment.reset();
     World.setWater(World.getMaxWater());
     World.setHp(World.getMaxHealth());

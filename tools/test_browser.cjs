@@ -63,15 +63,15 @@ async function port() {
     };
     call = (method, params = {}, sessionId) => new Promise((resolve, reject) => {
       const requestId = ++id;
-      const timeout = setTimeout(() => { pending.delete(requestId); reject(Error('Timed out: ' + method)); }, 30000);
+      const timeout = setTimeout(() => { pending.delete(requestId); reject(Error('Timed out: ' + method)); }, method === 'Runtime.evaluate' ? (params.timeout || 30000) : 30000);
       pending.set(requestId, { resolve, reject, timeout });
       socket.send(JSON.stringify({ id: requestId, method, params, sessionId }));
     });
     const { targetId } = await call('Target.createTarget', { url: 'about:blank' });
     const { sessionId } = await call('Target.attachToTarget', { targetId, flatten: true });
     const page = (method, params) => call(method, params, sessionId);
-    const evaluate = async expression => {
-      const result = await page('Runtime.evaluate', { expression, awaitPromise: true, returnByValue: true });
+    const evaluate = async (expression, timeout=30000) => {
+      const result = await page('Runtime.evaluate', { expression, awaitPromise: true, returnByValue: true, timeout });
       if (result.exceptionDetails) throw Error(result.exceptionDetails.exception?.description || result.exceptionDetails.text);
       return result.result.value;
     };
@@ -1153,6 +1153,59 @@ async function port() {
       return checks;
     })()`);
     console.log(journalChecks.map(name=>'PASS: '+name).join('\n'));
+    const longQuestChecks=await evaluate(`(async function(){
+      const checks=[],check=(ok,label)=>{if(!ok)throw Error(label);checks.push(label);};
+      const until=async fn=>{for(let i=0;i<220&&!fn();i++)await new Promise(resolve=>setTimeout(resolve,30));if(!fn())throw Error('long quest timeout: '+Events.activeScene);};
+      const settle=()=>new Promise(resolve=>$('#outerSlider').promise().done(resolve));
+      const location=tile=>{let found;World.state.map.forEach((row,x)=>row.forEach((cell,y)=>{if(!found&&cell[0]===tile)found=[x,y];}));check(!!found,'long quest site exists: '+tile);World.curPos=found;World.drawMap();};
+      const depart=()=>{Path.outfit={'nichirin katana':1,'cured meat':10};$SM.set('outfit',Path.outfit);check(Path.embark(),'normal long quest departure');};
+      Engine.travelTo(Path);await new Promise(resolve=>$('#locationSlider').promise().done(resolve));
+      for(const branch of ['mercy','slay']){
+        $SM.remove('game.longQuests');let battles=0;
+        $SM.setM('stores',{'nichirin katana':3,'cured meat':300});
+        for(let stage=0;stage<10;stage++){
+          depart();await settle();location(LongQuests.stages[stage].tile);
+          if(stage===0||stage===9)World.doSpace();else{$('.longQuestJournal').prop('open',true);$('.longQuestAction').trigger('click');}
+          check(Events.activeEvent().title.includes('失名的引路人'),'actual tracker/landmark opens NPC stage '+stage);
+          $('#begin').trigger('click');check($('#decide').hasClass('disabled'),'two evidence sources are required');
+          $('#clueA').trigger('click');$('#back').trigger('click');$('#clueB').trigger('click');$('#back').trigger('click');$('#decide').trigger('click');
+          $('#'+(stage===0?branch:'continue')).trigger('click');$('#act').trigger('click');
+          if(stage===0)$('#'+(branch==='mercy'?'spare':'battle')).trigger('click');
+          if(Events.activeScene==='fight'){
+            battles++;Events.clearTimeouts();Events.dotDamage($('#enemy'),9999,'test support strike');
+            await until(()=>Events.fought&&$('#report').length);Button.clearCooldown($('#report'));$('#report').trigger('click');
+          }
+          check(LongQuests.run().data.npc.stage===stage+1&&LongQuests.saved().npc.stage===stage,'NPC chapter stays temporary until home');
+          $('#leave').trigger('click');await until(()=>!Events.activeEvent());
+          check(World.goHome()&&LongQuests.saved().npc.stage===stage+1,'actual safe return saves stage '+(stage+1));await settle();
+          check(ExpeditionReport.latest().unlocks.some(s=>s.includes('失名的引路人')),'recap reports the delivered NPC checkpoint');
+        }
+        check(battles===(branch==='mercy'?1:3),'real branch combat count: '+branch);
+        check($SM.get('achievements.'+(branch==='mercy'?'namelessMercy':'namelessSlay'))===true,'actual ending achievement awarded: '+branch);
+      }
+      $SM.remove('game.longQuests');$SM.remove('achievements.fourCornerLights');$SM.remove('achievements.namelessArchive');
+      depart();await settle();
+      for(const corner of LongQuests.corners){
+        location(corner.tile);World.doSpace();$('#read').trigger('click');$('#wrong').trigger('click');
+        check(!LongQuests.run().data.corners.includes(corner.tile),'wrong symbol does not activate room '+corner.tile);
+        $('#retry').trigger('click');$('#correct').trigger('click');$('#leave').trigger('click');await until(()=>!Events.activeEvent());
+      }
+      check(LongQuests.saved().corners.length===0,'four switches are not delivered remotely');
+      World.goHome();await settle();check(LongQuests.saved().corners.length===4&&!$SM.get('achievements.fourCornerLights'),'switch delivery still waits for real castle entry');
+      $SM.set('game.spaceShip.crows',3);$SM.setM('stores',{'nichirin katana':3,'cured meat':100});Path.outfit={'nichirin katana':1,'cured meat':10};$SM.set('outfit',Path.outfit);
+      Engine.options.testerMode=false;Engine.travelTo(Ship);await new Promise(resolve=>$('#locationSlider').promise().done(resolve));
+      check(Ship.descend()&&$SM.get('achievements.fourCornerLights'),'actual paid descent awards the four-corner achievement');
+      World.die('combat');await until(()=>Engine.activeModule===Room&&!Engine.keyLock);await new Promise(resolve=>setTimeout(resolve,800));
+      if(Events.activeEvent())Events.endEvent();await until(()=>!Events.activeEvent());await settle();
+      Engine.travelTo(Path);await new Promise(resolve=>$('#locationSlider').promise().done(resolve));
+      $SM.set('game.roadsideSeen',WorldRoadStories.entries.map(entry=>entry.id));depart();await settle();location('J');
+      $('.longQuestArchiveAction').trigger('click');check(Events.activeEvent().title==='九封没有署名的信','nine-entry collection opens the actual epilogue');
+      $('#finish').trigger('click');$('#leave').trigger('click');await until(()=>!Events.activeEvent());World.goHome();await settle();
+      check($SM.get('achievements.namelessArchive'),'archive ending awarded only after real return');
+      Engine.travelTo(Room);await new Promise(resolve=>$('#locationSlider').promise().done(resolve));
+      return checks;
+    })()`,120000);
+    console.log(longQuestChecks.map(name=>'PASS: '+name).join('\n'));
     const blueprintStateBackup = await evaluate('JSON.stringify(State)');
     const blueprintChecks = await evaluate(`(async function() {
       const checks=[],check=(ok,label)=>{if(!ok) throw Error(label);checks.push(label);};

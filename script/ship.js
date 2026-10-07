@@ -268,6 +268,7 @@ $SM.fireUpdate('stores');
 $SM.fireUpdate('game.spaceShip.crows');
 $('#outerSlider').animate({top: '-910px'}, 300);
 Space.onArrival();
+if (window.LongQuests) LongQuests.onCastleEntry();
 Engine.saveGame();
 AudioEngine.playSound(AudioLibrary.LIFT_OFF);
 return true;

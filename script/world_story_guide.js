@@ -107,6 +107,7 @@ var WorldStoryGuide = {
       card.find('.worldStoryNote').text(entry.note).toggle(!!entry.note);
     });
     WorldStoryGuide.updateJournal(guide);
+    if (window.LongQuests) LongQuests.render(guide);
   },
   updateJournal: function(guide) {
     if (!window.WorldRoadStories) return;

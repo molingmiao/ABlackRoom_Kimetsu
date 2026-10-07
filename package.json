@@ -27,6 +27,7 @@
     "test:early": "node tools/test_early_game.cjs && node tools/test_campaign_train.cjs && node tools/test_campaign_progress.cjs && node tools/test_yoshiwara.cjs && node tools/test_story_chapters.cjs && node tools/test_blueprint_progression.cjs && node tools/test_companions.cjs && node tools/test_story_crafting.cjs",
     "test:expedition": "node tools/test_travel_budget.cjs && node tools/test_expedition_report.cjs && node tools/test_field_treatment.cjs && node tools/test_road_journal.cjs",
     "test:camp": "node tools/test_camp_guide.cjs",
+    "test:long-quests": "node tools/test_long_quests.cjs",
     "test:reserves": "node tools/test_production_reserves.cjs",
     "test:economy": "node tools/test_economy.cjs && node tools/test_cured_meat_recipe.cjs",
     "test:ux": "node tools/test_update_notes.cjs && node tools/test_production_overview.cjs && node tools/test_scrap_preview.cjs && node tools/test_equipment_recycling.cjs && node tools/test_buy_preview.cjs && node tools/test_loadout_editor.cjs && node tools/test_talent_cards.cjs",
