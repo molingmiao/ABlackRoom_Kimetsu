@@ -25,7 +25,10 @@ var World = {
     EXECUTIONER: 'X',
     MUGEN_TRAIN: 'T',
     SWORDSMITH_VILLAGE: 'K',
-    BUTTERFLY_ESTATE: 'E'
+    BUTTERFLY_ESTATE: 'E',
+    SAGIRI_ROAD: 'Q',
+    DRUM_ROAD: 'G',
+    WISTERIA_HOUSE: 'J'
   },
   TILE_PROBS: {},
   LANDMARKS: {},
@@ -153,6 +156,9 @@ var World = {
     World.LANDMARKS[World.TILE.MUGEN_TRAIN] = { num: 1, minRadius: 18, maxRadius: 18, scene: 'mugenTrain', label: '无限列车站台' };
     World.LANDMARKS[World.TILE.SWORDSMITH_VILLAGE] = { num: 1, minRadius: 22, maxRadius: 22, scene: 'swordsmithVillage', label: '锻刀村（唯一地点）' };
     World.LANDMARKS[World.TILE.BUTTERFLY_ESTATE] = { num: 1, minRadius: 12, maxRadius: 12, scene: 'butterflyEstate', label: '蝶屋 · 康复训练' };
+    World.LANDMARKS[World.TILE.SAGIRI_ROAD] = { num: 1, minRadius: 7, maxRadius: 7, scene: 'sagiriRoad', label: '狭雾山旧道 · 送行见闻' };
+    World.LANDMARKS[World.TILE.DRUM_ROAD] = { num: 1, minRadius: 11, maxRadius: 11, scene: 'drumRoad', label: '鼓屋外围 · 撤离支援' };
+    World.LANDMARKS[World.TILE.WISTERIA_HOUSE] = { num: 1, minRadius: 16, maxRadius: 16, scene: 'wisteriaHouse', label: '藤之家 · 夜路护送' };
 
     // Only add the cache if there is prestige data
     if($SM.get('previous.stores')) {
@@ -611,6 +617,8 @@ var World = {
 
   doSpace: function() {
     var curTile = World.state.map[World.curPos[0]][World.curPos[1]];
+    // Only these optional sites have a read-only revisit scene after completion.
+    if (World.isRoadStoryTile(curTile)) curTile = curTile.charAt(0);
 
     if(curTile == World.TILE.VILLAGE) {
       World.goHome();
@@ -642,7 +650,8 @@ var World = {
     // D/R are variants of the old ordinary towns, not extra requirements that
     // may not exist on a cleared legacy map. Unique O and story T still count.
     var optional = [World.TILE.OUTPOST,World.TILE.ROAD_TOWN,World.TILE.MARKET_TOWN,
-      World.TILE.SWORDSMITH_VILLAGE,World.TILE.BUTTERFLY_ESTATE];
+      World.TILE.SWORDSMITH_VILLAGE,World.TILE.BUTTERFLY_ESTATE,
+      World.TILE.SAGIRI_ROAD,World.TILE.DRUM_ROAD,World.TILE.WISTERIA_HOUSE];
     var need = Object.keys(World.LANDMARKS).filter(function(key) {return optional.indexOf(key) < 0;});
     if (!need.every(function(key) {return !!visited[key];}) || $SM.get('game.castleMeta.perfectExploration',true)) return false;
     $SM.set('game.castleMeta.perfectExploration',true,true);
@@ -681,6 +690,7 @@ var World = {
     return {distance:distance,direction:directions.join('、') || '已在庄园',budget:budget,food:food,water:water,status:status};
   },
   updateTravelGuide: function() {
+    if (window.WorldStoryGuide) WorldStoryGuide.update();
     var info = World.travelInfo(), guide = $('#worldTravelGuide');
     if (!info) {if (guide.length) guide.hide();return;}
     if (!guide.length) {
@@ -970,6 +980,11 @@ var World = {
 
   markVisited: function(x, y) {
     World.state.map[x][y] = World.state.map[x][y] + '!';
+    if (window.WorldStoryGuide) WorldStoryGuide.update();
+  },
+
+  isRoadStoryTile: function(tile) {
+    return typeof tile === 'string' && ['Q','G','J','Q!','G!','J!'].indexOf(tile) >= 0;
   },
 
   drawMap: function() {
@@ -997,6 +1012,7 @@ var World = {
           mapString += '<span class="landmark">@<div class="tooltip ' + ttClass + '">'+_('Wanderer')+'</div></span>';
         } else if(World.state.mask[i][j]) {
           var c = World.state.map[i][j];
+          if (World.isRoadStoryTile(c)) c = c.charAt(0);
           switch(c) {
             case World.TILE.VILLAGE:
               mapString += '<span class="landmark">' + c + '<div class="tooltip' + ttClass + '">'+_('The&nbsp;Village')+'</div></span>';
@@ -1019,6 +1035,7 @@ var World = {
       mapString += '<br/>';
     }
     map.html(mapString);
+    if (window.WorldStoryGuide) WorldStoryGuide.update();
   },
 
   die: function(reason) {
@@ -1142,7 +1159,7 @@ var World = {
   finishExpeditionReport: function(outcome,reason) {
     if (!window.ExpeditionReport || !World.state) return null;
     var unlocks = [];
-    var flags = {ironmine:'铁矿供应',coalmine:'煤矿供应',sulphurmine:'硫磺矿供应',ship:'无限城入口',executioner:'制造器',mugentrain:'无限列车支援完成',yoshiwara:'游郭救援完成',swordsmith:'锻刀村支援完成',butterfly:'蝶屋康复训练完成'};
+    var flags = {ironmine:'铁矿供应',coalmine:'煤矿供应',sulphurmine:'硫磺矿供应',ship:'无限城入口',executioner:'制造器',mugentrain:'无限列车支援完成',yoshiwara:'游郭救援完成',swordsmith:'锻刀村支援完成',butterfly:'蝶屋康复训练完成',sagiri:'狭雾山见闻交付',drumRoad:'鼓屋外围支援交付',wisteriaHouse:'藤之家夜路交付'};
     Object.keys(flags).forEach(function(key) {
       if (outcome === 'return' && World.state[key] && !(World._expeditionFlags || {})[key]) unlocks.push(flags[key]);
     });
@@ -1316,7 +1333,7 @@ var World = {
     World.drawMap();
     World._expeditionFlags = {};
     World._expeditionBlueprints = $.extend({},$SM.get('character.blueprints') || {});
-    ['ironmine','coalmine','sulphurmine','ship','executioner','mugentrain','yoshiwara','swordsmith','butterfly'].forEach(function(key) {World._expeditionFlags[key] = !!World.state[key];});
+    ['ironmine','coalmine','sulphurmine','ship','executioner','mugentrain','yoshiwara','swordsmith','butterfly','sagiri','drumRoad','wisteriaHouse'].forEach(function(key) {World._expeditionFlags[key] = !!World.state[key];});
     if (window.ExpeditionReport) ExpeditionReport.begin({outfit:Path.outfit || {},map:World.state.map,mask:World.state.mask,equipped:Path.getLoadoutEquipment()});
     World.setTitle();
     AudioEngine.playBackgroundMusic(AudioLibrary.MUSIC_WORLD);
@@ -1344,7 +1361,10 @@ var World = {
     var changed = false;
     [
       {tile:World.TILE.SWORDSMITH_VILLAGE,radius:22,flag:'game.swordsmithChapterDone'},
-      {tile:World.TILE.BUTTERFLY_ESTATE,radius:12,flag:'game.butterflyEstateDone'}
+      {tile:World.TILE.BUTTERFLY_ESTATE,radius:12,flag:'game.butterflyEstateDone'},
+      {tile:World.TILE.SAGIRI_ROAD,radius:7,flag:'game.sagiriRoadDone'},
+      {tile:World.TILE.DRUM_ROAD,radius:11,flag:'game.drumRoadDone'},
+      {tile:World.TILE.WISTERIA_HOUSE,radius:16,flag:'game.wisteriaHouseDone'}
     ].forEach(function(site) {
       if (site.tile === World.TILE.SWORDSMITH_VILLAGE && $SM.get('game.world.swordsmith')) {
         if (!$SM.get(site.flag)) {$SM.set(site.flag,true,true);changed = true;}

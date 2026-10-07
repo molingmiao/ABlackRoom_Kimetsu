@@ -1039,6 +1039,91 @@ async function port() {
       return checks;
     })()`);
     console.log(newStoryChecks.map(name=>'PASS: '+name).join('\n'));
+    const roadStoryChecks=await evaluate(`(async function() {
+      const checks=[],check=(ok,label)=>{if(!ok)throw Error(label);checks.push(label);};
+      const until=async fn=>{for(let i=0;i<180&&!fn();i++)await new Promise(resolve=>setTimeout(resolve,30));if(!fn())throw Error('road story transition timed out: '+Events.activeScene);};
+      clearTimeout(Engine._incomeTimeout);
+      Engine.travelTo(Path);await new Promise(resolve=>$('#locationSlider').promise().done(resolve));
+      const cases=[
+        {id:'sagiri',tile:'Q',report:'狭雾山见闻交付',steps:['enter','stream','continue','mend','listen','depart','trace','return','finish']},
+        {id:'drumRoad',tile:'G',report:'鼓屋外围支援交付',steps:['enter','names','listen','wait','signal','route','guard','WIN:check','wait','report']},
+        {id:'wisteriaHouse',tile:'J',report:'藤之家夜路交付',steps:['enter','sit','listen','ask','guide','search','escort','guard','WIN:return','rest','finish']}
+      ];
+      for(const item of cases) {
+        const definition=Events.StoryChapters.definitions[item.id];
+        $SM.set(definition.flag,false);$SM.set('game.world.'+item.id,false);
+        $SM.setM('stores',{'nichirin katana':3,'cured meat':30,cloth:2,fur:2,teeth:2,medicine:2});
+        Path.outfit={'nichirin katana':1,'cured meat':10};$SM.set('outfit',Path.outfit);
+        check(Path.embark(),item.tile+' story enters through normal departure');
+        const matches=[];World.state.map.forEach((row,x)=>row.forEach((cell,y)=>{if(cell[0]===item.tile)matches.push([x,y]);}));
+        check(matches.length===1,item.tile+' has exactly one generated location');
+        const position=matches[0];World.curPos=position;World.state.mask[position[0]][position[1]]=true;World.drawMap();
+        if(item.tile==='Q') {
+          check($('#worldStoryGuide').length===1&&!$('#worldStoryGuide').prop('open'),'field notes are collapsed by default');
+          $('#worldStoryGuide').prop('open',true);WorldStoryGuide.update();
+          check($('.worldStoryCard').length===7&&$('#worldStoryGuide [data-tile="Q"]').text().includes('你就在这里'),'seven separately framed landmarks show the discovered local destination');
+          const list=$('.worldStoryList')[0];list.scrollTop=60;WorldStoryGuide.update();
+          check($('#worldStoryGuide').prop('open')&&list.scrollTop===60,'map redraw retains field notes open state and scroll');
+        }
+        World.doSpace();
+        for(const step of item.steps) {
+          if(step.startsWith('WIN:')) {
+            const next=step.slice(4);
+            check(Events.activeScene==='guard'&&$('#enemy').length===1,item.tile+' enters a real support battle');
+            check(!$('.storySupplyAction').length,'no manor commission during support combat');
+            Events.clearTimeouts();Events.dotDamage($('#enemy'),9999,'regression finishing strike');
+            await until(()=>Events.fought&&$('#'+next).length);Button.clearCooldown($('#'+next));$('#'+next).trigger('click');
+          } else {
+            const button=$('#'+step);
+            check(button.length===1&&!button.hasClass('disabled'),item.tile+' free story choice '+step+' is available');
+            button.trigger('click');
+          }
+        }
+        check(World.state[item.id]&&!$SM.get(definition.flag),item.tile+' completed story is temporary until safe return');
+        check($('#worldStoryGuide [data-tile="'+item.tile+'"]').attr('data-status')==='pending','field notes immediately show pending hand-in');
+        $('#leave').trigger('click');await until(()=>!Events.activeEvent());
+        const stock=JSON.parse(JSON.stringify(State.stores)),carried=JSON.parse(JSON.stringify(Path.outfit));
+        check(World.goHome()&&$SM.get(definition.flag),item.tile+' ordinary safe return commits optional story');
+        for(const key of Object.keys(definition.reward))check($SM.get('stores['+JSON.stringify(key)+']')===(stock[key]||0)+(carried[key]||0)+definition.reward[key],item.tile+' exact one-time reward '+key);
+        check(ExpeditionReport.latest().unlocks.includes(item.report),item.tile+' delivery appears in expedition recap');
+        await new Promise(resolve=>$('#outerSlider').promise().done(resolve));
+        Path.outfit={'nichirin katana':1,'cured meat':10};$SM.set('outfit',Path.outfit);
+        check(Path.embark(),item.tile+' revisit departs normally');World.curPos=position;World.drawMap();
+        const before=JSON.stringify(State.stores);World.doSpace();
+        check($('#enter').hasClass('disabled')&&!$('#recap').hasClass('disabled'),item.tile+' cleared map tile offers only read-only recap');
+        $('#recap').trigger('click');check(Events.activeScene==='recap'&&!$('#enemy').length,item.tile+' revisit cannot farm another battle');
+        check(JSON.stringify(State.stores)===before,item.tile+' revisit grants no duplicate reward');
+        $('#leave').trigger('click');await until(()=>!Events.activeEvent());World.goHome();
+        await new Promise(resolve=>$('#outerSlider').promise().done(resolve));
+      }
+      return checks;
+    })()`);
+    console.log(roadStoryChecks.map(name=>'PASS: '+name).join('\n'));
+    await page('Emulation.setDeviceMetricsOverride',{width:1200,height:745,deviceScaleFactor:1,mobile:false});
+    await evaluate(`(async function(){
+      Path.outfit={'nichirin katana':1,'cured meat':10};$SM.set('outfit',Path.outfit);Path.embark();
+      await new Promise(resolve=>$('#outerSlider').promise().done(resolve));
+      $('#worldStoryGuide').prop('open',true);WorldStoryGuide.update();
+      const panel=document.querySelector('#worldPanel');panel.scrollTop=panel.scrollHeight;
+      const map=document.querySelector('#map').getBoundingClientRect(),view=panel.getBoundingClientRect();
+      if(map.bottom>view.bottom+1||view.bottom>innerHeight)throw Error('expanded field notes make the bottom map rows unreachable');
+      panel.scrollTop=0;$('.worldStoryList').scrollTop(0);
+    })()`);
+    for(const dark of [false,true]) {
+      await evaluate(`(async function(){
+        if(Engine.isLightsOff()!==${dark})Engine.turnLightsOff();await new Promise(resolve=>setTimeout(resolve,700));
+        const lum=color=>{const rgb=color.match(/\\d+/g).slice(0,3).map(Number).map(v=>{v/=255;return v<=.04045?v/12.92:Math.pow((v+.055)/1.055,2.4);});return rgb[0]*.2126+rgb[1]*.7152+rgb[2]*.0722;};
+        const bodyColor=getComputedStyle(document.body).backgroundColor;
+        const a=lum(bodyColor==='rgba(0, 0, 0, 0)'?'rgb(255, 255, 255)':bodyColor),b=lum(getComputedStyle(document.querySelector('.worldStoryCard')).color);
+        if((Math.max(a,b)+.05)/(Math.min(a,b)+.05)<4.5)throw Error('story guide contrast below 4.5');
+      })()`);
+    }
+    const roadScreenshot=await page('Page.captureScreenshot',{format:'png'});
+    const roadFilename=path.join(profile,'map-story-guide.png');
+    fs.writeFileSync(roadFilename,Buffer.from(roadScreenshot.data,'base64'));console.log('SCREENSHOT: '+roadFilename);
+    await evaluate(`(async function(){World.goHome();await new Promise(resolve=>$('#outerSlider').promise().done(resolve));Engine.travelTo(Room);await new Promise(resolve=>$('#locationSlider').promise().done(resolve));})()`);
+    await page('Emulation.setDeviceMetricsOverride',{width:1280,height:1000,deviceScaleFactor:1,mobile:false});
+    console.log('PASS: scrollable full map with expanded story notes at 1200x745 and readable light/dark themes');
     const blueprintStateBackup = await evaluate('JSON.stringify(State)');
     const blueprintChecks = await evaluate(`(async function() {
       const checks=[],check=(ok,label)=>{if(!ok) throw Error(label);checks.push(label);};

@@ -27,8 +27,9 @@ Events.StoryChapters = {
     var definition = Events.StoryChapters.definitions[id];
     return !!definition && !!World.state && Engine.activeModule === World && !World.dead
       && !World.state[id] && !$SM.get(definition.flag)
-      && ((definition.legacyFlag && $SM.get(definition.legacyFlag)) || !window.EarlyGame
-        || EarlyGame.storyPrerequisite(id === 'swordsmith' ? 'smiths' : id));
+      && (typeof definition.prerequisite === 'function' ? definition.prerequisite()
+        : ((definition.legacyFlag && $SM.get(definition.legacyFlag)) || !window.EarlyGame
+          || EarlyGame.storyPrerequisite(id === 'swordsmith' ? 'smiths' : id)));
   },
   finish: function(id) {
     var definition = Events.StoryChapters.definitions[id];
@@ -68,12 +69,14 @@ Events.StoryChapters = {
       var legacyCompleted = definition.legacyFlag && $SM.get(definition.legacyFlag);
       $SM.set(definition.flag,true,true);
       if (definition.legacyFlag) $SM.set(definition.legacyFlag,true,true);
-      if (!$SM.hasPerk(definition.perk)) $SM.addPerk(definition.perk);
+      if (definition.perk && !$SM.hasPerk(definition.perk)) $SM.addPerk(definition.perk);
       if (definition.reward && !legacyCompleted) $SM.addM('stores',definition.reward,true);
       if (id === 'swordsmith' && Events.StoryChapters.grantSwordsmithBlueprint()) {
         Notifications.notify(null,'锻刀村的藤花精油制造图纸已送达庄园；回大厅点击“参加柱训练”，无需等待随机事件。');
       }
-      Notifications.notify(null,definition.name + '已安全交付，章节与训练已保存；阶段奖励可在庄园领取。');
+      Notifications.notify(null,definition.name + (definition.perk
+        ? '已安全交付，章节与训练已保存；阶段奖励可在庄园领取。'
+        : '已安全交付，见闻已记录，一次性支援补给已送入庄园仓库。'));
       changed = true;
     });
     if (changed) $SM.fireUpdate('stores');

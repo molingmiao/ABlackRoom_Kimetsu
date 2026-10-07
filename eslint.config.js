@@ -17,6 +17,7 @@ const gameGlobals = {
 	Outside: 'writable',
 	Path: 'writable',
 	World: 'writable',
+	WorldStoryGuide: 'writable',
 	Ship: 'writable',
 	Space: 'writable',
 	CombatStyles: 'writable',

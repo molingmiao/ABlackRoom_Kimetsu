@@ -11,11 +11,14 @@ c.$.extend = (...values) => Object.assign(...values.filter(value=>typeof value !
 c.$.Dispatch = () => ({publish(){}});
 c.window = c;
 vm.createContext(c);
-for (const file of ['state_manager.js','world.js','early_game.js','events/global.js','events/story_chapters.js']) {
+for (const file of ['state_manager.js','world.js','early_game.js','events/global.js','events/story_chapters.js','events/road_stories.js','world_story_guide.js']) {
   vm.runInContext(fs.readFileSync(path.join(__dirname,'../script',file),'utf8'),c);
 }
 c.$SM = c.StateManager;
 const sm = c.$SM, world = c.World, chapter = c.Events.StoryChapters;
+const guide = c.WorldStoryGuide;
+// DOM rendering is exercised by the real-browser suite; keep the pure model here.
+guide.update = () => {};
 const copy = value => JSON.parse(JSON.stringify(value));
 const map = () => Array.from({length:61},()=>Array(61).fill('.'));
 const count = (value,tile) => value.flat().filter(cell=>typeof cell==='string'&&cell[0]===tile).length;
@@ -28,6 +31,7 @@ const original = copy(c.State);
 assert.equal(world.ensureStoryLandmarks(),true);
 const migrated = sm.get('game.world.map');
 assert.equal(count(migrated,'K'),1);assert.equal(count(migrated,'E'),1);
+for (const tile of ['Q','G','J']) assert.equal(count(migrated,tile),1);
 assert.equal(migrated.flat().filter(cell=>cell==='K').length,1,'old smith completion still permits the new full chapter');
 assert.deepEqual(copy(sm.get('game.world.mask')),original.game.world.mask);
 assert.deepEqual(copy(sm.get('stores')),original.stores);
@@ -38,9 +42,9 @@ assert.equal(migrated[42][30],'P');assert.equal(migrated[52][30],'Y!');assert.eq
 assert.equal(count(old,'K')+count(old,'E'),0,'in-use old map references are not overwritten');
 const after = JSON.stringify(c.State);
 assert.equal(world.ensureStoryLandmarks(),false);assert.equal(JSON.stringify(c.State),after,'migration is idempotent');
-for (const tile of ['E','K']) {
+for (const tile of ['E','K','Q','G','J']) {
   const position=migrated.flatMap((row,x)=>row.map((cell,y)=>cell===tile?[x,y]:null).filter(Boolean))[0];
-  assert.equal(world.getDistance(position),tile==='E'?12:22);
+  assert.equal(world.getDistance(position),{E:12,K:22,Q:7,G:11,J:16}[tile]);
 }
 sm.set('game.world.swordsmith',true);
 assert.equal(world.ensureStoryLandmarks(),true,'a safely saved full-chapter map migrates the completion flag');
@@ -61,6 +65,9 @@ assert.throws(()=>world.init({}),/stop after landmark setup/);
 c.$=originalJquery;
 const generated=world.generateMap();
 assert.equal(count(generated,'K'),1);assert.equal(count(generated,'E'),1);
+for (const [tile,scene] of [['Q','sagiriRoad'],['G','drumRoad'],['J','wisteriaHouse']]) {
+  assert.equal(count(generated,tile),1);assert.equal(world.LANDMARKS[tile].scene,scene);
+}
 assert.equal(world.LANDMARKS.K.scene,'swordsmithVillage');assert.equal(world.LANDMARKS.E.scene,'butterflyEstate');
 assert.equal(world.LANDMARKS.B.scene,'borehole','E does not collide with the existing B landmark');
 
@@ -86,7 +93,7 @@ function enter(id) {
 function progress(id) {chapter.definitions[id].required.forEach(key=>chapter.mark(id,key));}
 world.testMap=()=>{};world.redeemBlueprints=()=>{};world.returnOutfit=()=>{};world.updateTravelGuide=()=>{};
 world._reportExpeditionSummary=()=>{};
-for (const id of ['butterfly','swordsmith']) {
+for (const id of ['butterfly','swordsmith','sagiri','drumRoad','wisteriaHouse']) {
   const definition=chapter.definitions[id];sm.set(definition.flag,false);
   if(definition.legacyFlag) sm.set(definition.legacyFlag,false);
   enter(id);assert.equal(chapter.ready(id),true);
@@ -105,9 +112,16 @@ for (const id of ['butterfly','swordsmith']) {
   enter(id);assert.equal(chapter.has(id,definition.required[0]),false,'starting another expedition does not resume chapter choices');
   progress(id);assert.equal(chapter.finish(id),true);
   const beforeReward=sm.get('stores["nichirin katana"]',true);
+  const rewardBefore=copy(sm.get('stores') || {});
   assert.equal(world.goHome(),true,'the actual safe-return path commits chapter completion');
   assert.equal(sm.get(definition.flag),true);assert.equal(sm.get('game.world.'+id),true);
-  assert.equal(sm.hasPerk(definition.perk),true);
+  if (definition.perk) assert.equal(sm.hasPerk(definition.perk),true);
+  else {
+    assert.equal(!!sm.hasPerk('undefined'),false,'side stories cannot create an undefined perk');
+    for (const [key,amount] of Object.entries(definition.reward)) {
+      assert.equal(sm.get('stores['+JSON.stringify(key)+']'),(rewardBefore[key]||0)+amount,'safe return grants exact side reward once');
+    }
+  }
   if(definition.legacyFlag) {
     assert.equal(sm.get(definition.legacyFlag),true);
     assert.equal(sm.get('stores["nichirin katana"]'),beforeReward+1,'new players receive one village blade on safe return');
@@ -127,7 +141,7 @@ assert.equal(sm.get('game.swordsmithVillageDone'),true);assert.equal(sm.get('gam
 assert.deepEqual(copy(sm.get('game.campaignClaims')),{smiths:true,pillars:true});
 
 // All scene edges are playable; each chapter has a real battle and no mandatory rare-item dead end.
-for(const [key,min,battles] of [['butterflyEstate',20,1],['swordsmithVillage',20,3]]) {
+for(const [key,min,battles] of [['butterflyEstate',20,1],['swordsmithVillage',20,3],['sagiriRoad',12,0],['drumRoad',12,1],['wisteriaHouse',12,1]]) {
   const event=c.Events.Setpieces[key],scenes=event.scenes;
   assert.equal(event.storySupply,true);assert.ok(Object.keys(scenes).length>=min);
   assert.equal(Object.values(scenes).filter(scene=>scene.combat).length,battles);
@@ -150,4 +164,32 @@ assert.match(c.Events.Setpieces.swordsmithVillage.scenes.genya.text.join(' '),/�
 assert.equal(c.EarlyGame.milestones().length,21);
 const task=c.EarlyGame.milestones().find(item=>item.id==='butterfly');
 assert.equal(task.legacyFlag,'game.world.mugentrain','progressed saves are not forced to replay rehabilitation for old mainline rewards');
-console.log('PASS: unique E/K, safe old-map migration, actual death/safe-home paths, old blade/claims preserved, 44 reachable scenes, 4 battles and lore-safe trio links.');
+
+// New optional sites never add another gate to the existing exploration blessing.
+sm.set('game.castleMeta.perfectExploration',false);
+sm.set('game.landmarksVisited',Object.fromEntries(Object.keys(world.LANDMARKS).filter(tile=>!['Q','G','J'].includes(tile)).map(tile=>[tile,true])));
+assert.equal(world.recordLandmarkVisit('I'),true);
+// Revisit uses the ordinary map dispatcher, not a shortcut which awards again.
+for (const [id,scene] of [['sagiri','sagiriRoad'],['drumRoad','drumRoad'],['wisteriaHouse','wisteriaHouse']]) {
+  enter(id);world.state.map[45][30]=chapter.definitions[id].tile+'!';
+  let opened=null;c.Events.startEvent=event=>{opened=event;};
+  world.doSpace();assert.equal(opened,c.Events.Setpieces[scene]);
+  assert.equal(opened.scenes.start.buttons.enter.available(),false);
+  assert.equal(opened.scenes.start.buttons.recap.available(),true);
+  const saved=JSON.stringify(c.State);assert.equal(chapter.finish(id),false);assert.equal(JSON.stringify(c.State),saved);
+}
+assert.equal(world.isRoadStoryTile('K!'),false,'existing cleared landmarks keep their old behavior');
+
+// Guide cannot disclose a hidden point, mutate fog/state, or persist an active journey.
+enter('sagiri');sm.set('game.sagiriRoadDone',false);
+world.state.mask=Array.from({length:61},()=>Array(61).fill(false));world.curPos=[30,30];
+const beforeGuide=JSON.stringify([c.State,world.state]);
+let entry=guide.entries().find(site=>site.tile==='Q');
+assert.equal(entry.status,'unknown');assert.ok(!entry.route.includes('东'));
+assert.equal(JSON.stringify([c.State,world.state]),beforeGuide);
+world.state.mask[45][30]=true;
+entry=guide.entries().find(site=>site.tile==='Q');assert.equal(entry.status,'known');assert.match(entry.route,/东15 格/);
+world.state.sagiri=true;assert.equal(guide.entries().find(site=>site.tile==='Q').status,'pending');
+sm.set('game.sagiriRoadDone',true);assert.equal(guide.entries().find(site=>site.tile==='Q').status,'done');
+world.dead=true;assert.equal(guide.entries().length,0);
+console.log('PASS: five unique story sites, safe migration/death/return, once-only rewards, read-only revisits, fog-safe guide and unchanged mainline/exploration gates.');
