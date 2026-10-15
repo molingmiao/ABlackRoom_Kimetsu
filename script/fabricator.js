@@ -3,7 +3,7 @@
  * A blacksmith's forge where demon-slayer weapons are tempered
  * using demon stone (青鬼石) and nichirin techniques.
  */
-const Fabricator = {
+const Fabricator = window.Fabricator = {
   _STORES_OFFSET: 0,
   name: _('Forge'),
   Craftables: {
@@ -146,7 +146,7 @@ const Fabricator = {
 
     for (const [ key, value ] of Object.entries(Fabricator.Craftables)) {
       const max = $SM.num(key, value) >= value.maximum;
-      if (value.type === 'upgrade' && max) {
+      if (!Fabricator.canFabricate(key) || (value.type === 'upgrade' && max)) {
         if (value.button) value.button.remove();
         value.button = null;
         continue;
@@ -196,6 +196,7 @@ const Fabricator = {
       const id = 'blueprint_' + k.replace(/ /g, '-');
       if (k === 'flame blade' || k === 'nichirin blade flame') {$('#' + id).remove();continue;}
       let r = $('#' + id);
+      if (!$SM.get(`character.blueprints["${k}"]`)) {r.remove();continue;}
       if($SM.get(`character.blueprints["${k}"]`) && r.length === 0) {
         r = $('<div>').attr('id', id).addClass('blueprintRow').appendTo(blueprints);
         $('<div>').addClass('row_key').text(_(k)).appendTo(r);
@@ -207,42 +208,16 @@ const Fabricator = {
     }
   },
 
-  canFabricate: itemKey => 
-    !Fabricator.Craftables[itemKey].blueprintRequired || 
-    $SM.get(`character.blueprints['${itemKey}']`),
+  canFabricate: itemKey => !!Fabricator.Craftables[itemKey] && (
+    !Fabricator.Craftables[itemKey].blueprintRequired ||
+    !!$SM.get(`character.blueprints['${itemKey}']`)),
 
   fabricate: button => {
     const thing = $(button).attr('fabricateThing');
     const craftable = Fabricator.Craftables[thing];
     if (!craftable) return false;
-    const numThings = Math.max(0, $SM.get(`stores['${thing}']`, true));
-
-    if (craftable.maximum <= numThings) {
-      return;
-    }
-
-    const quantity = typeof craftable.maximum === 'number'
-      ? Math.min(craftable.quantity ?? 1, craftable.maximum - numThings)
-      : craftable.quantity ?? 1;
-
-    const storeMod = {};
-    const cost = craftable.cost();
-    for (const [ key, value ] of Object.entries(cost)) {
-      const have = $SM.get(`stores['${key}']`, true);
-      if (have < value && !Engine.options.testerMode) {
-        Notifications.notify(Fabricator, _(`not enough ${key}`));
-        return false;
-      } else {
-        storeMod[key] = have - value;
-      }
-    }
-    if (!Engine.options.testerMode) {
-      $SM.setM('stores', storeMod);
-    }
-    $SM.add(`stores['${thing}']`, quantity);
-
-    Notifications.notify(Fabricator, craftable.buildMsg);
-    AudioEngine.playSound(AudioLibrary.CRAFT);
+    return Crafting.execute({item:thing,recipe:craftable,location:Fabricator,unlocked:() =>
+      !!$SM.get('features.location.fabricator') && Fabricator.canFabricate(thing)});
   }
 
 };

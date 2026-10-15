@@ -1,4 +1,5 @@
 _.addTranslation({
+  'packed weight: {0}/{1}': '背包负重：{0}/{1}',
   'invalid backpack quantity: {0}. adjust your backpack before departure.': '背包中的{0}数量异常，请先调整背包再出发。',
   'not enough stock for {0}: packed {1}, available {2}.': '{0}库存不足：预装 {1}，目前只有 {2}。',
   'a guide crow is required before descending.': '至少需要一只引路鸦才能入城。',

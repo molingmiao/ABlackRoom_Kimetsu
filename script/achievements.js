@@ -320,9 +320,16 @@ var Achievements = {
 
 	showPanel: function() {
 		if ($('#achievementsOverlay').length) return;
+		if (window.UIContext && !UIContext.canInspect()) {
+			Notifications.notify(null,Engine.activeModule === World || Engine.activeModule === Space
+				? '探索与战斗中暂不能打开成就，请返回庄园后查看。' : '请先关闭当前窗口，再查看成就。');return false;
+		}
+		var previousFocus = document.activeElement, previousKeyLock = Engine.keyLock;
+		Engine.keyLock = true;
+		if (Engine._resetHotkeys) Engine._resetHotkeys();
 		var overlay = $('<div>').attr('id', 'achievementsOverlay');
-		var panel = $('<div>').attr('id', 'achievementsPanel').appendTo(overlay);
-		$('<div>').addClass('achTitle').text(_('achievements')).appendTo(panel);
+		var panel = $('<div>').attr({id:'achievementsPanel',role:'dialog','aria-modal':'true','aria-labelledby':'achievementsTitle',tabindex:-1}).appendTo(overlay);
+		$('<div>').attr('id','achievementsTitle').addClass('achTitle').text(_('achievements')).appendTo(panel);
 
 		var summary = $('<div>').addClass('achSummary').appendTo(panel);
 		var total = Achievements.List.length;
@@ -381,7 +388,7 @@ var Achievements = {
 			});
 		});
 
-		$('<div>').addClass('achClose menuBtn').text(_('close.'))
+		var close = $('<button>').attr('type','button').addClass('achClose menuBtn').text(_('close.'))
 			.click(Achievements.closePanel)
 			.appendTo(panel);
 
@@ -389,9 +396,24 @@ var Achievements = {
 		overlay.click(function(e) {
 			if (e.target === overlay[0]) Achievements.closePanel();
 		});
+		var keyHandler = function(e) {
+			if (e.key === 'Escape') {e.preventDefault();e.stopImmediatePropagation();Achievements.closePanel();}
+			else if (e.key === 'Tab') {e.preventDefault();e.stopImmediatePropagation();close.trigger('focus');}
+		};
+		Achievements._panelContext = {previousFocus:previousFocus,keyLock:previousKeyLock,keyHandler:keyHandler};
+		document.addEventListener('keydown',keyHandler,true);panel.trigger('focus');
+		return true;
 	},
 
 	closePanel: function() {
+		var context = Achievements._panelContext;
+		if (!context) return false;
+		Achievements._panelContext = null;
+		document.removeEventListener('keydown',context.keyHandler,true);
 		$('#achievementsOverlay').remove();
+		Engine.keyLock = context.keyLock;
+		if (Engine._resetHotkeys) Engine._resetHotkeys();
+		if (context.previousFocus && document.documentElement.contains(context.previousFocus)) context.previousFocus.focus();
+		return true;
 	}
 };

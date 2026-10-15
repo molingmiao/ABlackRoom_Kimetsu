@@ -115,6 +115,37 @@ async function port() {
       await pause(100);
     }
     assert.ok(ready, 'game modules did not initialize');
+    if(process.env.GAME_BROWSER_FOCUS==='action-integrity') {
+      const result=await evaluate(`(async function(){
+        const check=(ok,label)=>{if(!ok)throw Error(label);};
+        const until=async fn=>{for(let i=0;i<100&&!fn();i++)await new Promise(resolve=>setTimeout(resolve,25));if(!fn())throw Error('action audit transition timeout');};
+        clearTimeout(Events._eventTimeout);clearTimeout(Engine._incomeTimeout);
+        AudioEngine.playSound=AudioEngine.playBackgroundMusic=AudioEngine.playEventMusic=function(){};
+        $SM.set('game.builder.level',4,true);$SM.set('game.temperature.value',4,true);$SM.set('game.buildings.workshop',1,true);
+        $SM.setM('stores',{wood:200,teeth:10,'demon stone':3});Room.updateBuildButtons();
+        $('#build_bone-yari').trigger('click');
+        check($SM.get('stores["bone yari"]')===1&&$SM.get('stores.wood')===100&&$SM.get('stores.teeth')===5,'actual room craft commits one product and exact ingredients');
+        if(!Fabricator.panel)Fabricator.init();Engine.travelTo(Fabricator);await new Promise(resolve=>$('#locationSlider').promise().done(resolve));
+        $SM.set('character.blueprints["wisteria oil"]',true);Fabricator.updateBuildButtons();
+        $('[fabricateThing="wisteria oil"]').trigger('click');
+        check($SM.get('stores["wisteria oil"]')===5&&$SM.get('stores["demon stone"]')===2,'real forge batch produces five oils and pays one stone');
+        $SM.set('character.blueprints["wisteria oil"]',false);Fabricator.updateBuildButtons();
+        check(!$('[fabricateThing="wisteria oil"]').length&&!document.getElementById('blueprint_wisteria-oil'),'revoked blueprint removes its stale button and blueprint row');
+        check(UpdateNotes.show(),'update notes now open from the real lexical forge module');$('#closeUpdateNotes').trigger('click');await until(()=>!Events.activeEvent());
+        check(Achievements.showPanel(),'achievements open at the forge');
+        check(Engine.keyLock&&document.querySelector('#achievementsPanel[role="dialog"]'),'achievement panel locks background actions');
+        check(!CampGuide.showMaterialSources()&&!UpdateNotes.show()&&!LongQuestJournal.show(),'inspection panels cannot stack over achievements');
+        document.dispatchEvent(new KeyboardEvent('keydown',{key:'Tab',bubbles:true}));
+        check(document.activeElement.classList.contains('achClose'),'Tab reaches the native close control');
+        document.dispatchEvent(new KeyboardEvent('keydown',{key:'Escape',bubbles:true}));
+        check(!document.querySelector('#achievementsOverlay')&&!Engine.keyLock,'Escape restores normal controls');
+        const module=Engine.activeModule;for(const unsafe of [World,Space]){Engine.activeModule=unsafe;check(!Achievements.showPanel()&&!CampGuide.showMaterialSources()&&!UpdateNotes.show(),'exploration cannot open a blocking inspector');}Engine.activeModule=module;
+        $SM.set('stores.medicine',9,true);$SM.set('game.spaceShip.crows',1,true);Path.outfit={'bone yari':1,medicine:9};
+        const info=Ship.getDepartureInfo();check(info.weight===11&&info.capacity===10&&info.errors.includes(_('backpack is over capacity. remove supplies before departing.')),'castle preflight catches overweight legacy packs');
+        const stock=()=>JSON.stringify([State.stores,State.outfit,$SM.get('game.spaceShip.crows')]);const before=stock();Engine.activeModule=Ship;check(!Ship.descend()&&stock()===before,'overweight descent never consumes the crow or supplies');Engine.activeModule=module;
+        return 'PASS: real room/forge craft accounting, blueprint invalidation, forge announcements, achievement keyboard/modal isolation and overweight departure';
+      })()`);console.log(result);assert.deepEqual(errors,[]);return;
+    }
     if(process.env.GAME_BROWSER_FOCUS==='quest-journal') {
       const result=await evaluate(`(async function(){
         AudioEngine.playSound=AudioEngine.playBackgroundMusic=AudioEngine.playEventMusic=function(){};

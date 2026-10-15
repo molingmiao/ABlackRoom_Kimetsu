@@ -937,6 +937,11 @@ body.noMask #description {
 	color: #999;
 }
 #achievementsPanel .achClose {
+	font: inherit;
+	color: inherit;
+	background: transparent;
+	border: 1px solid currentColor;
+	padding: 4px 10px;
 	display: inline-block;
 	margin-top: 14px;
 	cursor: pointer;

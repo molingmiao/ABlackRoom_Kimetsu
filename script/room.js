@@ -1414,70 +1414,15 @@ var Room = {
 
 	build: function (buildBtn) {
 		var thing = $(buildBtn).attr('buildThing');
-		if ($SM.get('game.temperature.value') <= Room.TempEnum.Cold.value) {
-			Notifications.notify(Room, _("builder just shivers"));
-			return false;
-		}
 		var craftable = Room.Craftables[thing];
-
-		var numThings = 0;
-		switch (craftable.type) {
-			case 'good':
-			case 'weapon':
-			case 'tool':
-			case 'upgrade':
-				numThings = $SM.get('stores["' + thing + '"]', true);
-				break;
-			case 'building':
-				numThings = $SM.get('game.buildings["' + thing + '"]', true);
-				break;
+		if (!craftable) return false;
+		if ($SM.get('game.temperature.value') <= Room.TempEnum.Cold.value) {
+			Notifications.notify(Room, _("builder just shivers"));return false;
 		}
-
-		if (numThings < 0) numThings = 0;
-		if (craftable.maximum <= numThings) {
-			return;
-		}
-
-		var storeMod = {};
-		var cost = craftable.cost();
-		for (var k in cost) {
-			var have = $SM.get('stores["' + k + '"]', true);
-			if (have < cost[k] && !Engine.options.testerMode) {
-				Notifications.notify(Room, _("not enough " + k));
-				return false;
-			} else {
-				storeMod[k] = have - cost[k];
-			}
-		}
-		if (!Engine.options.testerMode) {
-			$SM.setM('stores', storeMod);
-		}
-
-		Notifications.notify(Room, craftable.buildMsg);
-
-		switch (craftable.type) {
-			case 'good':
-			case 'weapon':
-			case 'upgrade':
-			case 'tool':
-				$SM.add('stores["' + thing + '"]', 1);
-				break;
-			case 'building':
-				$SM.add('game.buildings["' + thing + '"]', 1);
-				break;
-		}
-
-		// audio
-		switch (craftable.type) {
-			case 'weapon':
-			case 'upgrade':
-			case 'tool':
-				AudioEngine.playSound(AudioLibrary.CRAFT);
-				break;
-			case 'building':
-				AudioEngine.playSound(AudioLibrary.BUILD);
-				break;
-		}
+		return Crafting.execute({item:thing,recipe:craftable,location:Room,unlocked:function(){
+			return $SM.get('game.temperature.value') > Room.TempEnum.Cold.value && $SM.get('game.builder.level') >= 4
+				&& (!Room.needsWorkshop(craftable.type) || $SM.get('game.buildings.workshop',true) > 0);
+		}});
 	},
 
 	needsWorkshop: function (type) {

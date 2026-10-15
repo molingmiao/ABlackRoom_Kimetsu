@@ -94,7 +94,7 @@ const copy = value => JSON.parse(JSON.stringify(value));
   assert.equal(c.Ship.getDepartureInfo().healing[0].amount, 1, 'summary only counts valid stocked supplies');
 }
 
-for (const invalid of ['missing stock', 'missing crow', 'negative', 'fraction', 'not number', 'infinite']) {
+for (const invalid of ['missing stock', 'missing crow', 'negative', 'fraction', 'not number', 'infinite', 'overweight']) {
   const f = fixture(), c = f.ctx;
   if (invalid === 'missing stock') c.State.stores.medicine = 1;
   if (invalid === 'missing crow') c.State.game.spaceShip.crows = 0;
@@ -102,6 +102,7 @@ for (const invalid of ['missing stock', 'missing crow', 'negative', 'fraction', 
   if (invalid === 'fraction') c.Path.outfit.medicine = 1.5;
   if (invalid === 'not number') c.Path.outfit.medicine = '3';
   if (invalid === 'infinite') c.Path.outfit.medicine = Infinity;
+  if (invalid === 'overweight') c.Path.outfit.medicine = 8;
   const before = copy(c.State);
   assert.equal(c.Ship.descend(), false, invalid);
   assert.deepEqual(copy(c.State), before, 'failed departure is atomic: ' + invalid);

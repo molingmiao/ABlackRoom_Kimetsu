@@ -3,6 +3,17 @@ var UpdateNotes = window.UpdateNotes = {
   categories: ['全部', '玩法', '资源', '界面', '修复'],
   entries: [
     {
+      id: '2026-10-15-bug-audit', date: '2026-10-15', title: '全局检查：制造结算、弹窗与出发修复',
+      items: [
+        ['修复', '制造扣料和产物一起保存', '普通制造、建筑和锻刀场图纸制造改为先完整检查，再一次提交材料与成品。修复先扣料保存、后保存产物的分段结算；材料不足、异常库存、达到上限、批量产出溢出或重复回调不执行，精油仍是每批消耗一份材料产出五瓶。'],
+        ['修复', '制作时重新确认解锁条件', '普通制作复核建造者、室温和工坊；锻刀制造复核地点和真实图纸。已失效的图纸同步移除制作按钮和图纸行，旧按钮不能绕过条件扣料。永久装备的已有能力与回收保护不变。'],
+        ['修复', '锻刀场也能正常打开公告', '修复锻刀场对象未挂到页面全局，导致公告入口误判当前地点的问题；现在与庄园、备战和无限城入口一致。'],
+        ['修复', '查看窗口不再叠进战斗或数量确认', '成就、战报、材料指南、公告和任务册统一检查当前地点及已有弹窗。随机事件和游方铁匠遇到操作锁或弹窗会延后，不会在确认回收、购买或查看成就时突然插入。'],
+        ['界面', '成就面板支持键盘关闭', '查看成就时屏蔽背景快捷键，Tab 可到达关闭按钮，Esc 或关闭按钮退出后恢复原焦点与操作。探索、战斗中点击成就会提示返回庄园查看。'],
+        ['修复', '无限城出发检查实际负重', '入城预检补上背包容量检查，摘要显示实际负重／容量。旧配置超重时明确阻止，保留物资和引路鸦；可以调整后重试，战斗和背包容量数值不变。']
+      ]
+    },
+    {
       id: '2026-10-15-quest-journal', date: '2026-10-15', title: '备战任务册、剧情回读与下一站补给提示',
       items: [
         ['界面', '出发前就能查阅长线任务', '备战页增加“查看长线任务册与已交付剧情”，集中展示已交付阶段、已锁定路线、四角机关与两条其它秘闻进度。旧城镇已清理时同样显示无名渡口的替代调查目的地。'],
@@ -249,6 +260,7 @@ var UpdateNotes = window.UpdateNotes = {
     }).filter(function(entry) { return entry.items.length > 0; });
   },
   canShow: function() {
+    if (window.UIContext && !UIContext.canInspect()) return false;
     if (!window.Engine || !window.Events || Events.activeEvent()) return false;
     if (![window.Room, window.Outside, window.Path, window.Ship, window.Fabricator].some(function(module) {
       return module && Engine.activeModule === module;

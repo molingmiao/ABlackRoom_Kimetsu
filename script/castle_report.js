@@ -166,6 +166,7 @@ var CastleReport = {
     return _(names[id] || id);
   },
   show: function() {
+    if (typeof window !== 'undefined' && window.UIContext && !UIContext.canInspect()) return false;
     var report = CastleReport.getLastReport();
     if (!report || typeof document === 'undefined' || !document.body) return false;
     CastleReport.close();

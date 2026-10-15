@@ -38,6 +38,7 @@ var CampGuide = {
       castle:castle, wild:CampGuide.materialSourceRows(item), home:home};
   },
   showMaterialSources: function() {
+    if (window.UIContext && !UIContext.canInspect()) return false;
     if (Events.activeEvent()) return false;
     Events.startEvent({title:'材料获取途径', materialSourceGuide:true,
       scenes:{start:{text:[],buttons:{close:{text:_('close'),nextScene:'end'}}}}}, {width:'580px'});

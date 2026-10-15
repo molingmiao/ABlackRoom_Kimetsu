@@ -332,6 +332,7 @@ const pause = ms => new Promise(resolve => setTimeout(resolve, ms));
       }
       $SM.setM('stores',{'bone yari':8,wood:100,teeth:100},true);
       Path.outfit['bone yari']=1;$SM.set('outfit["bone yari"]',1,true);$SM.fireUpdate('stores');Path.updateOutfitting();
+      Achievements.checkAll(); // Settle earned first-item rewards before measuring cancellation.
       window.__recyclingBeforeCancel=JSON.stringify([$SM.get('stores'),$SM.get('game.scrapRemainders')]);
     })()`);
     console.log('PASS: four real low-cost recycling clicks retain 30/60/90/20 credit and return exactly one stone');
@@ -352,7 +353,7 @@ const pause = ms => new Promise(resolve => setTimeout(resolve, ms));
     await nativeClick('.scrapQuantityActions button:last-child');
     await evaluate(`(function(){
       if(document.getElementById('scrapQuantityOverlay')||JSON.stringify([$SM.get('stores'),$SM.get('game.scrapRemainders')])!==window.__recyclingBeforeCancel)
-        throw Error('cancelling real recycling dialog changed inventory or fractional credit');
+        throw Error('cancelling real recycling dialog changed inventory or fractional credit: '+JSON.stringify({overlay:!!document.getElementById('scrapQuantityOverlay'),changed:Object.keys($SM.get('stores')||{}).filter(key=>($SM.get('stores')||{})[key]!==JSON.parse(window.__recyclingBeforeCancel)[0][key])}));
     })()`);
     await nativeClick('#outfit_row_bone-yari .scrapBtn',true);
     await evaluate(`(function() {

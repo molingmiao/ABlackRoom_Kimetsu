@@ -134,6 +134,9 @@ if (!tester && effective[key] < amount) {
 info.errors.push(_('not enough stock for {0}: packed {1}, available {2}.', _(key), amount, effective[key]));
 }
 });
+info.capacity = Path.getCapacity();
+info.weight = Object.keys(info.outfit).reduce(function(total,key){return total + Path.getWeight(key) * info.outfit[key];},0);
+if (!Number.isFinite(info.weight) || info.weight > info.capacity + 0.000001) info.errors.push(_('backpack is over capacity. remove supplies before departing.'));
 if (!tester && count(Ship.getCrowCount()) < 1) info.errors.push(_('a guide crow is required before descending.'));
 var ordered = [];
 ['primary', 'secondary', 'tool'].forEach(function(category) {
@@ -179,6 +182,7 @@ return weapon.uses === null ? _(weapon.key) : _('{0} ({1} uses)', _(weapon.key),
 });
 var healing = info.healing.map(function(item) { return _(item.key) + ' ×' + item.amount; });
 var text = [
+_('packed weight: {0}/{1}', Math.round(info.weight*100)/100, info.capacity),
 _('chosen form: {0}', window.CombatStyles ? CombatStyles.getName(info.style) : _('battle technique')),
 _('usable equipped weapons: {0}', weapons.length ? weapons.join(' / ') : _('fists only')),
 _('packed healing supplies: {0}', healing.length ? healing.join(' / ') : _('none')),

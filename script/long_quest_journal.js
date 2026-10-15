@@ -1,6 +1,7 @@
 /** Read-only preparation journal. No active expedition or unearned chapter is opened here. */
 var LongQuestJournal = {
   canShow: function() {
+    if (window.UIContext) return UIContext.canInspect();
     return [Room,Path,Ship].indexOf(Engine.activeModule) >= 0 && !Engine.keyLock && !Events.activeEvent()
       && !document.querySelector('[role="dialog"],#loadoutEditorOverlay,#scrapQuantityOverlay,#buyQuantityOverlay,#nichirinForgeOverlay,#achievementsOverlay');
   },

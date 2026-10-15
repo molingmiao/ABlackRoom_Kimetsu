@@ -51,6 +51,7 @@ var Events = {
 	// 游方铁匠：每 _MERCHANT_INTERVAL 尝试出现一次，检查条件后触发 MerchantScrap
 	tryMerchant: function() {
 		if (typeof Room === 'undefined' || typeof Events.MerchantScrap === 'undefined') return;
+		if (Engine.keyLock || (typeof document !== 'undefined' && document.querySelector && document.querySelector('[role="dialog"],#achievementsOverlay'))) return;
 		if (Engine.activeModule !== Room) return;
 		if (Events.activeEvent()) return;
 		if (!$SM.get('features.location.outside')) return;
@@ -1745,6 +1746,9 @@ var Events = {
 
 	// Makes an event happen!
 	triggerEvent: function() {
+		if (Engine.keyLock || (typeof document !== 'undefined' && document.querySelector && document.querySelector('[role="dialog"],#achievementsOverlay'))) {
+			Events.scheduleNextEvent(0.5);return false;
+		}
 		if(Events.activeEvent() == null) {
 			var possibleEvents = [];
 			for(var i in Events.EventPool) {
