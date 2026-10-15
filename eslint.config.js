@@ -20,6 +20,7 @@ const gameGlobals = {
 	WorldStoryGuide: 'writable',
 	WorldRoadStories: 'writable',
 	LongQuests: 'writable',
+	LongQuestJournal: 'writable',
 	Ship: 'writable',
 	Space: 'writable',
 	CombatStyles: 'writable',

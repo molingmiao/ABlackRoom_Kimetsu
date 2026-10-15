@@ -24,3 +24,7 @@ div#outerSlider > div#worldPanel {
 .longQuestNpc, .longQuestCorners { font-weight: bold; }
 .longQuestJournal button { color: inherit; background: transparent; border: 1px solid currentColor; padding: 5px 9px; cursor: pointer; }
 .longQuestJournal button:disabled { opacity: .5; cursor: default; }
+.longQuestHistoryCard { border: 1px solid #91958b; padding: 7px 10px; margin: 7px 0; }
+.longQuestHistoryCard > summary { cursor: pointer; font-weight: bold; }
+.longQuestHistoryCard > strong { display: block; margin-top: 7px; }
+.longQuestTravel, .longQuestTravelWarning { font-weight: bold; }

@@ -2,10 +2,10 @@ const assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('nod
 let active=null;
 const chain={removeClass(){return this;},stop(){return this;},animate(){return this;},css(){return this;}};
 const c={State:{},_:s=>s,AudioLibrary:{},AudioEngine:{playSound(){}},Notifications:{notify(){}},
-  Engine:{options:{},saveGame(){},event(){},log(){},keyLock:false},Space:{currentFloor:1},Room:{},Path:{outfit:{},onArrival(){}},
+  Engine:{options:{},saveGame(){},event(){},log(){},keyLock:false},Space:{currentFloor:1},Room:{},Ship:{},Path:{outfit:{},onArrival(){}},document:{querySelector:()=>null},
   Events:{Setpieces:{},_LEAVE_COOLDOWN:0,activeEvent:()=>active,startEvent:event=>{active=event;load('start');}}};
 c.$=()=>chain;c.$.Dispatch=()=>({publish(){}});c.window=c;vm.createContext(c);
-for(const file of ['state_manager.js','world.js','achievements.js','world_road_stories.js','long_quests.js'])
+for(const file of ['state_manager.js','world.js','achievements.js','world_road_stories.js','long_quests.js','long_quest_journal.js'])
   vm.runInContext(fs.readFileSync(path.join(__dirname,'../script',file),'utf8'),c);
 c.$SM=c.StateManager;
 const Q=c.LongQuests,W=c.World,sm=c.$SM,copy=v=>JSON.parse(JSON.stringify(v));
@@ -92,4 +92,22 @@ for(const [stage,tile]of [[2,'D'],[6,'R']]){
   assert.equal(Q.target(stage),'P','a just-cleared town can hand off the quest in place');assert.equal(Q.openNpc(false),true);finishStage('slay');W.goHome();
 }
 sm.set('game.longQuests',{npc:{stage:99,branch:'unknown'},corners:{}},true);assert.equal(Q.saved().npc.stage,0);assert.equal(Q.saved().corners.length,0);
+
+// Preparation reads only delivered records, and route planning sees only revealed cells.
+W.state=null;Q.reset();active=null;c.Engine.activeModule=c.Path;c.Engine.keyLock=false;
+const savedMap=map(),mask=Array.from({length:61},()=>Array(61).fill(false));savedMap[35][30]='N';
+sm.set('game.world',{map:savedMap,mask},true);sm.set('game.longQuests',{},true);
+assert.equal(Q.travelPreview().known,false);assert.equal(Q.travelPreview().outward,undefined,'hidden destinations do not leak distance');
+mask[35][30]=true;sm.set('game.world.mask',mask,true);
+assert.equal(Q.travelPreview().outward,5);assert.equal(Q.travelPreview().returnDistance,5);assert.equal(Q.travelPreview().water,9);
+sm.set('game.longQuests',{npc:{stage:2,branch:'mercy'}},true);
+assert.equal(Q.target(2),'N','home planner shares the legacy-town fallback');
+let journal=c.LongQuestJournal.model();assert.equal(journal.history.length,2);assert.equal(journal.branch,'mercy');
+assert.ok(journal.history[0].paragraphs.includes(Q.stages[0].mercy));assert.ok(!journal.history[0].paragraphs.includes(Q.stages[0].slay));
+const readSnapshot=JSON.stringify(c.State);journal.history[0].title='changed';c.LongQuestJournal.model();assert.equal(JSON.stringify(c.State),readSnapshot);
+assert.equal(c.LongQuestJournal.canShow(),true);c.Engine.activeModule=W;assert.equal(c.LongQuestJournal.show(),false);
+c.Engine.activeModule=c.Path;active={};assert.equal(c.LongQuestJournal.show(),false);active=null;
+c.Engine.keyLock=true;assert.equal(c.LongQuestJournal.show(),false);c.Engine.keyLock=false;
+embark();Q.run().data.npc.stage=3;
+assert.equal(c.LongQuestJournal.model().history.length,2,'unsubmitted chapters never appear in the home archive');
 console.log('PASS: ten real stages on both branches (1 vs 3 battles), death/return checkpoints, choice lock, no duplicate ending rewards, corner migration/switches/real entry, ordered-route and archive eggs.');

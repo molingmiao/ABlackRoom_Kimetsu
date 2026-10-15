@@ -115,6 +115,28 @@ async function port() {
       await pause(100);
     }
     assert.ok(ready, 'game modules did not initialize');
+    if(process.env.GAME_BROWSER_FOCUS==='quest-journal') {
+      const result=await evaluate(`(async function(){
+        AudioEngine.playSound=AudioEngine.playBackgroundMusic=AudioEngine.playEventMusic=function(){};
+        if(!Path.panel)Path.init();
+        $SM.set('game.longQuests',{npc:{stage:10,branch:'slay'}},true);
+        Engine.travelTo(Path);await new Promise(resolve=>$('#locationSlider').promise().done(resolve));
+        const before=JSON.stringify(State);$('#longQuestJournalButton').trigger('click');
+        if(!$('.longQuestReport').length)throw Error('journal open failed '+JSON.stringify({button:$('#longQuestJournalButton').length,module:Engine.activeModule.name,lock:Engine.keyLock,event:Events.activeEvent()&&Events.activeEvent().title,dialog:document.querySelector('[role="dialog"]')?.id,api:!!window.LongQuestJournal}));
+        $('.longQuestHistoryCard').prop('open',true);const desc=$('.longQuestReport #description')[0];desc.scrollTop=desc.scrollHeight;
+        if(!desc.scrollTop)throw Error('history cannot scroll');
+        if(JSON.stringify(State)!==before)throw Error('journal changed the save');
+        const progress=JSON.stringify([$SM.get('game.longQuests'),$SM.get('outfit')]);
+        $('#closeLongQuestJournal').trigger('click');for(let i=0;i<100&&Events.activeEvent();i++)await new Promise(resolve=>setTimeout(resolve,30));
+        if(JSON.stringify([$SM.get('game.longQuests'),$SM.get('outfit')])!==progress)throw Error('closing the journal changed quest or outfit');
+        LongQuestJournal.show();$('.longQuestHistoryCard').prop('open',true);
+        return 'PASS: focused real preparation journal opens, scrolls and leaves save unchanged';
+      })()`);console.log(result);
+      for(const dark of [false,true])await checkDialogTheme('.longQuestReport',dark);
+      const shot=await page('Page.captureScreenshot',{format:'png'}),filename=path.join(profile,'long-quest-home-journal.png');
+      fs.writeFileSync(filename,Buffer.from(shot.data,'base64'));console.log('SCREENSHOT: '+filename);
+      assert.deepEqual(errors,[]);return;
+    }
     // Room's initial income tick is untracked until it creates Engine._incomeTimeout.
     // Let it finish before freezing income for asynchronous inventory assertions below.
     await pause(1100);
@@ -155,6 +177,7 @@ async function port() {
       AudioEngine.playSound = AudioEngine.playBackgroundMusic = AudioEngine.playEventMusic = function() {};
       Engine.options.testerMode = false;
       clearTimeout(Engine._incomeTimeout); // Keep fixture inventory stable during asynchronous confirmation fades.
+      clearTimeout(Events._eventTimeout); // This suite now spans the random-event interval; test events explicitly.
       check($('#roomPanel .earlyGameTask').length === 1, 'new saves show one collapsible estate task');
       $SM.set('game.fire.value', 3); $SM.set('game.temperature.value', 4);
       $SM.set('game.builder.level', 4);
@@ -1196,6 +1219,7 @@ async function port() {
       Engine.options.testerMode=false;Engine.travelTo(Ship);await new Promise(resolve=>$('#locationSlider').promise().done(resolve));
       check(Ship.descend()&&$SM.get('achievements.fourCornerLights'),'actual paid descent awards the four-corner achievement');
       World.die('combat');await until(()=>Engine.activeModule===Room&&!Engine.keyLock);await new Promise(resolve=>setTimeout(resolve,800));
+      if(CastleReport._dialog){check(!LongQuestJournal.canShow(),'quest journal respects an open castle result dialog');CastleReport.close();}
       if(Events.activeEvent())Events.endEvent();await until(()=>!Events.activeEvent());await settle();
       Engine.travelTo(Path);await new Promise(resolve=>$('#locationSlider').promise().done(resolve));
       $SM.set('game.roadsideSeen',WorldRoadStories.entries.map(entry=>entry.id));depart();await settle();location('J');
@@ -1206,6 +1230,29 @@ async function port() {
       return checks;
     })()`,120000);
     console.log(longQuestChecks.map(name=>'PASS: '+name).join('\n'));
+    const homeJournalChecks=await evaluate(`(async function(){
+      const checks=[],check=(ok,label)=>{if(!ok)throw Error(label);checks.push(label);};
+      Engine.travelTo(Path);await new Promise(resolve=>$('#locationSlider').promise().done(resolve));
+      const before=JSON.stringify(State);$('#longQuestJournalButton').trigger('click');
+      check($('.longQuestReport').length===1,'preparation button opens the delivered-quest journal '+JSON.stringify({button:$('#longQuestJournalButton').length,module:Engine.activeModule.name,lock:Engine.keyLock,event:Events.activeEvent()&&Events.activeEvent().title,api:!!window.LongQuestJournal}));
+      const count=LongQuests.saved().npc.stage;
+      check($('.longQuestReport .longQuestHistoryCard').length>=count,'all delivered chapter records are reachable');
+      $('.longQuestReport .longQuestHistoryCard').prop('open',true);
+      const desc=$('.longQuestReport #description')[0];desc.scrollTop=desc.scrollHeight;
+      check(desc.scrollTop>0,'long history can scroll to the last record');
+      check(JSON.stringify(State)===before,'opening and reading the journal never saves, awards, or changes supplies');
+      const progress=JSON.stringify([$SM.get('game.longQuests'),$SM.get('game.roadsideSeen'),$SM.get('outfit')]);
+      $('#closeLongQuestJournal').trigger('click');
+      for(let i=0;i<100&&Events.activeEvent();i++)await new Promise(resolve=>setTimeout(resolve,30));
+      check(JSON.stringify([$SM.get('game.longQuests'),$SM.get('game.roadsideSeen'),$SM.get('outfit')])===progress,'closing the journal preserves delivered progress and outfit while normal game timers continue');
+      return checks;
+    })()`);
+    console.log(homeJournalChecks.map(name=>'PASS: '+name).join('\n'));
+    await evaluate('LongQuestJournal.show()');
+    for(const dark of [false,true])await checkDialogTheme('.longQuestReport',dark);
+    const journalShot=await page('Page.captureScreenshot',{format:'png'});
+    const journalFilename=path.join(profile,'long-quest-home-journal.png');fs.writeFileSync(journalFilename,Buffer.from(journalShot.data,'base64'));console.log('SCREENSHOT: '+journalFilename);
+    await evaluate(`(async function(){ $('#closeLongQuestJournal').trigger('click');for(let i=0;i<100&&Events.activeEvent();i++)await new Promise(resolve=>setTimeout(resolve,30));Engine.travelTo(Room);await new Promise(resolve=>$('#locationSlider').promise().done(resolve));})()`);
     const blueprintStateBackup = await evaluate('JSON.stringify(State)');
     const blueprintChecks = await evaluate(`(async function() {
       const checks=[],check=(ok,label)=>{if(!ok) throw Error(label);checks.push(label);};

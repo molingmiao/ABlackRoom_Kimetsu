@@ -84,18 +84,49 @@ var LongQuests = {
   tile: function() {return World.state && World.curPos ? String(World.state.map[World.curPos[0]][World.curPos[1]]).charAt(0) : '';},
   target: function(stage) {
     var data = LongQuests.stages[stage], run = LongQuests.run();if (!data) return null;
-    if (['D','R'].indexOf(data.tile) < 0 || !run) return data.tile;
+    if (['D','R'].indexOf(data.tile) < 0) return data.tile;
     // Ordinary towns become P after clearing. Keep the current-site handoff,
     // and give fully cleared legacy maps a hub fallback rather than a dead end.
-    var last = run.lastTowns[data.tile];
+    var last = run && run.lastTowns[data.tile];
     if (last && LongQuests.tile() === 'P' && last[0] === World.curPos[0] && last[1] === World.curPos[1]) return 'P';
-    var remains = World.state.map.some(function(row){return Array.isArray(row) && row.some(function(cell){return String(cell).charAt(0) === data.tile;});});
+    var map = run ? World.state.map : $SM.get('game.world.map');
+    if (!Array.isArray(map)) return data.tile;
+    var remains = map.some(function(row){return Array.isArray(row) && row.some(function(cell){return String(cell).charAt(0) === data.tile;});});
     return remains ? data.tile : 'N';
   },
   destination: function(stage) {
     var data = LongQuests.stages[stage];if (!data) return '调查已结案';
     var target = LongQuests.target(stage);
     return target === data.tile ? data.place : target === 'P' ? '原地调查（刚清理的' + data.place + '）' : '无名渡口 N（旧城镇已清理，隐转送调查记录）';
+  },
+  travelPreview: function() {
+    var run = LongQuests.run(), inWorld = !!run && Engine.activeModule === World && !World.dead;
+    var data = inWorld ? run.data : LongQuests.saved(), stage = data.npc.stage;
+    if (!LongQuests.stages[stage]) return null;
+    var target = LongQuests.target(stage), state = inWorld ? World.state : $SM.get('game.world') || {};
+    var origin = inWorld ? World.curPos : World.VILLAGE_POS, positions = [];
+    (state.mask || []).forEach(function(row,x){if (Array.isArray(row)) row.forEach(function(visible,y){
+      if (!visible) return;
+      var cell = state.map && state.map[x] && state.map[x][y];
+      if (typeof cell === 'string' && cell.charAt(0) === target) positions.push([x,y]);
+    });});
+    // A just-cleared town is the current handoff, not an arbitrary P outpost.
+    if (target === 'P' && inWorld) positions = [World.curPos.slice()];
+    positions.sort(function(a,b){return World.getDistance(a,origin)-World.getDistance(b,origin);});
+    var result = {destination:LongQuests.destination(stage),known:positions.length > 0};
+    if (!positions.length) {result.text = '尚未发现这一站；先探索并照亮地点，任务册才会显示方向。';return result;}
+    var pos = positions[0], dx = pos[0]-origin[0], dy = pos[1]-origin[1], directions = [];
+    if (dx) directions.push((dx > 0 ? '东' : '西') + Math.abs(dx) + ' 格');
+    if (dy) directions.push((dy > 0 ? '南' : '北') + Math.abs(dy) + ' 格');
+    var outward = World.getDistance(pos,origin), back = World.getDistance(pos,World.VILLAGE_POS);
+    var budget = World.travelBudget(outward+back,inWorld ? World.foodMove : 0,inWorld ? World.waterMove : 0,
+      World.MOVES_PER_FOOD * ($SM.hasPerk('breath no food') ? 2 : 1),World.MOVES_PER_WATER * ($SM.hasPerk('breath no water') ? 2 : 1));
+    result.outward = outward;result.returnDistance = back;result.food = budget.food;result.water = budget.water;
+    result.text = (inWorld ? '当前位置' : '庄园出发') + (directions.length ? '向' + directions.join('、') : '即为调查地点')
+      + '；到达约 ' + outward + ' 步，之后返庄园约 ' + back + ' 步。按普通地形估算总需熏肉 ' + budget.food + '、水 ' + budget.water + '。';
+    result.warning = '估算不计战斗、治疗与绕路；地标路段可能少消耗，补给点不保证可用。请另外留出余量。';
+    if (!inWorld && budget.water > World.getMaxWater()) result.warning += ' 当前携水上限 ' + World.getMaxWater() + '，不足估算用量，建议先升级水容器或规划已知补水点。';
+    return result;
   },
   canOpen: function() {return !!LongQuests.run() && Engine.activeModule === World && !World.dead && !Engine.keyLock && !Events.activeEvent();},
   valid: function(session) {
@@ -261,6 +292,9 @@ var LongQuests = {
     box.find('.longQuestNpc').text('失名的引路人：已交付 ' + saved.npc.stage + '/10' + (data.npc.stage > saved.npc.stage ? '，本趟推进至 ' + data.npc.stage + '/10' : '') + '。'
       + (data.npc.branch ? '路线：' + (data.npc.branch === 'mercy' ? '放过 · 封缚查证' : '击杀 · 物证追查') + '。' : '首次关键选择交付后锁定。')
       + (stage ? '下一步：' + api.destination(data.npc.stage) + ' · ' + stage.title + '。完成当地普通事件后再点调查。' : '调查已结束；未交付时请先安全返程。'));
+    var travel = api.travelPreview(), route = box.find('.longQuestTravel');
+    if (!route.length) route = $('<p>').addClass('longQuestTravel').insertAfter(box.find('.longQuestNpc'));
+    route.toggle(!!travel).text(travel ? travel.text + (travel.warning || '') : '');
     box.find('.longQuestAction').prop('disabled',!stage || api.target(data.npc.stage) !== api.tile() || !api.canOpen());
     box.find('.longQuestCorners').text('四方灯火：' + api.corners.map(function(c){return c.name + (data.corners.indexOf(c.tile) < 0 ? ' ○' : saved.corners.indexOf(c.tile) >= 0 ? ' ✓' : '（待交付）');}).join('；')
       + '。寻找地图四角的 1/2/3/4 房间；旧地标占位时移至同一角落最近的空地。全部交付后下一次入城获得成就，旧队士不失去资格。');

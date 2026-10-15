@@ -311,6 +311,7 @@ var Path = {
 		Path.createLoadoutPanel();
 		$('<button>').attr({id:'materialSourcesButton',type:'button'}).text('材料获取途径').on('click', CampGuide.showMaterialSources).appendTo(Path.scroller);
 		$('<button>').attr({id:'expeditionReportButton',type:'button'}).text('查看上次远征报告').on('click',function() {if (window.ExpeditionReport) ExpeditionReport.show();}).appendTo(Path.scroller);
+		$('<button>').attr({id:'longQuestJournalButton',type:'button'}).text('查看长线任务册与已交付剧情').on('click',function(){if(window.LongQuestJournal) LongQuestJournal.show();}).appendTo(Path.scroller);
 
 		// 补齐配置与出发并排；补齐不会替换玩家选择的装备。
 		var buttonsRow = $('<div>').attr('id', 'pathButtonsRow').appendTo(this.scroller);
