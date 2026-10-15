@@ -470,6 +470,7 @@ var World = {
   },
 
   click: function(event) {
+    if (window.MobileUI && MobileUI.usesTouchControls()) return;
     var map = $('#map'),
       // measure clicks relative to the centre of the current location
       centreX = map.offset().left + map.width() * World.curPos[0] / (World.RADIUS * 2),
@@ -1096,6 +1097,7 @@ var World = {
         // 无限城中死亡：一并清理天赋 + 药水态 + 空面板
         try { if (window.Space) { Space.done = true; Space.clearTalents(); Space._potionEffect = null; Space._potionCharges = 0; Space.clearPillarTimers(); $('#spacePanel').empty().attr('style', ''); } } catch (e) { /* ignore */ }
         Engine.activeModule = Room;
+        if (window.MobileUI) MobileUI.sync();
         $('div.headerButton').removeClass('selected');
         Room.tab.addClass('selected');
         Engine.setTimeout(function(){
@@ -1165,6 +1167,7 @@ var World = {
     Engine.tabNavigation = true;
     Engine.keyLock = false;
     Path.onArrival();
+    if (window.MobileUI) MobileUI.sync();
     Engine.restoreNavigation = true;
     World.updateTravelGuide();
     return true;
@@ -1362,6 +1365,7 @@ var World = {
     $('div#bagspace-world > div').empty();
     World.updateSupplies();
     $('#bagspace-world').width($('#map').width());
+    if (window.MobileUI) MobileUI.sync();
   },
 
   setTitle: function() {

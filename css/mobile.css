@@ -1,0 +1,73 @@
+.endingCredits { max-width: 540px; margin: 24px auto; padding: 18px; border: 1px solid #888; line-height: 1.7; text-align: left; }
+.endingCredits h2 { font-size: 20px; margin: 0 0 10px; }
+.endingCredits dl { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 18px; }
+.endingCredits dd { margin: 0; font-weight: bold; }
+.endingSignature { text-align: right; }
+.outro, .endGame { color: inherit; }
+#mobileWorldControls { display: none; }
+
+@media (max-width: 760px) {
+  html, body { height: auto; min-height: 100%; }
+  body { font-size: 16px; padding-bottom: calc(64px + env(safe-area-inset-bottom)); }
+  body::after { content: ''; position: fixed; bottom: 0; left: 0; right: 0; height: calc(48px + env(safe-area-inset-bottom)); background: var(--mobile-footer-bg, #fff); border-top: 1px solid #888; z-index: 9; pointer-events: none; }
+  div#wrapper { box-sizing: border-box; width: 100%; padding: 12px; margin: 0; }
+  div#content { height: auto; overflow: visible; }
+  div#outerSlider, div#locationSlider { position: static; width: 100% !important; }
+  div#outerSlider > div, div.location { box-sizing: border-box; width: 100% !important; height: auto; float: none; overflow: visible; }
+  #locationSlider > .location, div#outerSlider > #worldPanel, div#outerSlider > #spacePanel { display: none; }
+  #locationSlider > .mobile-active-panel, div#outerSlider > .mobile-active-panel { display: block; }
+  body[data-active-panel="worldPanel"] #main, body[data-active-panel="spacePanel"] #main { display: none; }
+  div#outerSlider > #worldPanel, #spacePanel { position: static !important; max-height: none; }
+  div#header { display: flex; gap: 6px; height: auto; overflow-x: auto; padding-bottom: 12px; }
+  div.headerButton { flex: 0 0 auto; float: none; margin: 0; padding: 10px 8px; min-height: 24px; }
+  div.button, button { box-sizing: border-box; min-height: 44px; touch-action: manipulation; }
+  input, select, textarea { font-size: 16px; max-width: 100%; box-sizing: border-box; }
+  div#buildBtns, div#craftBtns, div#buyBtns, div#workers, div#village, div#perks, div#blueprints {
+    position: relative; top: auto !important; left: auto; right: auto; width: auto; margin: 22px 0;
+  }
+  div#buildBtns, div#craftBtns, div#buyBtns, #fabricateButtons { display: flex; flex-wrap: wrap; gap: 8px; }
+  div#buildBtns:before, div#craftBtns:before, div#buyBtns:before, #fabricateButtons:before { flex-basis: 100%; }
+  div#buildBtns .button, div#craftBtns .button, div#buyBtns .button, #fabricateButtons .button { width: calc(50% - 4px) !important; margin: 0; }
+  /* Keep the shared warehouse accessible when its desktop parent is inactive. */
+  #locationSlider > #roomPanel:not(.mobile-active-panel) { display: block; }
+  #roomPanel:not(.mobile-active-panel) > :not(#storesContainer) { display: none; }
+  #locationSlider { display: flex; flex-direction: column; }
+  #locationSlider > #roomPanel:not(.mobile-active-panel) { order: 2; }
+  #locationSlider > #roomPanel.mobile-active-panel { display: flex; flex-direction: column; }
+  div#storesContainer { position: static; margin: 24px 0; }
+  #roomPanel.mobile-active-panel > #storesContainer { order: 20; }
+  div#stores, div#weapons { box-sizing: border-box; width: 100%; }
+  #suppliesRow { flex-direction: column; gap: 24px; }
+  #outfitting, #equipDoll { box-sizing: border-box; max-width: 100%; }
+  #pathScroller, .forgeWorkbench { width: 100%; max-height: none; overflow: visible; box-sizing: border-box; }
+  .castleStylePicker { max-height: none; }
+  .castleStyleOptions, .worldStoryList { grid-template-columns: 1fr; }
+  div#notifications { position: relative; top: auto; left: auto; height: 140px; width: 100%; margin-top: 20px; overflow-y: auto; }
+  #notifyGradient { display: none; }
+  .menu { max-height: 44px; bottom: env(safe-area-inset-bottom); }
+  .menu:not(.open) { max-height: 44px; }
+  .menu .menuToggle { padding: 12px; }
+  .menu:not(.open):hover { max-height: 44px; }
+  .menu.open { max-height: 70vh; overflow-y: auto; background: #fff; color: #222; }
+  .menu.open span { padding: 5px 8px; }
+  #langSwitcher { bottom: calc(12px + env(safe-area-inset-bottom)); }
+  .floorExitBtn { position: relative; top: auto; right: auto; display: inline-block; margin-top: 10px; min-height: 44px; padding: 10px; box-sizing: border-box; }
+  .eventPanel { box-sizing: border-box; position: fixed; left: 12px !important; top: 5dvh !important; width: calc(100vw - 24px) !important; padding: 16px; max-height: 90dvh; overflow-y: auto; }
+  .eventPanel:before { display: none; }
+  .eventPanel .eventTitle { position: relative; top: auto; margin-bottom: 12px; }
+  .eventPanel #description { max-height: none; }
+  .eventPanel #buttons { display: flex; flex-wrap: wrap; gap: 8px; }
+  .eventPanel #buttons > .button { width: calc(50% - 4px) !important; float: none; margin: 0; }
+  #dropMenu > div { min-height: 44px; box-sizing: border-box; padding: 10px; }
+  #achievementsPanel, #castleReportPanel { box-sizing: border-box; max-width: calc(100vw - 24px); }
+  .expeditionMetrics { grid-template-columns: 1fr; }
+  #worldOuter { display: block; max-width: 100%; overflow-x: auto; touch-action: pan-x pan-y; }
+  #bagspace-world { box-sizing: border-box; max-width: 100%; height: auto; min-height: 88px; }
+  #mobileWorldControls { display: flex; gap: 8px; margin: 12px 0; }
+  #mobileWorldControls button { flex: 1; color: inherit; background: transparent; border: 1px solid currentColor; }
+  .outroContainer, .centerCont { box-sizing: border-box; width: 100%; margin: 24px 0; padding: 12px; left: auto; }
+  .endingCredits { box-sizing: border-box; max-width: 100%; }
+  .endGame { font-size: 26px; overflow-wrap: anywhere; }
+  .endingCredits dl { grid-template-columns: 1fr; gap: 2px; }
+  .endingCredits dd { margin-bottom: 8px; }
+}

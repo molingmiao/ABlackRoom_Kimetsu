@@ -106,6 +106,11 @@ async function port() {
     await page('Network.enable');
     await page('Network.setBlockedURLs', { urls: ['https://*'] });
     await page('Page.enable');
+    if(process.env.GAME_BROWSER_FOCUS==='mobile') {
+      await page('Emulation.setDeviceMetricsOverride',{width:390,height:844,deviceScaleFactor:1,mobile:true});
+      await page('Emulation.setTouchEmulationEnabled',{enabled:true});
+      await page('Emulation.setUserAgentOverride',{userAgent:'Mozilla/5.0 (Linux; Android 13) AppleWebKit/537.36 Chrome/120.0.0.0 Mobile Safari/537.36'});
+    }
     await page('Page.addScriptToEvaluateOnNewDocument', { source: "if (!localStorage.getItem('gameState')) localStorage.setItem('gameState', JSON.stringify({version:1.4,game:{prologue:{done:true}},playStats:{audioAlertShown:true}}));" });
     await page('Page.navigate', { url: 'http://127.0.0.1:' + server.address().port + '/index.html?lang=zh_cn' });
     let ready = false;
@@ -115,6 +120,89 @@ async function port() {
       await pause(100);
     }
     assert.ok(ready, 'game modules did not initialize');
+    if(process.env.GAME_BROWSER_FOCUS==='mobile') {
+      console.log(await evaluate(`(async function(){
+        const check=(ok,label)=>{if(!ok)throw Error(label);};
+        const fits=label=>check(document.documentElement.scrollWidth<=innerWidth+1,label+': horizontal overflow '+document.documentElement.scrollWidth+'/'+innerWidth);
+        clearTimeout(Events._eventTimeout);clearTimeout(Engine._incomeTimeout);
+        AudioEngine.playSound=AudioEngine.playBackgroundMusic=AudioEngine.playEventMusic=function(){};
+        check(!location.pathname.includes('Warning')&&MobileUI.usesTouchControls(),'real Android user agent enters game without warning');fits('opening');
+        check(document.getElementById('stokeButton').getBoundingClientRect().height>=44,'primary action has a finger-sized target');
+        $SM.set('game.builder.level',4,true);$SM.set('game.temperature.value',4,true);$SM.set('game.buildings.workshop',1,true);
+        $SM.setM('stores',{wood:200,teeth:10,'cured meat':30,medicine:5});Room.updateBuildButtons();fits('crafting');
+        check(document.getElementById('storesContainer').getBoundingClientRect().top>document.getElementById('stokeButton').getBoundingClientRect().bottom,'inventory does not bury primary actions');
+        if(!Path.panel)Path.init();Engine.travelTo(Path);await new Promise(resolve=>$('#locationSlider').promise().done(resolve));fits('preparation');
+        check(getComputedStyle(Room.panel[0]).display!=='none'&&getComputedStyle(document.getElementById('stokeButton')).display==='none','shared inventory remains available without inactive room actions');
+        if(!Fabricator.panel)Fabricator.init();Engine.travelTo(Fabricator);await new Promise(resolve=>$('#locationSlider').promise().done(resolve));fits('forge');
+        check(NichirinForge.open(),'touch forge dialog opens');let rect=document.getElementById('nichirinForgePanel').getBoundingClientRect();
+        check(rect.left>=0&&rect.right<=innerWidth&&rect.bottom<=innerHeight,'forge dialog fits phone');NichirinForge.close(true);
+        check(UpdateNotes.show(),'announcement opens');rect=Events.eventPanel()[0].getBoundingClientRect();check(rect.left>=0&&rect.right<=innerWidth&&rect.bottom<=innerHeight,'event dialog fits phone');$('#closeUpdateNotes').trigger('click');
+        for(let i=0;i<100&&Events.activeEvent();i++)await new Promise(resolve=>setTimeout(resolve,20));
+        Engine.travelTo(Path);await new Promise(resolve=>$('#locationSlider').promise().done(resolve));Path.outfit={'cured meat':5};
+        check(Path.embark(),'normal expedition starts on phone');fits('world');
+        check(getComputedStyle(document.getElementById('main')).display==='none','camp panels disappear during expedition');
+        check(document.querySelectorAll('#mobileWorldControls button').length===4,'world controls created after late map initialization');
+        const before=World.curPos.slice();World.state.map[before[0]][before[1]-1]='.';
+        document.querySelector('[aria-label="向北走一步"]').click();
+        check(World.curPos[1]===before[1]-1,'direction tap performs exactly one actual step');
+        Engine.swipeLeft({});check(World.curPos[0]===before[0],'scroll/swipe never causes extra travel');
+        Engine.keyLock=true;document.querySelector('[aria-label="向东走一步"]').click();Engine.keyLock=false;check(World.curPos[0]===before[0],'locked interaction blocks touch movement');
+        World.goHome();check(document.body.dataset.activePanel==='pathPanel'&&getComputedStyle(document.getElementById('main')).display!=='none','safe return restores preparation');fits('return');
+        const stock=JSON.stringify(State);Space._showEndingOptions('测试失败结算',false);check(!document.querySelector('.endingCredits'),'failure does not pretend to complete the game');$('.centerCont').remove();
+        Space._showEndingOptions('测试通关结算',true);check(document.querySelectorAll('.endingCredits dd').length===5,'victory includes all five credits');
+        check(Array.from(document.querySelectorAll('.endingCredits dd')).every(el=>el.textContent==='molingmiao'),'every credit belongs only to the author');
+        Space.showCredits($('.centerCont'));check(document.querySelectorAll('.endingCredits').length===1&&JSON.stringify(State)===stock,'credits are read-only and never duplicated');
+        return 'PASS: Android entry, narrow camp/crafting/preparation/forge/dialogs, safe touch map controls, return and author-only victory credits';
+      })()`));
+      for(const width of [320,375,430,760,1137]) {
+        await page('Emulation.setDeviceMetricsOverride',{width,height:844,deviceScaleFactor:1,mobile:width<761});
+        await pause(100);
+        await evaluate(`if(document.documentElement.scrollWidth>innerWidth+1)throw Error('credits overflow at '+innerWidth);`);
+      }
+      console.log('PASS: credits remain readable from 320 to 1137 CSS pixels');
+      await evaluate("$('.centerCont').remove();");
+      for(const width of [320,375,430,760]) {
+        await page('Emulation.setDeviceMetricsOverride',{width,height:844,deviceScaleFactor:1,mobile:true});await pause(100);
+        console.log(await evaluate(`(async function(){
+          const fits=label=>{if(document.documentElement.scrollWidth>innerWidth+1)throw Error(label+' overflow at '+innerWidth+': '+document.documentElement.scrollWidth);};
+          Engine.travelTo(Room);await new Promise(resolve=>$('#locationSlider').promise().done(resolve));fits('camp');
+          Engine.travelTo(Path);await new Promise(resolve=>$('#locationSlider').promise().done(resolve));fits('preparation');
+          Engine.travelTo(Fabricator);await new Promise(resolve=>$('#locationSlider').promise().done(resolve));fits('forge');
+          return 'PASS: camp, preparation and forge fit '+innerWidth+' CSS pixels';
+        })()`));
+      }
+      await page('Emulation.setDeviceMetricsOverride',{width:390,height:844,deviceScaleFactor:1,mobile:true});await pause(100);
+      await evaluate(`Engine.travelTo(Room);`);await pause(400);
+      await evaluate(`if(parseFloat(getComputedStyle(document.querySelector('.menu')).maxHeight)>44)throw Error('closed mobile menu must not cover crafting after dialog focus restoration');
+        if(document.querySelector('#buildBtns .button').getBoundingClientRect().width<150)throw Error('Chinese stylesheet must not override mobile two-column targets');`);
+      const camp=await page('Page.captureScreenshot',{format:'png'});fs.writeFileSync(path.join(profile,'mobile-camp.png'),Buffer.from(camp.data,'base64'));
+      console.log('SCREENSHOT: '+path.join(profile,'mobile-camp.png'));
+      console.log(await evaluate(`(async function(){
+        if(!Ship.panel)Ship.init();Engine.travelTo(Ship);await new Promise(resolve=>$('#locationSlider').promise().done(resolve));
+        $SM.set('game.spaceShip.crows',1,true);Path.outfit={'cured meat':3};
+        if(!Ship.descend()||Engine.activeModule!==Space||document.body.dataset.activePanel!=='spacePanel')throw Error('actual phone castle departure');
+        if(document.documentElement.scrollWidth>innerWidth+1||getComputedStyle(document.getElementById('main')).display!=='none')throw Error('castle must fit without camp');
+        const before=Space.currentFloor;Space.returnToShip();await new Promise(resolve=>setTimeout(resolve,400));
+        if(document.body.dataset.activePanel!=='shipPanel')throw Error('castle return must restore entrance');
+        return 'PASS: real phone castle entry and retreat restore the correct panels';
+      })()`));
+      console.log(await evaluate(`(async function(){
+        CastleReport.close();$.fx.off=true;
+        const timer=window.setTimeout;
+        window.setTimeout=function(callback,delay,...args){return timer(callback,[500,5500,10500,14000,17000].includes(delay)?0:delay,...args);};
+        try{Space.triggerGoodEnd();}finally{window.setTimeout=timer;}
+        for(let i=0;i<100&&!document.getElementById('end-btn');i++)await new Promise(resolve=>timer(resolve,10));
+        if(!document.getElementById('end-btn'))throw Error('actual victory must offer dawn ending');
+        document.getElementById('end-btn').click();
+        for(let i=0;i<100&&!document.querySelector('.endingCredits');i++)await new Promise(resolve=>timer(resolve,10));
+        if(!document.querySelector('.endingCredits')||document.querySelectorAll('.endingCredits dd').length!==5)throw Error('real good-end pipeline must reach author credits');
+        document.querySelector('.endingCredits').scrollIntoView();
+        return 'PASS: actual victory cinematic and dawn action reach the author-only credits';
+      })()`));
+      const shot=await page('Page.captureScreenshot',{format:'png'});fs.writeFileSync(path.join(profile,'ending-credits.png'),Buffer.from(shot.data,'base64'));
+      console.log('SCREENSHOT: '+path.join(profile,'ending-credits.png'));
+      assert.deepEqual(errors,[]);return;
+    }
     if(process.env.GAME_BROWSER_FOCUS==='reward-integrity') {
       console.log(await evaluate(`(async function(){
         const check=(ok,label)=>{if(!ok)throw Error(label);};

@@ -73,6 +73,7 @@ var Space = {
 
 		// 显示第一层
 		Space.showFloor();
+		if (window.MobileUI) MobileUI.sync();
 	},
 
 	setTitle: function() {
@@ -1990,6 +1991,7 @@ if (window.CastleReport) CastleReport.show();
 });
 Engine.activeModule = Ship;
 Ship.onArrival();
+if (window.MobileUI) MobileUI.sync();
 Button.cooldown($('#liftoffButton'));
 },
 
@@ -2038,20 +2040,20 @@ $('#content, #notifications').remove();
 var c = $('<div>').addClass('outroContainer').appendTo('body');
 window.setTimeout(function() {
 $('<div>').addClass('outro')
-.html('the Pillars stand in the ruins of the Infinity Castle.<br>battered, bleeding — but alive.')
+.html('众柱立于无限城的废墟之上。<br>伤痕累累，却仍然活着。')
 .appendTo(c).animate({ opacity: 1 }, 500);
 }, 500);
 window.setTimeout(function() {
 $('<div>').addClass('outro')
-.html('the sun climbs above the shattered corridors.<br>Muzan\'s blood demon art dissolves with him.')
+.html('朝阳照进崩塌的回廊。<br>无惨的血鬼术，随他一同消散。')
 .appendTo(c).animate({ opacity: 1 }, 500);
 }, 5500);
 window.setTimeout(function() {
-$('<div>').addClass('outro').text('no more demons will be born.')
+$('<div>').addClass('outro').text('不再有新的鬼诞生。')
 .appendTo(c).animate({ opacity: 1 }, 500);
 }, 10500);
 window.setTimeout(function() {
-$('<div>').addClass('outro').text('the age of demons is over.')
+$('<div>').addClass('outro').text('长夜结束了。')
 .appendTo(c).animate({ opacity: 1 }, 500);
 }, 14000);
 window.setTimeout(function() {
@@ -2062,14 +2064,14 @@ btn.addClass('disabled');
 c.animate({ opacity: 0 }, 5000, 'linear', function() {
 c.remove();
 Prestige.save();
-Space._showEndingOptions(_('the Demon King is slain. the dawn has come.'));
+Space._showEndingOptions(_('the Demon King is slain. the dawn has come.'), true);
 });
 }
 }).animate({ opacity: 1 }, 500).appendTo(c);
 }, 17000);
 },
 
-_showEndingOptions: function(msg) {
+_showEndingOptions: function(msg, isVictory) {
 $('<center>').addClass('centerCont').appendTo('body');
 if(msg) {
 $('<span>').addClass('endGame').text(msg)
@@ -2085,9 +2087,22 @@ $('<span>').addClass('endGame')
 .appendTo('.centerCont').animate({ opacity: 1 }, 1500);
 $('<br />').appendTo('.centerCont');
 $('<br />').appendTo('.centerCont');
+if (isVictory) Space.showCredits($('.centerCont'));
 $('<span>').addClass('endGame endGameOption').text(_('restart.'))
 .click(Engine.confirmDelete)
 .appendTo('.centerCont').animate({ opacity: 1 }, 1500);
+},
+
+showCredits: function(container) {
+if (container.find('.endingCredits').length) return;
+var card = $('<section>').addClass('endingCredits').attr('aria-label','通关答谢').appendTo(container);
+$('<h2>').text('写在天明之后').appendTo(card);
+$('<p>').text('谢谢你从紫藤庄园的第一点火光，一路走到这里。愿这趟旅程中的选择、相遇与坚持，在长夜结束后仍值得回想。').appendTo(card);
+var list = $('<dl>').appendTo(card);
+['改编制作','玩法与数值设计','剧情与支线编排','界面与体验打磨','测试与持续更新'].forEach(function(role) {
+$('<dt>').text(role).appendTo(list);$('<dd>').text('molingmiao').appendTo(list);
+});
+$('<p>').addClass('endingSignature').text('—— molingmiao，感谢游玩。').appendTo(card);
 },
 
 // ---- UTIL ----

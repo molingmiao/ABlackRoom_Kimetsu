@@ -136,10 +136,7 @@
         window.location = 'browserWarning.html';
       }
 
-      // Check for mobile
-      if(Engine.isMobile()) {
-        window.location = 'mobileWarning.html';
-      }
+      // Touch devices use the responsive layout rather than a blocking warning.
 
       Engine.disableSelection();
 
@@ -866,6 +863,7 @@
 
       Engine.activeModule = module;
       module.onArrival(diff);
+      if (window.MobileUI) MobileUI.sync();
       Notifications.printQueue(module);
     },
 
@@ -1064,24 +1062,28 @@
     },
 
     swipeLeft: function(e) {
+      if (window.MobileUI && MobileUI.usesTouchControls()) return;
       if(Engine.activeModule.swipeLeft) {
         Engine.activeModule.swipeLeft(e);
       }
     },
 
     swipeRight: function(e) {
+      if (window.MobileUI && MobileUI.usesTouchControls()) return;
       if(Engine.activeModule.swipeRight) {
         Engine.activeModule.swipeRight(e);
       }
     },
 
     swipeUp: function(e) {
+      if (window.MobileUI && MobileUI.usesTouchControls()) return;
       if(Engine.activeModule.swipeUp) {
         Engine.activeModule.swipeUp(e);
       }
     },
 
     swipeDown: function(e) {
+      if (window.MobileUI && MobileUI.usesTouchControls()) return;
       if(Engine.activeModule.swipeDown) {
         Engine.activeModule.swipeDown(e);
       }

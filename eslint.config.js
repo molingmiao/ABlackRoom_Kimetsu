@@ -22,6 +22,7 @@ const gameGlobals = {
 	LongQuests: 'writable',
 	LongQuestJournal: 'writable',
 	UIContext: 'writable',
+	MobileUI: 'writable',
 	Crafting: 'writable',
 	Ship: 'writable',
 	Space: 'writable',
