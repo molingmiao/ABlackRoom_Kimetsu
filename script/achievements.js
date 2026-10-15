@@ -273,15 +273,14 @@ var Achievements = {
 		var ach = Achievements._byId[id];
 		if (!ach) return;
 		if ($SM.get('achievements["' + id + '"]')) return;
-		$SM.set('achievements["' + id + '"]', true);
-		Notifications.notify(null, _('achievement unlocked: {0}', ach.title));
+		// Publish only after the completion flag, supplies and permanent bonuses agree.
+		$SM.set('achievements["' + id + '"]', true, true);
 		if (ach.reward) {
-			$SM.addM('stores', ach.reward);
+			$SM.addM('stores', ach.reward, true);
 			var msgs = [];
 			for (var k in ach.reward) {
 				msgs.push(_(k) + ' +' + ach.reward[k]);
 			}
-			if (msgs.length) Notifications.notify(null, _('rewards: ') + msgs.join(', '));
 		}
 		// 跨周目 buff 奏动：将 bonuses 叠加到 previous.legacy.bonuses
 		if (ach.bonuses && typeof Prestige !== 'undefined' && Prestige.addBonus) {
@@ -290,8 +289,14 @@ var Achievements = {
 				Prestige.addBonus(bn, ach.bonuses[bn]);
 				bmsgs.push(Achievements._bonusLabel(bn, ach.bonuses[bn]));
 			}
-			if (bmsgs.length) Notifications.notify(null, _('permanent boon: ') + bmsgs.join(', '));
 		}
+		Engine.saveGame();
+		$SM.fireUpdate('achievements');
+		if (ach.reward) $SM.fireUpdate('stores');
+		if (ach.bonuses) $SM.fireUpdate('previous.legacy.bonuses');
+		Notifications.notify(null, _('achievement unlocked: {0}', ach.title));
+		if (msgs && msgs.length) Notifications.notify(null, _('rewards: ') + msgs.join(', '));
+		if (bmsgs && bmsgs.length) Notifications.notify(null, _('permanent boon: ') + bmsgs.join(', '));
 	},
 
 	// 将 buff (名, 增量) 译为可读文本。整数 表示加成，小数 表示百分比
@@ -315,7 +320,7 @@ var Achievements = {
 		'combat':   '战斗',
 		'path':     '探索',
 		'training': '培养',
-		'prestige': '跨周目特赌'
+		'prestige': '跨周目传承'
 	},
 
 	showPanel: function() {

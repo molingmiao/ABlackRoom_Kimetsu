@@ -28,6 +28,7 @@ const context = {
     eventPanel: () => element
   }
 };
+context.window = context;
 vm.createContext(context);
 vm.runInContext(fs.readFileSync(path.join(__dirname, '../script/expedition_report.js'), 'utf8'), context);
 const report = context.ExpeditionReport;
@@ -132,4 +133,16 @@ const bounded = reloaded.finish('return', {outfit: many, unlocks: names, reason:
 assert.equal(Object.keys(bounded.returned).length, 80);
 assert.equal(bounded.unlocks.length, 12);
 assert.equal(bounded.reason, null);
+// Imported/older optional summaries remain readable, bounded and read-only.
+state['game.lastExpeditionReport']={version:1,outcome:'death',steps:-5,newTiles:Infinity,
+  unlocks:{length:1},diagnostics:{missingAmmo:'bad'},mapSaved:true,returned:{wood:3},durationSeconds:125};
+const malformedSnapshot=JSON.stringify(state);
+const repaired=reloaded.latest();
+assert.equal(repaired.mapSaved,false);assert.equal(repaired.steps,0);assert.equal(repaired.newTiles,0);
+assert.deepEqual(Array.from(repaired.unlocks),[]);assert.equal(repaired.returned.wood,3);
+assert.match(reloaded.lines(repaired).join(' '),/2 分 5 秒/);assert.equal(reloaded.show(),true);
+assert.equal(JSON.stringify(state),malformedSnapshot,'display normalization never rewrites the original save');
+context.UIContext={canInspect:()=>false};shown=null;
+assert.equal(reloaded.show(),false);assert.equal(shown,null,'cannot layer over a native dialog or keyboard lock');
+context.UIContext.canInspect=()=>true;assert.equal(reloaded.show(),true);
 console.log('PASS ordinary expedition reports: progress, net resources, death recovery, read-only review, reload and bounded summaries');

@@ -115,6 +115,42 @@ async function port() {
       await pause(100);
     }
     assert.ok(ready, 'game modules did not initialize');
+    if(process.env.GAME_BROWSER_FOCUS==='reward-integrity') {
+      console.log(await evaluate(`(async function(){
+        const check=(ok,label)=>{if(!ok)throw Error(label);};
+        clearTimeout(Events._eventTimeout);clearTimeout(Engine._incomeTimeout);
+        AudioEngine.playSound=AudioEngine.playBackgroundMusic=AudioEngine.playEventMusic=function(){};
+        const ach={id:'browserRewardAudit',title:'奖励事务测试',reward:{wood:5},bonuses:{woodGather:0.05}};
+        Achievements._byId[ach.id]=ach;$SM.set('stores.wood',10,true);
+        $SM.set('previous.legacy',{kills:500},true);Achievements.unlock(ach.id);
+        let saved=JSON.parse(localStorage.getItem('gameState'));
+        check(saved.achievements[ach.id]&&saved.stores.wood===15&&saved.previous.legacy.bonuses.woodGather===0.05,'achievement writes badge, supplies and bonus in the same actual localStorage save');
+        $SM.set('previous.stores',[20,4],true);check(Prestige.collectStores(),'collect inherited parcel');
+        saved=JSON.parse(localStorage.getItem('gameState'));
+        check(!saved.previous.stores.length&&saved.stores.wood===35&&saved.stores.fur===4,'parcel consumed in actual save');
+        Prestige.applyLegacy();saved=JSON.parse(localStorage.getItem('gameState'));
+        check(saved.stores.wood===85&&saved.previous.legacy.appliedTiers.tier4&&saved.character.perks['kehai dansha'],'milestone supplies and perks persist with completed tiers');
+        const stock=JSON.stringify(State.stores);Prestige.applyLegacy();check(!Prestige.collectStores()&&JSON.stringify(State.stores)===stock,'repeated rewards are no-ops');
+        ExpeditionReport.begin({});ExpeditionReport.finish('return',{outfit:{}});
+        check(Achievements.showPanel(),'open real achievement modal');check(!ExpeditionReport.show(),'expedition report cannot overlay achievements');
+        document.dispatchEvent(new KeyboardEvent('keydown',{key:'Escape',bubbles:true}));
+        check(!Engine.keyLock&&ExpeditionReport.show(),'report opens after closing achievements');
+        check(document.querySelector('.expeditionMetrics').textContent.includes('本次用时'),'duration is visible in real report');
+        $('#closeExpeditionReport').trigger('click');
+        return 'PASS: actual localStorage rewards, legacy milestones, report modal isolation and duration';
+      })()`));
+      await page('Page.reload',{ignoreCache:true});
+      for(let i=0;i<100;i++) {
+        if(await evaluate('!!(window.Engine && Engine.activeModule && window.Achievements && window.Prestige)'))break;
+        await pause(100);
+      }
+      console.log(await evaluate(`(function(){
+        if(!$SM.get('achievements.browserRewardAudit')||Prestige.getBonus('woodGather')!==0.05||$SM.get('stores.wood')!==85||!$SM.hasPerk('kehai dansha'))throw Error('reload must preserve bonuses, supplies and perks without duplicate grants');
+        if(Prestige.collectStores())throw Error('parcel must stay consumed after reload');
+        return 'PASS: real page reload preserves all rewards and never collects the parcel again';
+      })()`));
+      assert.deepEqual(errors,[]);return;
+    }
     if(process.env.GAME_BROWSER_FOCUS==='action-integrity') {
       const result=await evaluate(`(async function(){
         const check=(ok,label)=>{if(!ok)throw Error(label);};

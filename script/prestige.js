@@ -71,17 +71,22 @@ var Prestige = {
   
 	collectStores : function() {
 		var prevStores = $SM.get('previous.stores');
-		if(prevStores != null) {
+		if(Array.isArray(prevStores) && prevStores.length) {
 			var toAdd = {};
 			for(var i in this.storesMap) {
 				var s = this.storesMap[i];
-				toAdd[s.store] = prevStores[i];
+				var amount = prevStores[i];
+				if (Number.isFinite(amount) && amount > 0) toAdd[s.store] = Math.floor(amount);
 			}
-			$SM.addM('stores', toAdd);
-			
-			// Loading the stores clears em from the save
-			prevStores.length = 0;
+			// Consuming the parcel and receiving its contents is one saved transaction.
+			$SM.set('previous.stores', [], true);
+			$SM.addM('stores', toAdd, true);
+			Engine.saveGame();
+			$SM.fireUpdate('stores');
+			$SM.fireUpdate('previous.stores');
+			return true;
 		}
+		return false;
 	},
 
 	randGen : function(storeType) {
@@ -107,42 +112,37 @@ var Prestige = {
 
 	// 血脉传承：跨周目累计击杀里程碑。每个层级在新存档启动后只应用一次
 	LegacyTiers: [
-		{ threshold: 10,  key: 'tier1', name: 'Legacy I',   apply: function() {
-			$SM.add('stores.wood', 50);
-			Notifications.notify(null, _('legacy of fallen slayers — 50 wood at your gate.'));
-		}},
-		{ threshold: 50,  key: 'tier2', name: 'Legacy II',  apply: function() {
-			$SM.add('stores["cured meat"]', 20);
-			$SM.add('stores["wisteria charm"]', 2);
-			Notifications.notify(null, _('legacy of fallen slayers — supplies left at the wisteria gate.'));
-		}},
-		{ threshold: 200, key: 'tier3', name: 'Legacy III', apply: function() {
-			if (!$SM.hasPerk('breath no food')) $SM.addPerk('breath no food');
-			Notifications.notify(null, _('legacy of fallen slayers — their endurance lives on in you.'));
-		}},
-		{ threshold: 500, key: 'tier4', name: 'Legacy IV',  apply: function() {
-			$SM.add('stores["medicine"]', 5);
-			$SM.add('stores["wisteria charm"]', 5);
-			if (!$SM.hasPerk('kehai dansha')) $SM.addPerk('kehai dansha');
-			Notifications.notify(null, _('legacy of fallen slayers — a full caravan arrives in your name.'));
-		}}
+		{ threshold: 10, key: 'tier1', stores: {wood:50}, message: 'legacy of fallen slayers — 50 wood at your gate.' },
+		{ threshold: 50, key: 'tier2', stores: {'cured meat':20,'wisteria charm':2}, message: 'legacy of fallen slayers — supplies left at the wisteria gate.' },
+		{ threshold: 200, key: 'tier3', perk: 'breath no food', message: 'legacy of fallen slayers — their endurance lives on in you.' },
+		{ threshold: 500, key: 'tier4', stores: {medicine:5,'wisteria charm':5}, perk: 'kehai dansha', message: 'legacy of fallen slayers — a full caravan arrives in your name.' }
 	],
 
 	// 在新存档起步后调用：检查跨周目累计击杀是否达到某档，未应用过则应用一次
 	applyLegacy: function() {
 		var kills = $SM.get('previous.legacy.kills', true);
-		if (!kills || kills <= 0) return;
+		if (!Number.isFinite(kills) || kills <= 0) return;
 		var applied = $SM.get('previous.legacy.appliedTiers') || {};
-		var dirty = false;
+		var earned = [];
 		for (var i = 0; i < Prestige.LegacyTiers.length; i++) {
 			var tier = Prestige.LegacyTiers[i];
 			if (kills >= tier.threshold && !applied[tier.key]) {
-				tier.apply();
 				applied[tier.key] = true;
-				dirty = true;
+				if (tier.stores) $SM.addM('stores', tier.stores, true);
+				if (tier.perk && !$SM.hasPerk(tier.perk)) {
+					$SM.set('character.perks["'+tier.perk+'"]', true, true);
+					$SM.set('character.perksNew["'+tier.perk+'"]', true, true);
+				}
+				earned.push(tier);
 			}
 		}
-		if (dirty) $SM.set('previous.legacy.appliedTiers', applied, true);
+		if (!earned.length) return;
+		$SM.set('previous.legacy.appliedTiers', applied, true);
+		Engine.saveGame();
+		$SM.fireUpdate('previous.legacy.appliedTiers');
+		$SM.fireUpdate('stores');
+		$SM.fireUpdate('character.perks');
+		earned.forEach(function(tier) { Notifications.notify(null, _(tier.message)); });
 	},
 
 	// winFight 调用：累计跨周目击杀

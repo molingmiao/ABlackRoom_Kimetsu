@@ -112,7 +112,24 @@ var ExpeditionReport = {
   },
   latest: function() {
     var report = $SM.get('game.lastExpeditionReport');
-    return report && report.version === 1 && (report.outcome === 'return' || report.outcome === 'death') ? ExpeditionReport._copy(report) : null;
+    if (!report || report.version !== 1 || (report.outcome !== 'return' && report.outcome !== 'death')) return null;
+    // Old/imported summaries are optional display data, never a resumable run.
+    var clean = {version:1,outcome:report.outcome,mapSaved:report.outcome === 'return'};
+    ['endedAt','durationSeconds','steps','farthestDistance','newTiles','newLocations'].forEach(function(key) {
+      clean[key] = key === 'endedAt' && Number.isFinite(report[key]) ? Math.max(0,report[key]) : ExpeditionReport._number(report[key]);
+    });
+    ['gained','reduced','returned'].forEach(function(key){clean[key] = ExpeditionReport._inventory(report[key]);});
+    clean.unlocks = ExpeditionReport._names(report.unlocks);
+    clean.roadNotes = ExpeditionReport._names(report.roadNotes).slice(0,3);
+    clean.reason = ['food','water','combat'].indexOf(report.reason) >= 0 ? report.reason : null;
+    var diagnostic = report.diagnostics || {};
+    clean.diagnostics = {unarmed:diagnostic.unarmed === true,missingAmmo:ExpeditionReport._names(diagnostic.missingAmmo),
+      healingRemaining:ExpeditionReport._number(diagnostic.healingRemaining)};
+    return clean;
+  },
+  duration: function(report) {
+    var seconds = Math.floor(ExpeditionReport._number(report.durationSeconds));
+    return Math.floor(seconds / 60) + ' 分 ' + (seconds % 60) + ' 秒';
   },
   _format: function(values) {
     var names = Object.keys(ExpeditionReport._inventory(values));
@@ -136,6 +153,7 @@ var ExpeditionReport = {
     var lines = [
       report.outcome === 'death' ? '本次倒下：地图变化未保存，剩余背包已归还仓库。' : '已返回庄园：地图进展已保存，剩余背包已归还仓库。',
       '行程：' + report.steps + ' 步；最远距离 ' + report.farthestDistance + '。',
+      '本次用时：' + ExpeditionReport.duration(report) + '。',
       '新照亮地图：' + report.newTiles + ' 格；新访问地点：' + report.newLocations + ' 处。' + (report.mapSaved ? '这些地图变化已保存。' : '这些地图变化未保存，下次需要重新探索。'),
       '本次解锁：' + (report.unlocks.length ? report.unlocks.map(function(item) { return _(item); }).join('、') : '无'),
       '背包净增加：' + ExpeditionReport._format(report.gained),
@@ -147,6 +165,7 @@ var ExpeditionReport = {
     return lines.concat(ExpeditionReport.suggestions(report));
   },
   show: function() {
+    if (window.UIContext && !UIContext.canInspect()) return false;
     var report = ExpeditionReport.latest();
     if (!report || typeof Events === 'undefined' || Events.activeEvent()) return false;
     if (typeof Engine !== 'undefined' &&
@@ -178,7 +197,8 @@ var ExpeditionReport = {
     var progress = section('探索进展', 'expeditionProgress');
     var metrics = $('<div>').addClass('expeditionMetrics').appendTo(progress);
     [['行程', report.steps + ' 步'], ['最远距离', report.farthestDistance + ' 格'],
-      ['新照亮地图', report.newTiles + ' 格'], ['新访问地点', report.newLocations + ' 处']].forEach(function(metric) {
+      ['新照亮地图', report.newTiles + ' 格'], ['新访问地点', report.newLocations + ' 处'],
+      ['本次用时', ExpeditionReport.duration(report)]].forEach(function(metric) {
       var row = $('<div>').appendTo(metrics);
       $('<span>').text(metric[0]).appendTo(row);
       $('<strong>').text(metric[1]).appendTo(row);
